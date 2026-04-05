@@ -1,0 +1,126 @@
+# ===========================================================================
+# Vantag docker-compose.yml
+# ===========================================================================
+# Development (x86) and edge-simulation deployment.
+#
+# Usage:
+#   docker compose up --build              # start all services
+#   docker compose up vantag-backend       # start only the backend
+#   docker compose down -v                 # stop and remove volumes
+#
+# Required environment variables (copy .env.example → .env and fill in):
+#   VANTAG_FACE_KEY   — Fernet encryption key for face embeddings
+#   VANTAG_JWT_SECRET — JWT signing secret
+# ===========================================================================
+version: '3.9'
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  vantag-net:
+    driver: bridge
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  snapshots:
+    driver: local
+  mosquitto-data:
+    driver: local
+  mosquitto-logs:
+    driver: local
+
+# ---------------------------------------------------------------------------
+# Services
+# ---------------------------------------------------------------------------
+services:
+
+  # -------------------------------------------------------------------------
+  # Mosquitto MQTT broker
+  # -------------------------------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: vantag-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"   # MQTT TCP
+      - "9001:9001"   # MQTT over WebSocket
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-logs:/mosquitto/log
+    networks:
+      - vantag-net
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "health", "-m", "ping", "-q", "0"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # -------------------------------------------------------------------------
+  # Vantag backend (FastAPI + inference pipeline)
+  # -------------------------------------------------------------------------
+  vantag-backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.edge
+    container_name: vantag-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount model weights so they can be updated without rebuilding the image.
+      - ../models:/app/models
+      # Mount config so cameras.yaml can be edited on the host.
+      - ../backend/config:/app/backend/config
+      # Persist snapshots and PDF reports across container restarts.
+      - snapshots:/app/snapshots
+    environment:
+      - VANTAG_ENV=development
+      - VANTAG_FACE_KEY=${VANTAG_FACE_KEY}
+      - VANTAG_JWT_SECRET=${VANTAG_JWT_SECRET:-change-me-in-development}
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    networks:
+      - vantag-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    # Limit resource consumption on developer machines.
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+
+  # -------------------------------------------------------------------------
+  # Vantag frontend (React dashboard served via Nginx)
+  # -------------------------------------------------------------------------
+  vantag-frontend:
+    build:
+      context: ../frontend/web
+      dockerfile: Dockerfile
+    container_name: vantag-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      vantag-backend:
+        condition: service_healthy
+    networks:
+      - vantag-net
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000/ws
+      - VITE_MQTT_WS_URL=ws://localhost:9001

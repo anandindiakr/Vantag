@@ -1,0 +1,107 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+.installed.cfg
+*.egg-info
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+secrets.yaml
+secrets.json
+
+# Model weights and TRT engines (too large for git)
+models/weights/*.pt
+models/weights/*.engine
+models/weights/*.onnx
+models/export/__pycache__/
+
+# Node / React / Expo
+node_modules/
+frontend/web/node_modules/
+frontend/mobile/node_modules/
+frontend/web/dist/
+frontend/web/build/
+frontend/mobile/.expo/
+frontend/mobile/android/
+frontend/mobile/ios/
+frontend/mobile/.expo-shared/
+*.lock
+!package-lock.json
+
+# Snapshots & generated media
+snapshots/
+*.jpg
+*.jpeg
+*.png
+*.mp4
+*.avi
+*.ts
+!frontend/**/*.ts
+!frontend/**/*.tsx
+!tests/**/*.ts
+
+# DOCX generation temp
+_docgen/
+*.docx
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+.dockerignore
+
+# TensorRT / CUDA artifacts
+*.trt
+*.plan
+*.cache
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb

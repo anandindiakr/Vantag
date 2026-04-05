@@ -1,0 +1,72 @@
+# backend/webhooks/webhooks.yaml
+# ================================
+# Vantag outbound webhook subscription configuration.
+#
+# Supported connectors: slack | teams | twilio | generic
+#
+# Severity thresholds: LOW | MEDIUM | HIGH
+#   Only events at or above the threshold are dispatched.
+#
+# Event types (use "*" to match all):
+#   sweeping, dwell, empty_shelf, watchlist_match, queue,
+#   accident, staff_alert, tamper, pos_anomaly
+
+webhooks:
+  - id: slack-high-alerts
+    name: "Slack High Alerts"
+    connector: slack
+    url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    event_types:
+      - sweeping
+      - watchlist_match
+      - tamper
+    severity_threshold: HIGH
+
+  - id: slack-pos-anomalies
+    name: "Slack POS Anomalies"
+    connector: slack
+    url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    event_types:
+      - pos_anomaly
+    severity_threshold: MEDIUM
+
+  - id: teams-security-channel
+    name: "Teams Security Channel"
+    connector: teams
+    url: "https://YOUR-ORG.webhook.office.com/webhookb2/YOUR-TEAMS-WEBHOOK-URL"
+    event_types:
+      - accident
+      - tamper
+      - watchlist_match
+    severity_threshold: HIGH
+
+  - id: sms-emergency
+    name: "SMS Emergency"
+    connector: twilio
+    event_types:
+      - accident
+      - tamper
+    severity_threshold: HIGH
+    twilio_account_sid: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    twilio_auth_token: "your_twilio_auth_token_here"
+    twilio_from: "+15551234567"
+    twilio_to: "+15559876543"
+
+  - id: generic-webhook
+    name: "Custom System"
+    connector: generic
+    url: "https://your-system.com/api/vantag-events"
+    event_types:
+      - "*"
+    severity_threshold: MEDIUM
+    headers:
+      Authorization: "Bearer your-api-token-here"
+      Content-Type: "application/json"
+    payload_template:
+      source: "vantag"
+      alert_type: "{{type}}"
+      severity: "{{severity}}"
+      store: "{{store_id}}"
+      camera: "{{camera_id}}"
+      occurred_at: "{{timestamp}}"
+      message: "{{description}}"

@@ -1,0 +1,67 @@
+global:
+  mqtt_broker: "localhost"
+  mqtt_port: 1883
+  reconnect_backoff_max: 64          # seconds – exponential backoff ceiling
+  frame_buffer_size: 30              # max frames held per camera queue
+  risk_score_window_seconds: 60      # rolling window for risk aggregation
+
+cameras:
+  - id: "cam-01"
+    name: "Entrance – Main Door"
+    rtsp_url: "rtsp://admin:password@192.168.1.101:554/stream1"
+    location: "Ground Floor – Main Entrance"
+    resolution:
+      width: 1920
+      height: 1080
+    fps_target: 25
+    enabled: true
+    low_light_mode: false
+    zones:
+      - name: "entrance_gate"
+        points:
+          - [120, 80]
+          - [820, 80]
+          - [820, 600]
+          - [120, 600]
+      - name: "cash_register_area"
+        points:
+          - [900, 200]
+          - [1400, 200]
+          - [1400, 900]
+          - [900, 900]
+      - name: "exit_corridor"
+        points:
+          - [1450, 0]
+          - [1920, 0]
+          - [1920, 1080]
+          - [1450, 1080]
+    staff_zone_colors:
+      - "#FF6600"
+      - "#0099FF"
+
+  - id: "cam-02"
+    name: "Aisle 3 – Electronics"
+    rtsp_url: "rtsp://admin:password@192.168.1.102:554/stream1"
+    location: "Ground Floor – Electronics Aisle"
+    resolution:
+      width: 1280
+      height: 720
+    fps_target: 20
+    enabled: true
+    low_light_mode: true
+    zones:
+      - name: "high_value_shelf"
+        points:
+          - [0, 0]
+          - [640, 0]
+          - [640, 720]
+          - [0, 720]
+      - name: "aisle_walkway"
+        points:
+          - [640, 0]
+          - [1280, 0]
+          - [1280, 720]
+          - [640, 720]
+    staff_zone_colors:
+      - "#33CC33"
+      - "#CC3333"
