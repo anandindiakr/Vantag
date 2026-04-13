@@ -29,4 +29,47 @@
     background-color: rgba(100, 116, 139, 0.4);
     border-radius: 3px;
   }
+  .font-syne {
+    font-family: 'Syne', sans-serif;
+  }
+  .font-mono-alt {
+    font-family: 'Space Mono', monospace;
+  }
+  .font-body-alt {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
 }
+
+/* Landing page animations */
+@keyframes scan-line {
+  0%   { transform: translateY(-100%); opacity: 0.6; }
+  100% { transform: translateY(200vh); opacity: 0; }
+}
+@keyframes pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@keyframes blink-live {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.25; }
+}
+@keyframes drift-glow {
+  0%, 100% { transform: translate(0, 0)   scale(1); }
+  33%       { transform: translate(40px, -30px) scale(1.08); }
+  66%       { transform: translate(-20px, 20px) scale(0.95); }
+}
+@keyframes tick-count {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-scan-line     { animation: scan-line 6s linear infinite; }
+.animate-pulse-ring    { animation: pulse-ring 2s ease-out infinite; }
+.animate-blink-live    { animation: blink-live 1.4s ease-in-out infinite; }
+.animate-drift-glow    { animation: drift-glow 12s ease-in-out infinite; }
+.animate-fade-in-up    { animation: fade-in-up 0.6s ease forwards; }
+

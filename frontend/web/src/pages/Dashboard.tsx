@@ -157,7 +157,6 @@ export default function Dashboard() {
                   <RiskScoreCard
                     key={store.id}
                     store={store}
-                    riskScore={riskScores[store.id]}
                   />
                 ))}
               </div>

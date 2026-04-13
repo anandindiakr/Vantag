@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { useIncidents, useGenerateReport } from '../hooks/useApi';
+import { useIncidents, useGenerateReport, useStores } from '../hooks/useApi';
 import { Severity, EventType, Incident } from '../store/useVantagStore';
 
 type SortKey = 'ts' | 'severity' | 'riskScore';
@@ -25,16 +25,23 @@ const SEVERITY_ORDER: Record<Severity, number> = {
 };
 
 const EVENT_TYPE_LABELS: Record<EventType, string> = {
-  sweep:           'Sweep',
-  dwell:           'Dwell',
-  empty_shelf:     'Empty Shelf',
-  watchlist_match: 'Watchlist Match',
-  queue_alert:     'Queue Alert',
-  door_event:      'Door Event',
-  loitering:       'Loitering',
-  crowd:           'Crowd',
-  theft_attempt:   'Theft Attempt',
-  system:          'System',
+  sweep:               'Sweep',
+  dwell:               'Dwell',
+  empty_shelf:         'Empty Shelf',
+  watchlist_match:     'Watchlist Match',
+  queue_alert:         'Queue Alert',
+  door_event:          'Door Event',
+  loitering:           'Loitering',
+  crowd:               'Crowd',
+  theft_attempt:       'Theft Attempt',
+  system:              'System',
+  // New AI analyzers
+  shoplifting:         'Shoplifting',
+  inventory_movement:  'Inventory Move',
+  restricted_zone:     'Restricted Zone',
+  queue_length:        'Queue Breach',
+  fall_detection:      'Fall Detected',
+  tamper:              'Camera Tamper',
 };
 
 function SeverityBadge({ s }: { s: Severity }) {
@@ -62,7 +69,11 @@ export default function IncidentsPage() {
   const [typeFilter, setTypeFilter]   = useState<EventType | 'all'>('all');
   const [downloadingId, setDownloadingId]   = useState<string | null>(null);
 
-  const { data, isLoading, isFetching } = useIncidents(null, page);
+  // Collect all store IDs so we can aggregate incidents across them
+  const { data: stores = [] } = useStores();
+  const storeIds = useMemo(() => stores.map((s) => s.id).filter(Boolean), [stores]);
+
+  const { data, isLoading, isFetching } = useIncidents(null, page, storeIds);
   const { mutateAsync: generateReport } = useGenerateReport();
 
   const items: Incident[] = useMemo(() => {

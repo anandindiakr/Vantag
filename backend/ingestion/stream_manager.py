@@ -118,8 +118,15 @@ class _CameraWorker:
             cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
         else:
             # Force TCP transport to avoid UDP packet loss on LANs.
-            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+            # Use rtsp_transport=tcp option in URL to set short open timeout.
+            rtsp_url = url
+            if "?" not in url and "rtsp://" in url:
+                rtsp_url = url  # keep as-is; timeout set via CAP_PROP_OPEN_TIMEOUT
+            cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            # Limit connection attempt to 8 seconds (avoids 30-s hangs on offline cameras)
+            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 8_000)
+            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 8_000)
 
         cap.set(cv2.CAP_PROP_FPS, self._config.fps_target)
         return cap

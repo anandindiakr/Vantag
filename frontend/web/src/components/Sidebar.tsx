@@ -1,9 +1,10 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   AlertTriangle,
   Users,
-  Settings,
+  Camera,
+  LogOut,
   ShieldCheck,
   Wifi,
   WifiOff,
@@ -19,18 +20,24 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard',  to: '/',          icon: <LayoutDashboard size={20} /> },
+  { label: 'Dashboard',  to: '/dashboard',  icon: <LayoutDashboard size={20} /> },
+  { label: 'Cameras',    to: '/cameras',    icon: <Camera size={20} /> },
   { label: 'Incidents',  to: '/incidents',  icon: <AlertTriangle size={20} /> },
   { label: 'Watchlist',  to: '/watchlist',  icon: <Users size={20} /> },
-  { label: 'Settings',   to: '/settings',   icon: <Settings size={20} /> },
 ];
 
 export default function Sidebar() {
-  const location      = useLocation();
+  const navigate      = useNavigate();
   const wsConnected   = useVantagStore((s) => s.wsConnected);
   const mqttConnected = useVantagStore((s) => s.mqttConnected);
   const stores        = useVantagStore((s) => s.stores);
   const activeCount   = stores.filter((s) => s.active).length;
+
+  const handleLogout = () => {
+    localStorage.removeItem('vantag_token');
+    localStorage.removeItem('vantag_tenant');
+    navigate('/');
+  };
 
   return (
     <aside className="flex flex-col w-64 min-h-screen bg-vantag-card border-r border-slate-700/60 flex-shrink-0">
@@ -47,28 +54,23 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive =
-            item.to === '/'
-              ? location.pathname === '/'
-              : location.pathname.startsWith(item.to);
-
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={clsx(
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              clsx(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150',
                 isActive
                   ? 'bg-vantag-red/15 text-vantag-red ring-1 ring-vantag-red/30'
                   : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50'
-              )}
-            >
-              {item.icon}
-              {item.label}
-            </NavLink>
-          );
-        })}
+              )
+            }
+          >
+            {item.icon}
+            {item.label}
+          </NavLink>
+        ))}
       </nav>
 
       {/* Connection Status */}
@@ -126,9 +128,16 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="px-6 py-3 border-t border-slate-700/60">
-        <p className="text-xs text-slate-600">v2.0.0 · Vantag Platform</p>
+      {/* Logout + Footer */}
+      <div className="px-4 pb-4 space-y-2">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 transition-colors"
+        >
+          <LogOut size={16} />
+          Sign Out
+        </button>
+        <p className="text-xs text-slate-600 text-center">v2.0.0 · Vantag Platform</p>
       </div>
     </aside>
   );

@@ -1,0 +1,119 @@
+version: "3.9"
+
+# Vantag Malaysia (JagaJaga) — Production
+# Domain: my.vantag.io
+# Currency: MYR | Language: ms/en
+
+x-common-env: &common-env
+  REGION: "MY"
+  APP_NAME: "Vantag JagaJaga"
+  DOMAIN: "my.vantag.io"
+  TZ: "Asia/Kuala_Lumpur"
+  LOG_LEVEL: "INFO"
+
+services:
+  postgres_my:
+    image: postgres:16-alpine
+    container_name: vantag_postgres_my
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-vantag_my}
+    volumes:
+      - vantag_pg_my:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vantag_my
+
+  redis_my:
+    image: redis:7-alpine
+    container_name: vantag_redis_my
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - vantag_redis_my:/data
+    networks:
+      - vantag_my
+
+  mosquitto_my:
+    image: eclipse-mosquitto:2.0
+    container_name: vantag_mqtt_my
+    restart: always
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - vantag_mqtt_my:/mosquitto/data
+    networks:
+      - vantag_my
+
+  backend_my:
+    image: ghcr.io/vantag/backend:${IMAGE_TAG:-latest}
+    container_name: vantag_backend_my
+    restart: always
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@postgres_my:5432/${DB_NAME:-vantag_my}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis_my:6379
+      MQTT_HOST: mosquitto_my
+      MQTT_PORT: "1883"
+      SECRET_KEY: ${SECRET_KEY}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID_MY}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET_MY}
+      CORS_ORIGINS: "https://my.vantag.io"
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+    depends_on:
+      postgres_my:
+        condition: service_healthy
+      redis_my:
+        condition: service_started
+    networks:
+      - vantag_my
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8800/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend_my:
+    image: ghcr.io/vantag/frontend:${IMAGE_TAG:-latest}
+    container_name: vantag_frontend_my
+    restart: always
+    environment:
+      VITE_REGION: "MY"
+      VITE_APP_NAME: "Vantag JagaJaga"
+    networks:
+      - vantag_my
+
+  nginx_my:
+    image: nginx:1.27-alpine
+    container_name: vantag_nginx_my
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/malaysia.conf:/etc/nginx/conf.d/vantag.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      - backend_my
+      - frontend_my
+    networks:
+      - vantag_my
+
+networks:
+  vantag_my:
+    driver: bridge
+
+volumes:
+  vantag_pg_my:
+  vantag_redis_my:
+  vantag_mqtt_my:

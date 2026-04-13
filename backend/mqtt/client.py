@@ -99,6 +99,7 @@ class MQTTClient:
         self._lock = threading.Lock()
         self._connected = threading.Event()
         self._stop = threading.Event()
+        self._reconnecting = False  # guard: only one reconnect thread at a time
 
         self._client = paho.Client(client_id=client_id, protocol=paho.MQTTv311)
         if username:
@@ -120,6 +121,12 @@ class MQTTClient:
         need to block until the connection is established.
         """
         self._stop.clear()
+        # Let paho handle reconnection internally — this avoids the race-condition
+        # where multiple manual reconnect threads each call client.connect() with
+        # the same client_id, causing Mosquitto to kick off each previous session.
+        self._client.reconnect_delay_set(
+            min_delay=1, max_delay=int(self._backoff_max)
+        )
         self._client.loop_start()
         self._attempt_connect()
         logger.info(
@@ -264,15 +271,13 @@ class MQTTClient:
         if self._stop.is_set():
             return  # Intentional disconnect – do not reconnect.
 
-        logger.warning(
-            "MQTT disconnected unexpectedly | rc=%d | scheduling reconnect", rc
-        )
-        reconnect_thread = threading.Thread(
-            target=self._reconnect_loop,
-            name="mqtt-reconnect",
-            daemon=True,
-        )
-        reconnect_thread.start()
+        if rc != 0:
+            logger.warning(
+                "MQTT disconnected unexpectedly | rc=%d | paho will auto-reconnect",
+                rc,
+            )
+        # paho's loop_start() + reconnect_delay_set() handles reconnection
+        # automatically — no manual reconnect thread needed.
 
     def _on_message(
         self,
@@ -324,12 +329,16 @@ class MQTTClient:
     def _reconnect_loop(self) -> None:
         """Back-off reconnection loop running in a daemon thread."""
         backoff: float = 1.0
-        while not self._stop.is_set() and not self._connected.is_set():
-            logger.info(
-                "MQTT reconnecting in %.1fs | broker=%s", backoff, self._broker
-            )
-            self._stop.wait(timeout=backoff)
-            if self._stop.is_set():
-                break
-            self._attempt_connect()
-            backoff = min(backoff * 2, self._backoff_max)
+        try:
+            while not self._stop.is_set() and not self._connected.is_set():
+                logger.info(
+                    "MQTT reconnecting in %.1fs | broker=%s", backoff, self._broker
+                )
+                self._stop.wait(timeout=backoff)
+                if self._stop.is_set():
+                    break
+                self._attempt_connect()
+                backoff = min(backoff * 2, self._backoff_max)
+        finally:
+            with self._lock:
+                self._reconnecting = False

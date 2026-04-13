@@ -46,6 +46,8 @@ models/weights/*.pt
 models/weights/*.engine
 models/weights/*.onnx
 models/export/__pycache__/
+# Root-level duplicate weight file (use models/yolov8n.pt instead)
+/yolov8n.pt
 
 # Node / React / Expo
 node_modules/

@@ -52,6 +52,13 @@ from ..mqtt.client import MQTTClient
 from ..mqtt.door_controller import DoorController, door_router, set_controller
 from ..pos.pos_router import router as pos_router
 from ..webhooks.webhook_engine import WebhookEngine
+from ..db.database import init_db
+from .auth_router import auth_router
+from .onboarding_router import onboarding_router
+from .tenants_router import tenants_router
+from .edge_router import edge_router
+from .billing_router import billing_router
+from .camera_probe_router import camera_probe_router
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +153,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await _pipeline.start()
     logger.info("Vantag API ready.")
 
+    # Initialize SaaS database tables
+    try:
+        await init_db()
+        logger.info("SaaS database tables initialized.")
+    except Exception as exc:
+        logger.warning("DB init skipped (may already exist): %s", exc)
+
     # ------------------------------------------------------------------
     # Yield control to FastAPI.
     # ------------------------------------------------------------------
@@ -215,6 +229,12 @@ app.include_router(watchlist_router)
 app.include_router(audio_router)
 app.include_router(door_router)
 app.include_router(pos_router)
+app.include_router(auth_router)
+app.include_router(onboarding_router)
+app.include_router(tenants_router)
+app.include_router(edge_router)
+app.include_router(billing_router)
+app.include_router(camera_probe_router)
 
 # ---------------------------------------------------------------------------
 # Health check endpoint

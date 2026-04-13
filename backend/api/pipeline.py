@@ -47,6 +47,12 @@ import cv2
 import numpy as np
 
 from ..analyzers.tamper_detector import TamperDetector, TamperEvent
+from ..analyzers.shoplifting import ShopliftingDetector, ShopliftingEvent
+from ..analyzers.inventory_movement import InventoryMovementDetector, InventoryEvent
+from ..analyzers.restricted_zone import RestrictedZoneDetector, ZoneEntryEvent
+from ..analyzers.queue_length import QueueLengthAnalyzer, QueueEvent
+from ..analyzers.fall_detection import FallDetector, FallEvent
+from ..inference.yolo_engine import YOLOEngine, Detection
 from ..ingestion.camera_registry import CameraRegistry
 from ..ingestion.health_monitor import HealthMonitor
 from ..ingestion.stream_manager import StreamManager
@@ -78,6 +84,12 @@ _EVENT_WEIGHTS: Dict[str, float] = {
     "low_light": 5.0,
     "crowd_surge": 20.0,
     "object_left": 12.0,
+    # New AI analyzers
+    "shoplifting": 45.0,
+    "inventory_movement": 20.0,
+    "restricted_zone": 30.0,
+    "queue_length": 10.0,
+    "fall_detection": 50.0,
     "unknown": 5.0,
 }
 
@@ -97,14 +109,23 @@ def _score_to_severity(score: float) -> str:
 # ---------------------------------------------------------------------------
 
 
-class _StubAnalyzer:
-    """Placeholder for analyzers that have not yet been implemented."""
+class _LegacyAdapter:
+    """
+    Adapts a single-arg analyzer (``analyze(frame)``) to the 3-arg interface
+    ``analyze(frame, detections, timestamp) -> List`` expected by the pipeline.
+    """
 
-    def __init__(self, name: str) -> None:
-        self._name = name
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
 
-    def analyze(self, frame: np.ndarray) -> Optional[dict]:  # noqa: ARG002
-        return None
+    def analyze(
+        self,
+        frame: np.ndarray,
+        detections: List[Detection],
+        timestamp: float,
+    ) -> List[Any]:
+        result = self._inner.analyze(frame)
+        return [result] if result is not None else []
 
 
 # ---------------------------------------------------------------------------
@@ -159,8 +180,13 @@ class VantagPipeline:
         self._ws_broadcast: Optional[Callable[[dict], Any]] = ws_broadcast
 
         # ---- Per-camera analyzers ----
-        # Dict[camera_id, list-of-analyzers]
+        # Dict[camera_id, list-of-analyzers] – all expose analyze(frame, detections, timestamp) -> List
         self._analyzers: Dict[str, List[Any]] = {}
+
+        # ---- YOLO inference engines ----
+        # One shared engine (per global config); per-camera engines can be added later.
+        self._yolo_engine: Optional[YOLOEngine] = self._init_yolo(global_cfg)
+
         self._build_analyzers()
 
         # ---- Shared state (read by API routers) ----
@@ -186,24 +212,53 @@ class VantagPipeline:
         self._start_time = time.monotonic()
 
     # ------------------------------------------------------------------
+    # YOLO engine initialisation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _init_yolo(global_cfg: dict) -> Optional[YOLOEngine]:
+        """Initialise the shared YOLO inference engine from global config."""
+        model_path = global_cfg.get("yolo_model_path", "")
+        device = global_cfg.get("yolo_device", "cpu")
+        conf = float(global_cfg.get("yolo_conf_threshold", 0.45))
+        try:
+            engine = YOLOEngine(model_path=model_path, device=device, conf_threshold=conf)
+            logger.info("YOLOEngine initialised | model=%s device=%s", model_path, device)
+            return engine
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("YOLOEngine init failed (%s) – analyzers will run without detections.", exc)
+            return None
+
+    # ------------------------------------------------------------------
     # Analyzer construction
     # ------------------------------------------------------------------
 
     def _build_analyzers(self) -> None:
-        """Instantiate one analyzer stack per enabled camera."""
+        """Instantiate the full analyzer stack per enabled camera."""
         for cam in self.registry.all_cameras():
             if not cam.enabled:
                 continue
+
+            acfg = cam.analyzer_config  # raw dict from cameras.yaml
+
+            shoplifting_cfg = acfg.get("shoplifting", {})
+            inventory_cfg = acfg.get("inventory_movement", {})
+            restricted_cfg = acfg.get("restricted_zone", {})
+            queue_cfg = acfg.get("queue_length", {})
+            fall_cfg = acfg.get("fall_detection", {})
+
             self._analyzers[cam.id] = [
-                TamperDetector(camera_id=cam.id),
-                _StubAnalyzer("loitering_detector"),
-                _StubAnalyzer("queue_analyzer"),
-                _StubAnalyzer("crowd_analyzer"),
-                _StubAnalyzer("object_left_detector"),
+                # Legacy (1-arg) analyzer wrapped for uniform interface
+                _LegacyAdapter(TamperDetector(camera_id=cam.id)),
+                # New 3-arg analyzers
+                ShopliftingDetector(cam.id, shoplifting_cfg),
+                InventoryMovementDetector(cam.id, inventory_cfg),
+                RestrictedZoneDetector(cam.id, restricted_cfg),
+                QueueLengthAnalyzer(cam.id, queue_cfg),
+                FallDetector(cam.id, fall_cfg),
             ]
-        logger.info(
-            "Analyzers built | cameras=%d", len(self._analyzers)
-        )
+
+        logger.info("Analyzers built | cameras=%d", len(self._analyzers))
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -314,23 +369,34 @@ class VantagPipeline:
         Run the full analyzer stack on a single frame.
 
         Steps:
-        1. (Optional) Low-light enhancement – stub for now.
-        2. Run each analyzer; collect non-None events.
-        3. Update risk score for the store.
-        4. Cache annotated JPEG snapshot.
-        5. Update heatmap.
-        6. Broadcast events via WebSocket and MQTT.
+        1. (Optional) Low-light enhancement.
+        2. Run YOLO inference to get typed Detection objects.
+        3. Run each analyzer with (frame, detections, timestamp); collect events.
+        4. Update risk score for the store.
+        5. Cache annotated JPEG snapshot.
+        6. Update heatmap.
+        7. Broadcast events via WebSocket and MQTT.
         """
-        # 1. Low-light enhancement placeholder.
+        timestamp = time.time()
+
+        # 1. Low-light enhancement.
         enhanced = self._enhance_low_light(camera_id, frame)
 
-        # 2. Run analyzers.
+        # 2. YOLO inference (graceful fallback to empty list if engine unavailable).
+        detections: List[Detection] = []
+        if self._yolo_engine is not None:
+            try:
+                detections = self._yolo_engine.detect(enhanced)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("YOLO inference error | camera=%s error=%s", camera_id, exc)
+
+        # 3. Run analyzers – all expose analyze(frame, detections, timestamp) -> List.
         events: List[dict] = []
         analyzers = self._analyzers.get(camera_id, [])
         for analyzer in analyzers:
             try:
-                result = analyzer.analyze(enhanced)
-                if result is not None:
+                results = analyzer.analyze(enhanced, detections, timestamp)
+                for result in results:
                     ev = self._normalise_event(result, camera_id, store_id)
                     events.append(ev)
             except Exception as exc:  # noqa: BLE001
@@ -341,7 +407,7 @@ class VantagPipeline:
                     exc,
                 )
 
-        # 3. Update risk score.
+        # 4. Update risk score.
         if events:
             async with self._event_buffer_lock:
                 now_mono = time.monotonic()
@@ -492,6 +558,7 @@ class VantagPipeline:
         """
         Convert an analyzer result (dataclass or dict) to a canonical event dict.
         """
+        # ── TamperDetector ──────────────────────────────────────────────────
         if isinstance(raw, TamperEvent):
             return {
                 "incident_id": str(uuid.uuid4()),
@@ -504,11 +571,135 @@ class VantagPipeline:
                 "metadata": {
                     "tamper_type": raw.tamper_type,
                     "confidence": raw.confidence,
-                    "snapshot_b64": raw.frame_snapshot_b64[:64] + "...",  # truncate for memory
+                    "snapshot_b64": raw.frame_snapshot_b64[:64] + "...",
                 },
                 "acknowledged": False,
                 "snapshot_url": None,
             }
+
+        # ── ShopliftingDetector ─────────────────────────────────────────────
+        if isinstance(raw, ShopliftingEvent):
+            return {
+                "incident_id": str(uuid.uuid4()),
+                "type": "shoplifting",
+                "camera_id": camera_id,
+                "store_id": store_id,
+                "severity": raw.severity.upper(),
+                "timestamp": raw.timestamp,
+                "description": (
+                    f"Shoplifting detected – {raw.event_subtype} "
+                    f"(track #{raw.person_track_id}, {raw.items_involved} item(s))"
+                ),
+                "metadata": {
+                    "event_subtype": raw.event_subtype,
+                    "person_track_id": raw.person_track_id,
+                    "confidence": raw.confidence,
+                    "bbox": list(raw.bbox),
+                    "items_involved": raw.items_involved,
+                },
+                "acknowledged": False,
+                "snapshot_url": None,
+            }
+
+        # ── InventoryMovementDetector ───────────────────────────────────────
+        if isinstance(raw, InventoryEvent):
+            return {
+                "incident_id": str(uuid.uuid4()),
+                "type": "inventory_movement",
+                "camera_id": camera_id,
+                "store_id": store_id,
+                "severity": raw.severity.upper(),
+                "timestamp": raw.timestamp,
+                "description": (
+                    f"Inventory drop in '{raw.zone_label}': "
+                    f"{raw.previous_count} → {raw.current_count} "
+                    f"(−{raw.delta} items"
+                    + (", person present" if raw.person_present else "")
+                    + ")"
+                ),
+                "metadata": {
+                    "zone_label": raw.zone_label,
+                    "previous_count": raw.previous_count,
+                    "current_count": raw.current_count,
+                    "delta": raw.delta,
+                    "person_present": raw.person_present,
+                },
+                "acknowledged": False,
+                "snapshot_url": None,
+            }
+
+        # ── RestrictedZoneDetector ──────────────────────────────────────────
+        if isinstance(raw, ZoneEntryEvent):
+            return {
+                "incident_id": str(uuid.uuid4()),
+                "type": "restricted_zone",
+                "camera_id": camera_id,
+                "store_id": store_id,
+                "severity": raw.severity.upper(),
+                "timestamp": raw.timestamp,
+                "description": (
+                    f"Person entered restricted zone '{raw.zone_name}' "
+                    f"(track #{raw.person_track_id})"
+                ),
+                "metadata": {
+                    "zone_name": raw.zone_name,
+                    "person_track_id": raw.person_track_id,
+                    "confidence": raw.confidence,
+                    "bbox": list(raw.bbox),
+                },
+                "acknowledged": False,
+                "snapshot_url": None,
+            }
+
+        # ── QueueLengthAnalyzer ─────────────────────────────────────────────
+        if isinstance(raw, QueueEvent):
+            return {
+                "incident_id": str(uuid.uuid4()),
+                "type": "queue_length",
+                "camera_id": camera_id,
+                "store_id": store_id,
+                "severity": raw.severity.upper(),
+                "timestamp": raw.timestamp,
+                "description": (
+                    f"Queue '{raw.zone_label}' exceeded limit: "
+                    f"{raw.queue_length}/{raw.max_allowed} people "
+                    f"(est. wait {raw.estimated_wait_minutes} min)"
+                ),
+                "metadata": {
+                    "zone_label": raw.zone_label,
+                    "queue_length": raw.queue_length,
+                    "max_allowed": raw.max_allowed,
+                    "estimated_wait_minutes": raw.estimated_wait_minutes,
+                },
+                "acknowledged": False,
+                "snapshot_url": None,
+            }
+
+        # ── FallDetector ────────────────────────────────────────────────────
+        if isinstance(raw, FallEvent):
+            return {
+                "incident_id": str(uuid.uuid4()),
+                "type": "fall_detection",
+                "camera_id": camera_id,
+                "store_id": store_id,
+                "severity": raw.severity.upper(),
+                "timestamp": raw.timestamp,
+                "description": (
+                    f"Person fall detected (track #{raw.person_track_id}, "
+                    f"method={raw.method}, {raw.duration_frames} frames)"
+                ),
+                "metadata": {
+                    "person_track_id": raw.person_track_id,
+                    "method": raw.method,
+                    "confidence": raw.confidence,
+                    "bbox": list(raw.bbox),
+                    "duration_frames": raw.duration_frames,
+                },
+                "acknowledged": False,
+                "snapshot_url": None,
+            }
+
+        # ── Generic dict pass-through ────────────────────────────────────────
         if isinstance(raw, dict):
             raw.setdefault("incident_id", str(uuid.uuid4()))
             raw.setdefault("camera_id", camera_id)
@@ -517,13 +708,14 @@ class VantagPipeline:
             raw.setdefault("severity", "low")
             raw.setdefault("acknowledged", False)
             return raw
-        # Unknown type – wrap in a generic event.
+
+        # ── Unknown type ─────────────────────────────────────────────────────
         return {
             "incident_id": str(uuid.uuid4()),
             "type": "unknown",
             "camera_id": camera_id,
             "store_id": store_id,
-            "severity": "low",
+            "severity": "LOW",
             "timestamp": datetime.now(tz=timezone.utc),
             "description": str(raw),
             "metadata": {},

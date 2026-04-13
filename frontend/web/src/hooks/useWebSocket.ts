@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useVantagStore, VantagEvent, RiskScore, QueueStatus, DoorState } from '../store/useVantagStore';
 
-const WS_URL = 'ws://localhost:8000/ws/events';
+// Dynamically derive WS URL from the current page host so it works
+// in dev (Vite proxy → localhost:8800) and production (nginx → backend) alike.
+const _proto  = window.location.protocol === 'https:' ? 'wss' : 'ws';
+const WS_URL  = `${_proto}://${window.location.host}/ws/events`;
 const INITIAL_RECONNECT_DELAY = 1000;   // 1 s
 const MAX_RECONNECT_DELAY     = 30_000; // 30 s
 const MAX_RECONNECT_ATTEMPTS  = 20;

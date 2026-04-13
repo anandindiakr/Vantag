@@ -1,0 +1,64 @@
+# =============================================================================
+# Vantag — Infrastructure-only compose file
+# Runs Mosquitto MQTT broker + PostgreSQL for local development / live testing.
+# The backend and frontend run natively (not in Docker) for hot-reload.
+#
+# Usage:
+#   docker compose -f docker/docker-compose.infra.yml up -d
+#   docker compose -f docker/docker-compose.infra.yml down
+# =============================================================================
+version: '3.9'
+
+networks:
+  vantag-net:
+    driver: bridge
+
+volumes:
+  mosquitto-data:
+  mosquitto-logs:
+  postgres-data:
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Mosquitto MQTT broker — door locks, real-time events, edge device comms
+  # ---------------------------------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: vantag-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"   # MQTT TCP  (backend + edge devices)
+      - "9001:9001"   # MQTT over WebSocket (dashboard)
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-logs:/mosquitto/log
+    networks: [vantag-net]
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "vantag/health", "-m", "ping", "-q", "0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16 — persistent event storage, watchlist, reports
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: vantag-postgres
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: vantag
+      POSTGRES_USER: vantag
+      POSTGRES_PASSWORD: vantag_dev_pass
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [vantag-net]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "vantag", "-d", "vantag"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

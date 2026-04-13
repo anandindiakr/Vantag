@@ -61,7 +61,13 @@ export type EventType =
   | 'loitering'
   | 'crowd'
   | 'theft_attempt'
-  | 'system';
+  | 'system'
+  | 'shoplifting'
+  | 'inventory_movement'
+  | 'restricted_zone'
+  | 'queue_length'
+  | 'fall_detection'
+  | 'tamper';
 
 export interface VantagEvent {
   id: string;

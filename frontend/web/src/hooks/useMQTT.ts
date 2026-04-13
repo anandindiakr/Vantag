@@ -3,7 +3,9 @@ import mqtt, { MqttClient, IClientOptions } from 'mqtt';
 import toast from 'react-hot-toast';
 import { useVantagStore, DoorState } from '../store/useVantagStore';
 
-const MQTT_BROKER_URL  = 'ws://localhost:9001';
+// Mosquitto WebSocket listener on port 9001 (exposed by Docker).
+// Path /mqtt is the standard WebSocket path for Mosquitto 2.x.
+const MQTT_BROKER_URL  = 'ws://localhost:9001/mqtt';
 const DOOR_STATUS_TOPIC = 'vantag/+/doors/+/status';
 const DOOR_CMD_TOPIC    = (storeId: string, doorId: string) =>
   `vantag/${storeId}/doors/${doorId}/command`;

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LineChart,
@@ -5,13 +6,14 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import { MapPin, Camera, ChevronRight, AlertOctagon } from 'lucide-react';
+import { MapPin, Camera, ChevronRight, AlertOctagon, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
-import { Store, RiskScore, Severity } from '../store/useVantagStore';
+import { Store, Severity } from '../store/useVantagStore';
+import { useVantagStore } from '../store/useVantagStore';
+import { useRiskScore } from '../hooks/useApi';
 
 interface RiskScoreCardProps {
   store: Store;
-  riskScore?: RiskScore;
 }
 
 function severityColor(s: Severity): string {
@@ -36,10 +38,20 @@ function severityBorder(s: Severity): boolean {
   return s === 'HIGH' || s === 'CRITICAL';
 }
 
-export default function RiskScoreCard({ store, riskScore }: RiskScoreCardProps) {
-  const navigate  = useNavigate();
+export default function RiskScoreCard({ store }: RiskScoreCardProps) {
+  const navigate = useNavigate();
+
+  // Self-contained polling — each card fetches its own risk score every 10 s
+  const { data: riskScore, isLoading } = useRiskScore(store.id);
+
+  // Sync polled score into Zustand so the Dashboard alert banner stays current
+  const updateRiskScore = useVantagStore((s) => s.updateRiskScore);
+  useEffect(() => {
+    if (riskScore) updateRiskScore(riskScore.storeId, riskScore);
+  }, [riskScore, updateRiskScore]);
+
   const severity  = riskScore?.severity ?? 'LOW';
-  const score     = riskScore?.score ?? 0;
+  const score     = riskScore?.score    ?? 0;
   const isHigh    = severityBorder(severity);
 
   const sparkData = (riskScore?.history ?? [])
@@ -61,7 +73,7 @@ export default function RiskScoreCard({ store, riskScore }: RiskScoreCardProps) 
           ? 'border-vantag-red/60 animate-pulse-border'
           : 'border-slate-700/60'
       )}
-      onClick={() => navigate(`/store/${store.id}`)}
+      onClick={() => navigate(`/stores/${store.id}`)}
     >
       {/* HIGH badge indicator */}
       {isHigh && (
@@ -82,22 +94,29 @@ export default function RiskScoreCard({ store, riskScore }: RiskScoreCardProps) 
       </div>
 
       {/* Risk Score + Severity */}
-      <div className="flex items-end gap-3">
-        <div className={clsx('text-5xl font-extrabold tabular-nums leading-none', severityColor(severity))}>
-          {score}
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-slate-500">
+          <Loader2 size={18} className="animate-spin" />
+          <span className="text-sm">Loading risk…</span>
         </div>
-        <div className="flex flex-col gap-1 pb-0.5">
-          <span
-            className={clsx(
-              'text-xs font-semibold px-2 py-0.5 rounded border',
-              severityBg(severity)
-            )}
-          >
-            {severity}
-          </span>
-          <span className="text-xs text-slate-500">risk score</span>
+      ) : (
+        <div className="flex items-end gap-3">
+          <div className={clsx('text-5xl font-extrabold tabular-nums leading-none', severityColor(severity))}>
+            {score}
+          </div>
+          <div className="flex flex-col gap-1 pb-0.5">
+            <span
+              className={clsx(
+                'text-xs font-semibold px-2 py-0.5 rounded border',
+                severityBg(severity)
+              )}
+            >
+              {severity}
+            </span>
+            <span className="text-xs text-slate-500">risk score</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Sparkline */}
       <div className="h-14">
@@ -139,7 +158,7 @@ export default function RiskScoreCard({ store, riskScore }: RiskScoreCardProps) 
           <span>{store.cameraCount} cameras</span>
         </div>
         <button
-          onClick={(e) => { e.stopPropagation(); navigate(`/store/${store.id}`); }}
+          onClick={(e) => { e.stopPropagation(); navigate(`/stores/${store.id}`); }}
           className="flex items-center gap-1 text-xs font-medium text-vantag-red hover:text-red-400 transition-colors"
         >
           View Store <ChevronRight size={13} />

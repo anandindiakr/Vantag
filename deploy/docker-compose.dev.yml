@@ -1,0 +1,97 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: vantag_postgres_dev
+    environment:
+      POSTGRES_USER: vantag
+      POSTGRES_PASSWORD: vantag_dev_password
+      POSTGRES_DB: vantag_dev
+    ports:
+      - "5434:5432"
+    volumes:
+      - vantag_pg_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vantag"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Mosquitto MQTT ──────────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: vantag_mqtt_dev
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - vantag_mqtt_dev:/mosquitto/data
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/version", "-C", "1", "-i", "healthcheck", "-W", "3"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Redis (alert dedup + session cache) ────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: vantag_redis_dev
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - vantag_redis_dev:/data
+
+  # ── Backend API ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ../../
+      dockerfile: vantag/backend/Dockerfile
+    container_name: vantag_backend_dev
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://vantag:vantag_dev_password@postgres:5432/vantag_dev
+      - REDIS_URL=redis://redis:6379
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - REGION=IN
+      - RAZORPAY_KEY_ID=
+      - RAZORPAY_KEY_SECRET=
+      - CORS_ORIGINS=http://localhost:3000
+      - LOG_LEVEL=DEBUG
+    ports:
+      - "8800:8800"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ../../vantag/backend:/app/backend
+    command: ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8800", "--reload"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8800/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Frontend (dev Vite) ─────────────────────────────────────
+  frontend:
+    image: node:20-alpine
+    container_name: vantag_frontend_dev
+    working_dir: /app
+    environment:
+      - VITE_API_URL=http://localhost:8800
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../../vantag/frontend/web:/app
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0"]
+
+volumes:
+  vantag_pg_dev:
+  vantag_mqtt_dev:
+  vantag_redis_dev:

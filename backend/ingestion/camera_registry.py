@@ -53,6 +53,8 @@ class CameraConfig:
     low_light_mode: bool
     zones: List[ZoneConfig]
     staff_zone_colors: List[str]
+    analyzer_config: Dict = field(default_factory=dict)
+    """Optional per-camera config for the AI analyzer stack (zones, thresholds, etc.)."""
 
 
 # ---------------------------------------------------------------------------
@@ -225,4 +227,5 @@ class CameraRegistry:
             low_light_mode=bool(raw["low_light_mode"]),
             zones=zones,
             staff_zone_colors=[str(c) for c in colors],
+            analyzer_config=dict(raw.get("analyzer_config", {})),
         )
