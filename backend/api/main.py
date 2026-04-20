@@ -71,7 +71,11 @@ logger = logging.getLogger(__name__)
 
 _BASE_DIR = Path(__file__).resolve().parent.parent.parent
 _SNAPSHOTS_DIR = _BASE_DIR / "snapshots"
-_CONFIG_PATH = _BASE_DIR / "backend" / "config" / "cameras.yaml"
+# Honour VANTAG_CAMERAS_YAML override (SaaS/production mode uses empty cameras.production.yaml)
+_CONFIG_PATH = Path(
+    os.getenv("VANTAG_CAMERAS_YAML")
+    or (_BASE_DIR / "backend" / "config" / "cameras.yaml")
+)
 
 # ---------------------------------------------------------------------------
 # CORS configuration

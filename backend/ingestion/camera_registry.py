@@ -72,8 +72,9 @@ _REQUIRED_GLOBAL_FIELDS: List[str] = [
     "frame_buffer_size", "risk_score_window_seconds",
 ]
 
-_DEFAULT_CONFIG_PATH: Path = (
-    Path(__file__).resolve().parent.parent / "config" / "cameras.yaml"
+_DEFAULT_CONFIG_PATH: Path = Path(
+    os.environ.get("VANTAG_CAMERAS_YAML")
+    or (Path(__file__).resolve().parent.parent / "config" / "cameras.yaml")
 )
 
 

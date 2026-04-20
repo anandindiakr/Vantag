@@ -38,6 +38,7 @@ export default function DownloadPage() {
       <section className="grid md:grid-cols-3 gap-4 mb-12">
         <a
           href="/downloads/vantag-agent-windows.zip"
+          download
           className="bg-gradient-to-br from-violet-600 to-purple-700 hover:from-violet-500 hover:to-purple-600 rounded-xl p-6 text-center transition-all"
         >
           <div className="text-5xl mb-3">🪟</div>
@@ -50,6 +51,7 @@ export default function DownloadPage() {
 
         <a
           href="/downloads/vantag-agent-linux.tar.gz"
+          download
           className="bg-gradient-to-br from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 rounded-xl p-6 text-center transition-all"
         >
           <div className="text-5xl mb-3">🐧</div>
@@ -62,6 +64,7 @@ export default function DownloadPage() {
 
         <a
           href="/downloads/vantag-agent-mac.zip"
+          download
           className="bg-gradient-to-br from-slate-600 to-slate-800 hover:from-slate-500 hover:to-slate-700 rounded-xl p-6 text-center transition-all"
         >
           <div className="text-5xl mb-3">🍎</div>
