@@ -186,3 +186,67 @@ async def get_config(
             for c in cameras
         ]
     }
+
+
+# ─── Simple edge agent endpoints (tenant_id-based, no API key) ──────────────
+class SimpleRegisterBody(BaseModel):
+    tenant_id: str
+    cameras: list[str]
+
+
+class SimpleHeartbeatBody(BaseModel):
+    tenant_id: str
+    timestamp: float
+
+
+@edge_router.post("/register")
+async def simple_register_cameras(
+    body: SimpleRegisterBody,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Lightweight endpoint used by the downloadable Python Edge Agent.
+    Auto-registers discovered camera IPs against a tenant.
+    """
+    tenant_res = await session.execute(
+        select(Tenant).where(Tenant.id == body.tenant_id)
+    )
+    if not tenant_res.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    created = 0
+    for ip in body.cameras:
+        cam_id = f"cam-{ip.replace('.', '-')}"
+        existing = await session.execute(
+            select(CameraConfig).where(
+                CameraConfig.tenant_id == body.tenant_id,
+                CameraConfig.camera_id == cam_id,
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue
+        session.add(CameraConfig(
+            tenant_id=body.tenant_id,
+            camera_id=cam_id,
+            rtsp_url=f"rtsp://{ip}:554/stream1",
+            name=f"Camera {ip}",
+            location="Auto-detected",
+            fps_target=10,
+            is_active=True,
+        ))
+        created += 1
+    await session.commit()
+    return {"registered": created, "total": len(body.cameras)}
+
+
+@edge_router.post("/heartbeat")
+async def simple_heartbeat(
+    body: SimpleHeartbeatBody,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Lightweight heartbeat from the downloadable Python Edge Agent."""
+    tenant_res = await session.execute(
+        select(Tenant).where(Tenant.id == body.tenant_id)
+    )
+    if not tenant_res.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return {"ok": True, "ts": body.timestamp}

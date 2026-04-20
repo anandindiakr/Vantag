@@ -31,6 +31,7 @@ const CameraView   = lazy(() => import('./pages/CameraView'));
 const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
 const StoreDetail  = lazy(() => import('./pages/StoreDetail'));
+const DownloadPage = lazy(() => import('./pages/DownloadPage'));
 
 // ── Auth helper ─────────────────────────────────────────────────────────────
 function isAuthenticated() {
@@ -98,6 +99,7 @@ export default function App() {
               <Route path="/incidents"  element={<IncidentsPage />} />
               <Route path="/watchlist"  element={<WatchlistPage />} />
               <Route path="/stores/:id" element={<StoreDetail />} />
+              <Route path="/download"   element={<DownloadPage />} />
             </Route>
 
             {/* Fallback */}

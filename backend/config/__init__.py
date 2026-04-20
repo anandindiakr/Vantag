@@ -131,7 +131,15 @@ def load_config(cameras_yaml: Optional[str] = None) -> Dict[str, Any]:
     if _cached_config is not None:
         return _cached_config
 
-    yaml_path = Path(cameras_yaml) if cameras_yaml else _CAMERAS_YAML
+    # Allow overriding the config file via VANTAG_CAMERAS_YAML env var
+    # (useful for SaaS / VPS deployments to start with zero hardcoded cameras).
+    env_override = os.environ.get("VANTAG_CAMERAS_YAML")
+    if cameras_yaml:
+        yaml_path = Path(cameras_yaml)
+    elif env_override:
+        yaml_path = Path(env_override)
+    else:
+        yaml_path = _CAMERAS_YAML
     config = _load_yaml(yaml_path)
 
     # Ensure expected top-level keys are present with safe defaults.
