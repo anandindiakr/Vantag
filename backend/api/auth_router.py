@@ -146,8 +146,52 @@ async def login(
 ) -> dict:
     email_lower = body.email.lower()
 
+    # ── Normal PostgreSQL path (tried FIRST) ─────────────────────────────────
+    try:
+        result = await session.execute(
+            select(TenantUser).where(TenantUser.email == email_lower)
+        )
+        user = result.scalar_one_or_none()
+        if user and verify_password(body.password, user.hashed_password):
+            if not user.is_active:
+                raise HTTPException(status_code=403, detail="Account suspended")
+
+            tenant_result = await session.execute(
+                select(Tenant).where(Tenant.id == user.tenant_id)
+            )
+            tenant = tenant_result.scalar_one_or_none()
+            if not tenant:
+                raise HTTPException(status_code=404, detail="Tenant not found")
+
+            access = make_token(
+                {"sub": user.id, "tenant_id": tenant.id, "email": user.email, "role": user.role},
+                timedelta(hours=JWT_EXPIRE_HOURS),
+            )
+            refresh = make_token(
+                {"sub": user.id, "tenant_id": tenant.id, "type": "refresh"},
+                timedelta(days=REFRESH_EXPIRE_DAYS),
+            )
+
+            return {
+                "access_token": access,
+                "refresh_token": refresh,
+                "token_type": "bearer",
+                "tenant_id": tenant.id,
+                "onboarding_step": tenant.onboarding_step,
+                "plan_id": tenant.plan_id,
+                "status": tenant.status,
+                "name": tenant.name,
+                "language": tenant.language,
+                "country": tenant.country,
+            }
+    except HTTPException:
+        raise
+    except Exception:
+        # DB unreachable — fall through to demo fallback below
+        pass
+
     # ── Demo / offline fallback ──────────────────────────────────────────────
-    # Used when PostgreSQL is not running (dev / demo / edge deployment).
+    # Used only when the user is NOT in the DB (dev / edge deployment).
     demo = _DEMO_ACCOUNTS.get(email_lower)
     if demo and body.password == demo["password"]:
         access = make_token(
@@ -172,50 +216,7 @@ async def login(
             "country": demo["country"],
         }
 
-    # ── Normal PostgreSQL path ───────────────────────────────────────────────
-    try:
-        result = await session.execute(
-            select(TenantUser).where(TenantUser.email == email_lower)
-        )
-        user = result.scalar_one_or_none()
-        if not user or not verify_password(body.password, user.hashed_password):
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-        if not user.is_active:
-            raise HTTPException(status_code=403, detail="Account suspended")
-
-        tenant_result = await session.execute(
-            select(Tenant).where(Tenant.id == user.tenant_id)
-        )
-        tenant = tenant_result.scalar_one_or_none()
-        if not tenant:
-            raise HTTPException(status_code=404, detail="Tenant not found")
-
-        access = make_token(
-            {"sub": user.id, "tenant_id": tenant.id, "email": user.email, "role": user.role},
-            timedelta(hours=JWT_EXPIRE_HOURS),
-        )
-        refresh = make_token(
-            {"sub": user.id, "tenant_id": tenant.id, "type": "refresh"},
-            timedelta(days=REFRESH_EXPIRE_DAYS),
-        )
-
-        return {
-            "access_token": access,
-            "refresh_token": refresh,
-            "token_type": "bearer",
-            "tenant_id": tenant.id,
-            "onboarding_step": tenant.onboarding_step,
-            "plan_id": tenant.plan_id,
-            "status": tenant.status,
-            "name": tenant.name,
-            "language": tenant.language,
-            "country": tenant.country,
-        }
-    except HTTPException:
-        raise
-    except Exception:
-        # DB is unreachable and no demo account matched
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+    raise HTTPException(status_code=401, detail="Invalid email or password")
 
 
 # ── OTP store (in-memory, TTL 10 min) ────────────────────────────────────────
