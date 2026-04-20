@@ -123,9 +123,10 @@ class CameraRegistry:
         self._global = global_raw
 
         # ---- per-camera entries ----
-        cameras_raw: list = raw.get("cameras", [])
-        if not isinstance(cameras_raw, list) or len(cameras_raw) == 0:
-            raise ConfigError("cameras.yaml must contain at least one camera under 'cameras'.")
+        # Allow empty camera list for SaaS mode (cameras added later via API/edge agent)
+        cameras_raw: list = raw.get("cameras") or []
+        if not isinstance(cameras_raw, list):
+            raise ConfigError("cameras.yaml 'cameras' must be a list.")
 
         self._cameras = {}
         for idx, cam_raw in enumerate(cameras_raw):
