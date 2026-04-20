@@ -20,7 +20,7 @@ import {
 
 // ─── Axios Instance ───────────────────────────────────────────────────────────
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: '/api',
   timeout: 15_000,
   headers: { 'Content-Type': 'application/json' },
@@ -35,6 +35,15 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    // 401 Unauthorized → token expired / invalid → force re-login
+    if (err.response?.status === 401) {
+      localStorage.removeItem('vantag_token');
+      localStorage.removeItem('vantag_tenant');
+      // Avoid infinite loop if already on login page
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login?reason=session_expired';
+      }
+    }
     const message =
       (err.response?.data as { detail?: string })?.detail ??
       err.message ??
@@ -106,6 +115,7 @@ const normIncident = (r: any): Incident => ({
   resolvedAt:  r.resolved_at ?? r.resolvedAt   ?? undefined,
   resolved:    r.acknowledged ?? r.resolved    ?? false,
   reportUrl:   r.report_url  ?? r.reportUrl    ?? undefined,
+  snapshotUrl: r.snapshot_url ?? r.snapshotUrl ?? undefined,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,14 +181,19 @@ const fetchHeatmap = (id: string, w: number) =>
 const fetchIncidents = async (
   storeId: string | null,
   page: number,
-  storeIds: string[] = []
+  storeIds: string[] = [],
+  typeFilter: string = 'all',
 ): Promise<{ items: Incident[]; total: number; page: number; pages: number }> => {
   const PAGE_SIZE = 25;
+
+  // Build server-side filter params
+  const filterParams: Record<string, unknown> = { page, page_size: PAGE_SIZE };
+  if (typeFilter && typeFilter !== 'all') filterParams.event_type = typeFilter;
 
   if (storeId) {
     // Single-store path
     const r = await api.get<unknown>(`/stores/${storeId}/incidents`, {
-      params: { page, page_size: PAGE_SIZE },
+      params: filterParams,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const raw = r.data as any;
@@ -194,15 +209,19 @@ const fetchIncidents = async (
   }
 
   // All-stores path: query every store in parallel and merge
+  // Use a larger page_size so all incidents are fetched and server-side type filter works.
   const ids = storeIds.length ? storeIds : [];
   if (ids.length === 0) {
     return { items: [], total: 0, page: 1, pages: 1 };
   }
 
+  const allStoreParams: Record<string, unknown> = { page: 1, page_size: 200 };
+  if (typeFilter && typeFilter !== 'all') allStoreParams.event_type = typeFilter;
+
   const responses = await Promise.allSettled(
     ids.map((sid) =>
       api
-        .get<unknown>(`/stores/${sid}/incidents`, { params: { page: 1, page_size: 100 } })
+        .get<unknown>(`/stores/${sid}/incidents`, { params: allStoreParams })
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .then((r) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -300,13 +319,14 @@ export function useHeatmap(storeId: string, windowMinutes: number): UseQueryResu
 export function useIncidents(
   storeId: string | null,
   page: number,
-  storeIds: string[] = []
+  storeIds: string[] = [],
+  typeFilter: string = 'all',
 ): UseQueryResult<{ items: Incident[]; total: number; page: number; pages: number }> {
   return useQuery({
     queryKey:        storeId
-                       ? queryKeys.incidents(storeId, page)
-                       : [...queryKeys.allIncidents(page), storeIds.join(',')],
-    queryFn:         () => fetchIncidents(storeId, page, storeIds),
+                       ? [...queryKeys.incidents(storeId, page), typeFilter]
+                       : [...queryKeys.allIncidents(page), storeIds.join(','), typeFilter],
+    queryFn:         () => fetchIncidents(storeId, page, storeIds, typeFilter),
     staleTime:       10_000,
     refetchInterval: 15_000,
     // Only run when we have data to query

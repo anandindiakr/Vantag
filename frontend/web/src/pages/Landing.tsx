@@ -2,10 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, useInView } from 'framer-motion';
+import { useRegion } from '../hooks/useRegion';
+import { REGIONS as REGION_MAP, type RegionConfig } from '../config/regions';
+import { LanguageSelector } from '../components/LanguageSelector';
 import {
-  Shield, Camera, Zap as _Zap, Lock, BarChart3, Bell,
+  Shield, Camera, Lock, BarChart3, Bell,
   CheckCircle, ArrowRight, Eye, Cpu, Smartphone,
-  Monitor, AlertTriangle as _AlertTriangle, Activity, Users, Package,
+  Monitor, Activity, Users, Package,
   MapPin, Timer, TrendingDown, ChevronRight, Play,
   Wifi, BrainCircuit, ShieldAlert, Flame,
 } from 'lucide-react';
@@ -14,10 +17,13 @@ import {
    DATA
 ───────────────────────────────────────────────────────── */
 
-const REGIONS = [
-  { code: 'IN', name: 'India',     app: 'Retail Nazar', flag: '🇮🇳', lang: 'hi', currency: '₹' },
-  { code: 'SG', name: 'Singapore', app: 'Vantag',       flag: '🇸🇬', lang: 'en', currency: 'S$' },
-  { code: 'MY', name: 'Malaysia',  app: 'JagaJaga',     flag: '🇲🇾', lang: 'ms', currency: 'RM' },
+const IS_LOCALHOST = typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+const REGION_SWITCHER = [
+  { code: 'IN' as const, name: 'India',     app: 'Retail Nazar', flag: '🇮🇳', lang: 'en' },
+  { code: 'SG' as const, name: 'Singapore', app: 'Vantag',       flag: '🇸🇬', lang: 'en' },
+  { code: 'MY' as const, name: 'Malaysia',  app: 'JagaJaga',     flag: '🇲🇾', lang: 'ms' },
 ];
 
 /* ── 11 AI Feature detectors ── */
@@ -125,24 +131,6 @@ const EDGE_OPTIONS = [
   { icon: Cpu,        title: 'Vantag Edge Box',        desc: 'Pre-configured plug-and-play device — connect power and ethernet, done.' },
 ];
 
-const PLANS = [
-  {
-    id: 'starter', name: 'Starter', cameras: '2–5', highlight: false,
-    priceIN: 2999, priceSG: 49, priceMY: 149,
-    features: ['AI Detection Suite (11 models)', 'Real-time Dashboard', 'One-Tap Door Lock', 'Email Alerts', '7-day history', 'Mobile + Web Portal'],
-  },
-  {
-    id: 'growth', name: 'Growth', cameras: '6–15', highlight: true,
-    priceIN: 5999, priceSG: 99, priceMY: 299,
-    features: ['Everything in Starter', 'Shoplifting + Fall Detection', 'Restricted Zone Polygons', 'Queue Management', 'Slack / Teams Alerts', '30-day history', 'Priority Support'],
-  },
-  {
-    id: 'enterprise', name: 'Enterprise', cameras: '16–30', highlight: false,
-    priceIN: 11999, priceSG: 199, priceMY: 599,
-    features: ['Everything in Growth', 'Watchlist Matching', 'POS Integration', 'Multi-location', 'Custom Webhooks + API', 'Unlimited history', 'Dedicated Support'],
-  },
-];
-
 const HOW_IT_WORKS = [
   { step: '01', title: 'Register & Configure', desc: 'Sign up and enter your store details + camera IP addresses in under 5 minutes. Works on mobile.' },
   { step: '02', title: 'AI Auto-Connects', desc: 'Vantag discovers your cameras, tests RTSP streams, and configures the AI analyzer stack automatically.' },
@@ -194,24 +182,27 @@ function Section({ children, className = '', id }: { children: React.ReactNode; 
 }
 
 /* ─────────────────────────────────────────────────────────
-   PRICING CARD
+   PRICING CARD (uses RegionConfig plans)
 ───────────────────────────────────────────────────────── */
-function PricingCard({ plan, region }: { plan: typeof PLANS[0]; region: typeof REGIONS[0] }) {
-  const priceMap: Record<string, number> = { IN: plan.priceIN, SG: plan.priceSG, MY: plan.priceMY };
-  const price = priceMap[region.code];
+function PricingCard({ plan, annual }: {
+  plan: RegionConfig['plans'][0];
+  annual: boolean;
+}) {
+  const price = annual ? plan.annualPrice : plan.monthlyPrice;
+  const suffix = annual ? '/mo (billed annually)' : '/mo';
 
   return (
     <div
       className={`relative flex flex-col rounded-2xl p-8 border transition-all duration-300 ${
-        plan.highlight
+        plan.popular
           ? 'bg-gradient-to-b from-cyan-950/60 to-[#0d1117] border-cyan-500/50 shadow-[0_0_40px_rgba(6,182,212,0.12)]'
           : 'bg-[#0d1117] border-white/8 hover:border-white/20'
       }`}
     >
-      {plan.highlight && (
+      {plan.popular && (
         <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
       )}
-      {plan.highlight && (
+      {plan.popular && (
         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 bg-cyan-500 rounded-full text-[11px] font-mono-alt font-bold text-black tracking-wider">
           MOST POPULAR
         </div>
@@ -220,15 +211,36 @@ function PricingCard({ plan, region }: { plan: typeof PLANS[0]; region: typeof R
       <div className="mb-6">
         <p className="text-xs font-mono-alt text-white/40 uppercase tracking-widest mb-2">{plan.name}</p>
         <div className="flex items-end gap-1">
-          <span className="text-xl font-mono-alt text-white/50">{region.currency}</span>
+          <span className="text-xl font-mono-alt text-white/50">{plan.symbol}</span>
           <span className="font-syne text-4xl font-bold text-white leading-none">{price.toLocaleString()}</span>
-          <span className="text-sm text-white/30 mb-1.5">/mo</span>
+          <span className="text-sm text-white/30 mb-1.5">{suffix}</span>
         </div>
-        <p className="text-xs text-white/30 mt-2 font-mono-alt">{plan.cameras} cameras · 14-day free trial</p>
+        <p className="text-xs text-white/30 mt-2 font-mono-alt">Up to {plan.cameras} cameras · 14-day free trial</p>
       </div>
 
       <ul className="space-y-3 flex-1 mb-8">
-        {plan.features.map(f => (
+        {plan.key === 'starter' && [
+          'AI Detection Suite (11 models)', 'Real-time Dashboard', 'One-Tap Door Lock',
+          'Email Alerts', '7-day history', 'Mobile + Web Portal',
+        ].map(f => (
+          <li key={f} className="flex items-start gap-2.5 text-sm">
+            <CheckCircle className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+            <span className="text-white/65 font-body-alt">{f}</span>
+          </li>
+        ))}
+        {plan.key === 'growth' && [
+          'Everything in Starter', 'Shoplifting + Fall Detection', 'Restricted Zone Polygons',
+          'Queue Management', 'Slack / Teams Alerts', '30-day history', 'Priority Support',
+        ].map(f => (
+          <li key={f} className="flex items-start gap-2.5 text-sm">
+            <CheckCircle className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+            <span className="text-white/65 font-body-alt">{f}</span>
+          </li>
+        ))}
+        {plan.key === 'pro' && [
+          'Everything in Growth', 'Watchlist Matching', 'POS Integration',
+          'Multi-location', 'Custom Webhooks + API', 'Unlimited history', 'Dedicated Support',
+        ].map(f => (
           <li key={f} className="flex items-start gap-2.5 text-sm">
             <CheckCircle className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
             <span className="text-white/65 font-body-alt">{f}</span>
@@ -237,9 +249,9 @@ function PricingCard({ plan, region }: { plan: typeof PLANS[0]; region: typeof R
       </ul>
 
       <Link
-        to={`/register?plan=${plan.id}&country=${region.code}`}
+        to={`/register?plan=${plan.key}`}
         className={`block text-center py-3.5 rounded-xl text-sm font-semibold font-body-alt transition-all ${
-          plan.highlight
+          plan.popular
             ? 'bg-cyan-500 hover:bg-cyan-400 text-black'
             : 'bg-white/8 hover:bg-white/14 text-white border border-white/10'
         }`}
@@ -255,10 +267,17 @@ function PricingCard({ plan, region }: { plan: typeof PLANS[0]; region: typeof R
 ───────────────────────────────────────────────────────── */
 export default function Landing() {
   const { i18n } = useTranslation();
-  const [activeRegion, setActiveRegion] = useState('IN');
+  const domainRegion = useRegion();
+
+  // On localhost dev, allow switching between regions to preview prices/branding
+  const [activeCode, setActiveCode] = useState<'IN' | 'SG' | 'MY'>(domainRegion.region);
+  const [annual, setAnnual] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
-  useInView(heroRef, { once: true }); // trigger hero animation
+  useInView(heroRef, { once: true });
+
+  // When domain region changes (e.g. on prod domains), sync activeCode
+  useEffect(() => { setActiveCode(domainRegion.region); }, [domainRegion.region]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -266,7 +285,9 @@ export default function Landing() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const region = REGIONS.find(r => r.code === activeRegion) ?? REGIONS[0];
+  // Get the full RegionConfig for whichever region is active in the switcher
+  const region: RegionConfig = IS_LOCALHOST ? (REGION_MAP[activeCode] ?? domainRegion) : domainRegion;
+  const regionRow = REGION_SWITCHER.find(r => r.code === region.region) ?? REGION_SWITCHER[0];
 
   /* group features by category for display */
   const securityFeatures  = AI_FEATURES.filter(f => f.category === 'SECURITY');
@@ -312,30 +333,40 @@ export default function Landing() {
               </div>
             </div>
             <span className="font-syne text-lg font-bold tracking-tight">
-              Vantag
-              {activeRegion === 'IN' && <span className="ml-2 text-sm font-body-alt font-medium text-cyan-400">Retail Nazar</span>}
-              {activeRegion === 'MY' && <span className="ml-2 text-sm font-body-alt font-medium text-emerald-400">JagaJaga</span>}
+              {region.brand}
             </span>
           </div>
 
-          {/* Region pill */}
-          <div className="hidden md:flex items-center gap-1 bg-white/5 border border-white/8 rounded-full p-1">
-            {REGIONS.map(r => (
-              <button
-                key={r.code}
-                onClick={() => { setActiveRegion(r.code); i18n.changeLanguage(r.lang); }}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold font-mono-alt tracking-wide transition-all ${
-                  activeRegion === r.code
-                    ? 'bg-cyan-500 text-black'
-                    : 'text-white/50 hover:text-white'
-                }`}
-              >
-                {r.flag} {r.name}
-              </button>
-            ))}
-          </div>
+          {/* Region pill — only visible on localhost for dev testing */}
+          {IS_LOCALHOST && (
+            <div className="hidden md:flex items-center gap-1 bg-white/5 border border-white/8 rounded-full p-1">
+              {REGION_SWITCHER.map(r => (
+                <button
+                  key={r.code}
+                  onClick={() => {
+                    setActiveCode(r.code);
+                    // Only change language if the current one isn't supported in the target region
+                    const targetRegion = REGION_MAP[r.code];
+                    const currentLangValid = targetRegion?.languages.some((l) => l.code === i18n.language);
+                    if (!currentLangValid) {
+                      i18n.changeLanguage(r.lang);
+                      localStorage.setItem('vantag_lang', r.lang);
+                    }
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold font-mono-alt tracking-wide transition-all ${
+                    activeCode === r.code
+                      ? 'bg-cyan-500 text-black'
+                      : 'text-white/50 hover:text-white'
+                  }`}
+                >
+                  {r.flag} {r.name}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center gap-4">
+            <LanguageSelector variant="dark" />
             <Link to="/login" className="text-sm text-white/50 hover:text-white transition-colors font-medium">
               Sign In
             </Link>
@@ -370,7 +401,7 @@ export default function Landing() {
             {/* Live badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/25 rounded-full text-red-400 text-xs font-mono-alt font-bold tracking-widest mb-5">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-blink-live flex-shrink-0" />
-              LIVE · {region.flag} {region.app}
+              LIVE · {regionRow.flag} {regionRow.app}
             </div>
 
             <h1 className="font-black text-3xl sm:text-4xl lg:text-[2.6rem] xl:text-5xl leading-tight tracking-tight mb-6">
@@ -708,27 +739,51 @@ export default function Landing() {
           <div className="text-center mb-12">
             <span className="inline-block font-mono-alt text-[11px] tracking-[0.2em] text-yellow-400 uppercase mb-4">Pricing</span>
             <h2 className="font-syne text-3xl sm:text-4xl font-black text-white mb-4">Simple. Local. Fair.</h2>
-            <p className="text-white/45 text-lg font-body-alt mb-8">Priced in your currency. No hidden fees.</p>
+            <p className="text-white/45 text-lg font-body-alt mb-6">Priced in {region.currency} · No hidden fees.</p>
 
-            {/* Region selector */}
-            <div className="inline-flex items-center gap-1 bg-white/5 border border-white/8 rounded-full p-1.5">
-              {REGIONS.map(r => (
-                <button
-                  key={r.code}
-                  onClick={() => setActiveRegion(r.code)}
-                  className={`px-5 py-2 rounded-full text-sm font-mono-alt font-bold tracking-wide transition-all ${
-                    activeRegion === r.code ? 'bg-cyan-500 text-black' : 'text-white/45 hover:text-white'
-                  }`}
-                >
-                  {r.flag} {r.name}
-                </button>
-              ))}
+            {/* Annual / Monthly toggle */}
+            <div className="inline-flex items-center gap-3 mb-4">
+              <span className={`text-sm font-mono-alt ${!annual ? 'text-white' : 'text-white/40'}`}>Monthly</span>
+              <button
+                onClick={() => setAnnual(a => !a)}
+                className={`relative w-12 h-6 rounded-full transition-colors ${annual ? 'bg-cyan-500' : 'bg-white/15'}`}
+              >
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${annual ? 'left-7' : 'left-1'}`} />
+              </button>
+              <span className={`text-sm font-mono-alt ${annual ? 'text-white' : 'text-white/40'}`}>
+                Annual <span className="text-cyan-400 font-bold">Save 17%</span>
+              </span>
             </div>
+
+            {/* Region selector — localhost only */}
+            {IS_LOCALHOST && (
+              <div className="inline-flex items-center gap-1 bg-white/5 border border-white/8 rounded-full p-1.5 ml-4">
+                {REGION_SWITCHER.map(r => (
+                  <button
+                    key={r.code}
+                    onClick={() => {
+                      setActiveCode(r.code);
+                      const targetRegion = REGION_MAP[r.code];
+                      const currentLangValid = targetRegion?.languages.some((l) => l.code === i18n.language);
+                      if (!currentLangValid) {
+                        i18n.changeLanguage(r.lang);
+                        localStorage.setItem('vantag_lang', r.lang);
+                      }
+                    }}
+                    className={`px-5 py-2 rounded-full text-sm font-mono-alt font-bold tracking-wide transition-all ${
+                      activeCode === r.code ? 'bg-cyan-500 text-black' : 'text-white/45 hover:text-white'
+                    }`}
+                  >
+                    {r.flag} {r.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 items-start">
-            {PLANS.map(plan => (
-              <PricingCard key={plan.id} plan={plan} region={region} />
+            {region.plans.map(plan => (
+              <PricingCard key={plan.key} plan={plan} annual={annual} />
             ))}
           </div>
 
@@ -787,7 +842,7 @@ export default function Landing() {
                 AI-powered retail security platform for shops across India, Singapore and Malaysia.
               </p>
               <div className="flex gap-2">
-                {REGIONS.map(r => (
+                {REGION_SWITCHER.map(r => (
                   <span key={r.code} className="text-[11px] font-mono-alt px-2 py-1 rounded border border-white/8 text-white/30">{r.flag} {r.app}</span>
                 ))}
               </div>

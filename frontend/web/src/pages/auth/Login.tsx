@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Shield, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Shield, Eye, EyeOff, ArrowRight, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useRegion } from '../../hooks/useRegion';
+import { LanguageSelector } from '../../components/LanguageSelector';
 
 export default function Login() {
   const nav = useNavigate();
+  const region = useRegion();
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reason') === 'session_expired') setSessionExpired(true);
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,12 +48,23 @@ export default function Login() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
               <Shield className="w-5 h-5" />
             </div>
-            <span className="text-xl font-bold">Vantag</span>
+            <span className="text-xl font-bold">{region.brandShort}</span>
           </Link>
+        </div>
+        <div className="absolute top-0 right-0">
+          <LanguageSelector variant="light" />
         </div>
         <div className="bg-white/3 border border-white/8 rounded-2xl p-8">
           <h1 className="text-2xl font-bold mb-2 text-center">Welcome back</h1>
-          <p className="text-white/40 text-sm text-center mb-6">Sign in to your Vantag account</p>
+          <p className="text-white/40 text-sm text-center mb-6">Sign in to your {region.brandShort} account</p>
+
+          {/* Session expired banner */}
+          {sessionExpired && (
+            <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-5 text-amber-300 text-sm">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <span>Your session has expired. Please sign in again to continue.</span>
+            </div>
+          )}
 
           {/* Demo quick-login */}
           <button

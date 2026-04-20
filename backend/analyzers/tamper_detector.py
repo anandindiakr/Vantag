@@ -64,15 +64,18 @@ _DEFAULTS: Dict[str, float | int] = {
     "blocked_duration_seconds": 2.0,        # must persist this long
 
     # STATIC
-    "static_variance_threshold": 25.0,      # per-pixel variance (grayscale)
-    "static_duration_seconds": 3.0,         # must persist this long
+    "static_variance_threshold": 8.0,       # tightened — only flag near-zero variance (lens covered)
+    "static_duration_seconds": 5.0,         # must persist this long
 
     # TILTED
-    "tilted_angle_delta_degrees": 20.0,     # sudden dominant-angle shift
-    "tilted_confirmation_frames": 3,        # consecutive frames confirming tilt
+    "tilted_angle_delta_degrees": 30.0,     # raised — require a larger angular shift
+    "tilted_confirmation_frames": 8,        # more frames needed to confirm
 
     # Rolling buffer
     "frame_buffer_size": 30,               # max frames kept for variance calc
+
+    # Cooldown — minimum seconds between events of the same type on the same camera
+    "cooldown_seconds": 300,               # 5 minutes between repeated tamper alerts
 }
 
 
@@ -113,6 +116,7 @@ class TamperDetector:
         self._tilt_confirm: int = int(cfg["tilted_confirmation_frames"])
 
         buf: int = int(cfg["frame_buffer_size"])
+        self._cooldown: float = float(cfg["cooldown_seconds"])
 
         # ---- rolling frame buffer (grayscale uint8) ----
         self._frame_buf: Deque[np.ndarray] = deque(maxlen=buf)
@@ -129,6 +133,10 @@ class TamperDetector:
         self._last_dominant_angle: Optional[float] = None
         self._tilt_confirm_count: int = 0
         self._tilt_event_emitted: bool = False
+
+        # ---- Per-type cooldown tracker ----
+        # Stores monotonic time of last emission for each tamper type
+        self._last_emitted: Dict[str, float] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -157,6 +165,17 @@ class TamperDetector:
             or self._check_static(frame, now)
             or self._check_tilted(gray, frame, now)
         )
+
+        # ── Cooldown gate ────────────────────────────────────────────────────
+        # Suppress repeated events of the same type within the cooldown window.
+        # This prevents a single continuous tamper condition from flooding the
+        # incident log with hundreds of identical alerts.
+        if event is not None:
+            last = self._last_emitted.get(event.tamper_type, 0.0)
+            if now - last < self._cooldown:
+                return None            # silently suppress — still within cooldown
+            self._last_emitted[event.tamper_type] = now
+
         return event
 
     # ------------------------------------------------------------------
@@ -266,9 +285,14 @@ class TamperDetector:
                 return self._make_event(TamperType.TILTED, confidence, bgr)
         else:
             # Condition resolved – update reference angle.
+            # Only reset the emitted flag if the cooldown has also passed,
+            # so a brief normalisation does NOT immediately re-arm the detector.
             self._last_dominant_angle = dominant
             self._tilt_confirm_count = 0
-            self._tilt_event_emitted = False
+            last = self._last_emitted.get("TILTED", 0.0)
+            import time as _time
+            if _time.monotonic() - last >= self._cooldown:
+                self._tilt_event_emitted = False
 
         return None
 

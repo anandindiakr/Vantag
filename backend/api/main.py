@@ -59,6 +59,9 @@ from .tenants_router import tenants_router
 from .edge_router import edge_router
 from .billing_router import billing_router
 from .camera_probe_router import camera_probe_router
+from .demo_router import router as demo_router
+from .demo_router import set_pipeline as demo_set_pipeline
+from .zone_router import router as zone_router
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +132,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     stores_set_pipeline(_pipeline)
     cameras_set_pipeline(_pipeline)
     reports_set_pipeline(_pipeline)
+    demo_set_pipeline(_pipeline)
 
     # ------------------------------------------------------------------
     # 3b. Initialise webhook engine and POS integration.
@@ -140,11 +144,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     set_webhook_engine(_webhook_engine)
 
     # ------------------------------------------------------------------
-    # 4. Snapshot directories.
+    # 4. Snapshot directories + SQLite incident store.
     # ------------------------------------------------------------------
     _SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     (_SNAPSHOTS_DIR / "watchlist").mkdir(exist_ok=True)
     (_SNAPSHOTS_DIR / "reports").mkdir(exist_ok=True)
+
+    # Initialise local SQLite audit store and purge events older than 30 days.
+    try:
+        from ..db import incident_store as _istore
+        _istore.init_db()
+        deleted = _istore.cleanup_old(30)
+        if deleted:
+            logger.info("Purged %d incident(s) older than 30 days from SQLite", deleted)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("SQLite incident store init failed (non-fatal) | error=%s", exc)
 
     # ------------------------------------------------------------------
     # 5. Start pipeline (RTSP threads + async tasks).
@@ -235,6 +249,8 @@ app.include_router(tenants_router)
 app.include_router(edge_router)
 app.include_router(billing_router)
 app.include_router(camera_probe_router)
+app.include_router(demo_router)
+app.include_router(zone_router)
 
 # ---------------------------------------------------------------------------
 # Health check endpoint

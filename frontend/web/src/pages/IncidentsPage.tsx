@@ -8,11 +8,53 @@ import {
   SortAsc,
   SortDesc,
   Filter,
+  Camera,
+  X,
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { useIncidents, useGenerateReport, useStores } from '../hooks/useApi';
 import { Severity, EventType, Incident } from '../store/useVantagStore';
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+function EvidenceLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  const [imgError, setImgError] = useState(false);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-4xl w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white/60 hover:text-white flex items-center gap-1 text-sm"
+        >
+          <X size={16} /> Close
+        </button>
+        {imgError ? (
+          <div className="w-full rounded-xl border border-slate-600 bg-slate-800 flex flex-col items-center justify-center py-20 gap-3">
+            <Camera size={36} className="text-slate-500" />
+            <p className="text-slate-400 text-sm">Snapshot not available</p>
+            <p className="text-slate-600 text-xs">The evidence image was captured before the camera frame loaded.</p>
+          </div>
+        ) : (
+          <img
+            src={url}
+            alt="Evidence snapshot"
+            className="w-full rounded-xl border border-slate-600 shadow-2xl"
+            onError={() => setImgError(true)}
+          />
+        )}
+        <p className="text-center text-xs text-slate-400 mt-3">
+          Camera snapshot captured at the moment of detection — zone highlighted in colour
+        </p>
+      </div>
+    </div>
+  );
+}
 
 type SortKey = 'ts' | 'severity' | 'riskScore';
 type SortDir  = 'asc' | 'desc';
@@ -68,24 +110,23 @@ export default function IncidentsPage() {
   const [severityFilter, setSeverityFilter] = useState<Severity | 'ALL'>('ALL');
   const [typeFilter, setTypeFilter]   = useState<EventType | 'all'>('all');
   const [downloadingId, setDownloadingId]   = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // Collect all store IDs so we can aggregate incidents across them
   const { data: stores = [] } = useStores();
   const storeIds = useMemo(() => stores.map((s) => s.id).filter(Boolean), [stores]);
 
-  const { data, isLoading, isFetching } = useIncidents(null, page, storeIds);
+  const { data, isLoading, isFetching } = useIncidents(null, page, storeIds, typeFilter);
   const { mutateAsync: generateReport } = useGenerateReport();
 
   const items: Incident[] = useMemo(() => {
     let list = data?.items ?? [];
 
-    // Filter
+    // Severity filter is still client-side (fast, no server round-trip needed)
     if (severityFilter !== 'ALL') {
       list = list.filter((i) => i.severity === severityFilter);
     }
-    if (typeFilter !== 'all') {
-      list = list.filter((i) => i.type === typeFilter);
-    }
+    // NOTE: typeFilter is now passed to the server — no client-side type filter needed.
 
     // Sort
     list = [...list].sort((a, b) => {
@@ -103,7 +144,11 @@ export default function IncidentsPage() {
     return list;
   }, [data, severityFilter, typeFilter, sortKey, sortDir]);
 
-  const totalPages = data?.pages ?? 1;
+  const totalPages   = data?.pages ?? 1;
+  const serverTotal  = data?.total ?? 0;
+  const filtersActive = severityFilter !== 'ALL' || typeFilter !== 'all';
+
+  const clearFilters = () => { setSeverityFilter('ALL'); setTypeFilter('all'); setPage(1); };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -141,7 +186,10 @@ export default function IncidentsPage() {
 
   return (
     <div className="min-h-screen bg-vantag-dark pb-10">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* Evidence lightbox */}
+      {lightboxUrl && (
+        <EvidenceLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+      )}
       <header className="sticky top-0 z-10 bg-vantag-dark/95 backdrop-blur border-b border-slate-700/60 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -149,7 +197,10 @@ export default function IncidentsPage() {
             <div>
               <h1 className="text-xl font-bold text-slate-100">Incident Log</h1>
               <p className="text-xs text-slate-400">
-                {data?.total ?? 0} total incidents
+                {filtersActive
+                  ? <>{items.length} shown · <span className="text-slate-500">{serverTotal} total</span></>
+                  : <>{serverTotal} total incidents</>
+                }
                 {isFetching && !isLoading && (
                   <span className="ml-2 text-slate-600">· Refreshing…</span>
                 )}
@@ -202,6 +253,16 @@ export default function IncidentsPage() {
               <option key={v} value={v}>{l}</option>
             ))}
           </select>
+
+          {/* Clear filters — only visible when a filter is active */}
+          {filtersActive && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-vantag-red/10 border border-vantag-red/40 text-vantag-red text-xs hover:bg-vantag-red/20 transition-colors"
+            >
+              <X size={11} /> Clear Filters
+            </button>
+          )}
         </div>
 
         {/* ── Table ─────────────────────────────────────────────────── */}
@@ -228,7 +289,7 @@ export default function IncidentsPage() {
             >
               Risk <SortIcon col="riskScore" />
             </button>
-            <div className="col-span-3">Description</div>
+            <div className="col-span-3">Description &amp; Evidence</div>
             <div className="col-span-1" />
           </div>
 
@@ -238,8 +299,27 @@ export default function IncidentsPage() {
               <Loader2 size={28} className="animate-spin text-slate-500" />
             </div>
           ) : items.length === 0 ? (
-            <div className="flex items-center justify-center py-16 text-slate-500 text-sm gap-2">
-              No incidents match the current filters
+            <div className="flex flex-col items-center justify-center py-16 text-slate-500 text-sm gap-3">
+              {filtersActive ? (
+                <>
+                  <Filter size={28} className="opacity-30" />
+                  <p className="font-medium text-slate-400">No incidents match the active filters</p>
+                  <p className="text-xs text-slate-600">
+                    {serverTotal} total incidents in database — filters are hiding them all
+                  </p>
+                  <button
+                    onClick={clearFilters}
+                    className="mt-1 flex items-center gap-1.5 px-4 py-2 rounded-lg bg-vantag-red/10 border border-vantag-red/40 text-vantag-red text-xs hover:bg-vantag-red/20 transition-colors"
+                  >
+                    <X size={12} /> Clear All Filters — Show All {serverTotal} Incidents
+                  </button>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle size={28} className="opacity-30" />
+                  <span>No incidents recorded yet — try firing a test event from Zone Editor</span>
+                </>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-slate-700/40">
@@ -295,9 +375,29 @@ export default function IncidentsPage() {
                     </span>
                   </div>
 
-                  {/* Description */}
-                  <div className="col-span-3 min-w-0">
-                    <p className="text-xs text-slate-300 truncate">{inc.description}</p>
+                  {/* Description + Evidence */}
+                  <div className="col-span-3 min-w-0 space-y-1.5">
+                    <p className="text-xs text-slate-300 leading-relaxed line-clamp-3">
+                      {inc.description}
+                    </p>
+                    {inc.snapshotUrl && (
+                      <button
+                        onClick={() => setLightboxUrl(inc.snapshotUrl!)}
+                        className="flex items-center gap-1.5 group mt-1"
+                        title="View evidence snapshot"
+                      >
+                        <img
+                          src={inc.snapshotUrl}
+                          alt="Evidence"
+                          className="h-9 rounded border border-slate-600 group-hover:border-slate-400 transition-colors object-cover"
+                          style={{ aspectRatio: '16/9', width: 'auto' }}
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                        <span className="text-[10px] text-slate-500 group-hover:text-slate-300 transition-colors flex items-center gap-1">
+                          <Camera size={10} /> View evidence
+                        </span>
+                      </button>
+                    )}
                     {inc.resolved && (
                       <span className="text-xs text-vantag-green">Resolved</span>
                     )}
@@ -328,7 +428,11 @@ export default function IncidentsPage() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between">
             <p className="text-xs text-slate-500">
-              Page {page} of {totalPages} · {data?.total ?? 0} incidents
+              Page {page} of {totalPages} ·{' '}
+              {filtersActive
+                ? <span><span className="text-vantag-red font-semibold">{items.length}</span> shown (filtered from {serverTotal})</span>
+                : <span>{serverTotal} total incidents</span>
+              }
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -339,25 +443,39 @@ export default function IncidentsPage() {
                 <ChevronLeft size={13} /> Prev
               </button>
 
-              {/* Page numbers */}
+              {/* Page numbers — simple window around current page */}
               <div className="flex gap-1">
-                {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
-                  const p = Math.max(1, Math.min(page - 3 + i, totalPages - 6 + i));
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p)}
-                      className={clsx(
-                        'w-8 h-8 rounded-lg text-xs font-medium transition-colors',
-                        p === page
-                          ? 'bg-vantag-red text-white'
-                          : 'bg-vantag-card border border-slate-700/60 text-slate-400 hover:text-slate-200'
-                      )}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
+                {(() => {
+                  // Build a unique, sorted list of page numbers to show
+                  const window = 2;
+                  const nums = new Set([1, totalPages]);
+                  for (let i = Math.max(1, page - window); i <= Math.min(totalPages, page + window); i++) nums.add(i);
+                  const sorted = Array.from(nums).sort((a, b) => a - b);
+
+                  const buttons: React.ReactNode[] = [];
+                  sorted.forEach((p, idx) => {
+                    if (idx > 0 && p - sorted[idx - 1] > 1) {
+                      buttons.push(
+                        <span key={`gap-${p}`} className="w-8 h-8 flex items-center justify-center text-slate-500 text-xs">…</span>
+                      );
+                    }
+                    buttons.push(
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={clsx(
+                          'w-8 h-8 rounded-lg text-xs font-medium transition-colors',
+                          p === page
+                            ? 'bg-vantag-red text-white'
+                            : 'bg-vantag-card border border-slate-700/60 text-slate-400 hover:text-slate-200'
+                        )}
+                      >
+                        {p}
+                      </button>
+                    );
+                  });
+                  return buttons;
+                })()}
               </div>
 
               <button

@@ -1,18 +1,25 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { Shield, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Shield, Eye, EyeOff, ArrowRight, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useRegion } from '../../hooks/useRegion';
+import { REGIONS as REGION_MAP } from '../../config/regions';
+import { LanguageSelector } from '../../components/LanguageSelector';
 
 const COUNTRIES = [
-  { code: 'IN', name: '🇮🇳 India', lang: 'hi' },
-  { code: 'SG', name: '🇸🇬 Singapore', lang: 'en' },
-  { code: 'MY', name: '🇲🇾 Malaysia', lang: 'ms' },
-];
+  { code: 'IN', name: '🇮🇳 India' },
+  { code: 'SG', name: '🇸🇬 Singapore' },
+  { code: 'MY', name: '🇲🇾 Malaysia' },
+] as const;
+
+type CountryCode = typeof COUNTRIES[number]['code'];
 
 export default function Register() {
   const nav = useNavigate();
+  const region = useRegion();
   const [params] = useSearchParams();
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -21,19 +28,30 @@ export default function Register() {
     email: '',
     password: '',
     phone: '',
-    country: params.get('country') || 'IN',
+    country: params.get('country') || region.region,
     plan_id: params.get('plan') || 'starter',
   });
 
   const up = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const { i18n } = useTranslation();
+
+  // Detect language/country mismatch so we can warn the user
+  const selectedRegionConfig = REGION_MAP[form.country as CountryCode];
+  const activeLang = localStorage.getItem('vantag_lang') || i18n.language;
+  const langValidForCountry = selectedRegionConfig?.languages.some((l) => l.code === activeLang) ?? true;
+  const langMismatch = !langValidForCountry;
+  /** Language we'll actually send to the backend: user's choice if valid, else country default */
+  const resolvedLanguage = langValidForCountry
+    ? activeLang
+    : (selectedRegionConfig?.defaultLang ?? 'en');
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.password.length < 8) { toast.error('Password must be at least 8 characters'); return; }
     setLoading(true);
     try {
-      const country = COUNTRIES.find(c => c.code === form.country);
-      const { data } = await axios.post('/api/auth/register', { ...form, language: country?.lang || 'en' });
+      const { data } = await axios.post('/api/auth/register', { ...form, language: resolvedLanguage });
       localStorage.setItem('vantag_token', data.access_token);
       localStorage.setItem('vantag_tenant', JSON.stringify({ id: data.tenant_id, plan: data.plan_id, step: 1 }));
       toast.success('Account created! Please verify your email.');
@@ -54,8 +72,11 @@ export default function Register() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
               <Shield className="w-5 h-5" />
             </div>
-            <span className="text-xl font-bold">Vantag</span>
+            <span className="text-xl font-bold">{region.brandShort}</span>
           </Link>
+        </div>
+        <div className="absolute top-0 right-0">
+          <LanguageSelector variant="light" />
         </div>
         <div className="bg-white/3 border border-white/8 rounded-2xl p-8">
           <h1 className="text-2xl font-bold mb-2 text-center">Create your account</h1>
@@ -85,6 +106,15 @@ export default function Register() {
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500/50 transition-colors">
                 {COUNTRIES.map(c => <option key={c.code} value={c.code} className="bg-gray-900">{c.name}</option>)}
               </select>
+              {langMismatch && (
+                <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 text-xs">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  <span>
+                    Your current UI language (<strong>{activeLang}</strong>) is not available for {selectedRegionConfig?.country ?? form.country}.
+                    Your account will be set to <strong>{resolvedLanguage}</strong> — you can change it after login.
+                  </span>
+                </div>
+              )}
             </div>
             <div>
               <label className="text-sm text-white/60 block mb-1.5">Password</label>

@@ -131,7 +131,7 @@ async def list_stores() -> List[StoreResponse]:
             1 for cam in cams if health_status.get(cam.id, {}).get("healthy", False)
         )
         last_events = pipeline.recent_events.get(store_id, [])
-        last_event_at = last_events[-1].get("timestamp") if last_events else None
+        last_event_at = (last_events[-1].get("timestamp") or last_events[-1].get("occurred_at")) if last_events else None
 
         stores.append(
             StoreResponse(
@@ -313,13 +313,23 @@ async def get_heatmap(
 async def list_incidents(
     store_id: str,
     page: int = Query(1, ge=1, description="Page number (1-based)."),
-    limit: int = Query(20, ge=1, le=100, description="Items per page."),
+    limit: int = Query(20, ge=1, le=200, description="Items per page."),
+    event_type: Optional[str] = Query(None, description="Filter by event type (e.g. inventory_movement)."),
 ) -> IncidentListResponse:
     """Return a paginated list of incidents for a store, newest first."""
     pipeline = _get_pipeline()
     all_incidents: List[dict] = list(
         reversed(pipeline.recent_events.get(store_id, []))
     )
+
+    # Server-side event_type filter — applied before pagination so page counts are correct.
+    if event_type and event_type != "all":
+        et_lower = event_type.lower()
+        all_incidents = [
+            r for r in all_incidents
+            if (r.get("type") or r.get("event_type", "")).lower() == et_lower
+        ]
+
     total = len(all_incidents)
     pages = max(1, math.ceil(total / limit))
     start = (page - 1) * limit
@@ -334,10 +344,10 @@ async def list_incidents(
                     incident_id=raw.get("incident_id", ""),
                     store_id=store_id,
                     camera_id=raw.get("camera_id", ""),
-                    event_type=raw.get("type", "unknown"),
+                    event_type=raw.get("type", raw.get("event_type", "unknown")),
                     severity=SeverityLevel(raw.get("severity", "low")),
                     description=raw.get("description", ""),
-                    occurred_at=raw.get("timestamp", datetime.now(tz=timezone.utc)),
+                    occurred_at=raw.get("timestamp", raw.get("occurred_at", datetime.now(tz=timezone.utc))),
                     snapshot_url=raw.get("snapshot_url"),
                     acknowledged=raw.get("acknowledged", False),
                     metadata=raw.get("metadata", {}),

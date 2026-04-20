@@ -1,19 +1,13 @@
-# start.ps1 - One-command Vantag startup
-# Run: cd "D:\AI Algo\Collaterals\Profiles\Retail Nazar\vantag" ; .\start.ps1
+# ============================================================
+#  Vantag - Start all services
+#  Run: cd "D:\AI Algo\Collaterals\Profiles\Retail Nazar\vantag" ; .\start.ps1
+# ============================================================
 
-$ROOT = Split-Path -Parent $MyInvocation.MyCommand.Path
-
-# Email credentials
-$env:PYTHONPATH        = $ROOT
-$env:VANTAG_SMTP_HOST  = "smtp.gmail.com"
-$env:VANTAG_SMTP_PORT  = "587"
-$env:VANTAG_SMTP_USER  = "anandindiakr@gmail.com"
-$env:VANTAG_SMTP_PASS  = "YOUR_GMAIL_APP_PASSWORD"
-$env:VANTAG_EMAIL_FROM = "Vantag <anandindiakr@gmail.com>"
+$ROOT = "D:\AI Algo\Collaterals\Profiles\Retail Nazar\vantag"
 
 Write-Host ""
 Write-Host "=======================================" -ForegroundColor Cyan
-Write-Host "  Vantag - Starting up" -ForegroundColor Cyan
+Write-Host "  Vantag - Starting services via pm2"  -ForegroundColor Cyan
 Write-Host "=======================================" -ForegroundColor Cyan
 
 # 1. Docker containers
@@ -23,32 +17,26 @@ Start-Sleep -Seconds 2
 Write-Host "      OK" -ForegroundColor Green
 
 # 2. Seed demo account
-Write-Host "[2/4] Seeding demo account..." -ForegroundColor Yellow
-python -m backend.db.seed_demo 2>&1
-Write-Host "      Done." -ForegroundColor Green
+Write-Host "[2/3] Seeding demo account..." -ForegroundColor Yellow
+$env:PYTHONPATH = $ROOT
+python -m backend.db.seed_demo 2>&1 | Select-Object -Last 1
+Write-Host "      Done" -ForegroundColor Green
 
-# 3. Backend
-Write-Host "[3/4] Starting backend on :8800..." -ForegroundColor Yellow
-$backend = Start-Process "python" `
-    -ArgumentList "-m","uvicorn","backend.api.main:app","--host","0.0.0.0","--port","8800" `
-    -WorkingDirectory $ROOT -PassThru -WindowStyle Normal
-Write-Host "      Backend PID $($backend.Id)" -ForegroundColor Green
-Start-Sleep -Seconds 4
-
-# 4. Frontend
-Write-Host "[4/4] Starting frontend on :3000..." -ForegroundColor Yellow
-$frontend = Start-Process "npx" `
-    -ArgumentList "vite","--port","3000" `
-    -WorkingDirectory "$ROOT\frontend\web" -PassThru -WindowStyle Normal
-Write-Host "      Frontend PID $($frontend.Id)" -ForegroundColor Green
+# 3. Start / restart via pm2
+Write-Host "[3/3] Starting backend + frontend via pm2..." -ForegroundColor Yellow
+Set-Location $ROOT
+pm2 start ecosystem.config.js --update-env 2>&1 | Where-Object { $_ -match "online|error|WARN" }
+pm2 save 2>$null
 
 Write-Host ""
 Write-Host "=======================================" -ForegroundColor Cyan
-Write-Host "  OPEN: http://localhost:3000" -ForegroundColor Green
-Write-Host "  Login: demo@vantag.io / demo1234" -ForegroundColor Magenta
-Write-Host "  Close this window to stop all servers" -ForegroundColor DarkGray
-Write-Host "=======================================" -ForegroundColor Cyan
+Write-Host "  All services running!" -ForegroundColor Green
 Write-Host ""
-
-Wait-Process -Id $backend.Id -ErrorAction SilentlyContinue
-Stop-Process -Id $frontend.Id -ErrorAction SilentlyContinue
+Write-Host "  Dashboard : http://localhost:3000"  -ForegroundColor White
+Write-Host "  API docs  : http://localhost:8800/docs" -ForegroundColor White
+Write-Host "  Login     : demo@vantag.io / demo1234" -ForegroundColor Magenta
+Write-Host ""
+Write-Host "  pm2 status  -> run: pm2 status"      -ForegroundColor DarkGray
+Write-Host "  pm2 logs    -> run: pm2 logs"         -ForegroundColor DarkGray
+Write-Host "  pm2 stop    -> run: pm2 stop all"     -ForegroundColor DarkGray
+Write-Host "=======================================" -ForegroundColor Cyan

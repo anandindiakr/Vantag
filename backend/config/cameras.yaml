@@ -1,204 +1,317 @@
 global:
-  mqtt_broker: "localhost"
+  mqtt_broker: localhost
   mqtt_port: 1883
-  reconnect_backoff_max: 64          # seconds – exponential backoff ceiling
-  frame_buffer_size: 30              # max frames held per camera queue
-  risk_score_window_seconds: 60      # rolling window for risk aggregation
-  yolo_model_path: "models/yolov8n.pt"
-  yolo_device: "cpu"                 # "cpu" | "cuda" | "cuda:0"
-  yolo_conf_threshold: 0.45
-
-# Real cameras discovered on 192.168.1.0/24 – 2026-04-06
-# Working RTSP URLs confirmed with cv2.VideoCapture live-frame read
+  reconnect_backoff_max: 64
+  frame_buffer_size: 30
+  risk_score_window_seconds: 60
+  yolo_model_path: models/yolov8n.pt
+  yolo_device: cpu
+  yolo_conf_threshold: 0.25
+  product_classes:
+  - bottle
+  - cup
+  - bowl
+  - banana
+  - apple
+  - orange
+  - sandwich
+  - book
+  - vase
+  - backpack
+  - handbag
+  - suitcase
+  - laptop
+  - cell phone
+  - remote
+  - scissors
+  - teddy bear
+  - clock
+  - wine glass
+  - fork
+  - knife
+  - spoon
 cameras:
-  - id: "cam-01"
-    name: "Camera – Zone A"
-    rtsp_url: "rtsp://192.168.1.106:554/"
-    location: "Zone A"
-    resolution:
-      width: 1920
-      height: 1080
-    fps_target: 15
-    enabled: true
-    low_light_mode: false
-    zones: []
-    staff_zone_colors:
-      - "#FF6600"
-      - "#0099FF"
-    analyzer_config:
-      # Shoplifting – use default thresholds
-      shoplifting:
-        proximity_px: 130
-        sweep_window_seconds: 4.0
-        sweep_item_threshold: 3
-        cooldown_seconds: 30
-
-      # Inventory monitoring zones (bboxes in 1920x1080 pixel coords)
-      inventory_movement:
-        drop_threshold: 2
-        check_interval_seconds: 5.0
-        cooldown_seconds: 20
-        person_suppression: true
-        zones:
-          - label: "Shelf A1"
-            bbox: [50, 200, 640, 700]
-          - label: "Shelf A2"
-            bbox: [640, 200, 1280, 700]
-          - label: "Shelf A3"
-            bbox: [1280, 200, 1870, 700]
-
-      # Restricted zones
-      restricted_zone:
-        cooldown_seconds: 15
-        min_frames_inside: 3
-        restricted_zones:
-          - name: "Back Office"
-            polygon: [[1600, 0], [1920, 0], [1920, 400], [1600, 400]]
-            severity: "critical"
-          - name: "Staff Only"
-            polygon: [[0, 800], [300, 800], [300, 1080], [0, 1080]]
-            severity: "high"
-            allowed_hours: [8, 22]   # alert only between 10pm-8am
-
-      # Queue zones
-      queue_length:
-        alert_threshold: 5
-        check_interval_seconds: 3.0
-        cooldown_seconds: 60
-        queue_zones:
-          - label: "Checkout Lane A"
-            bbox: [700, 600, 1300, 1080]
-            max_queue: 4
-
-      # Fall detection
-      fall_detection:
-        min_fallen_frames: 5
-        aspect_ratio_threshold: 1.4
-        cooldown_seconds: 45
-        alert_severity: "critical"
-
-  - id: "cam-03"
-    name: "Camera – Zone C (Dahua)"
-    rtsp_url: "rtsp://admin:admin@192.168.1.248:554/cam/realmonitor?channel=1&subtype=0"
-    location: "Zone C"
-    resolution:
-      width: 1920
-      height: 1080
-    fps_target: 15
-    enabled: true
-    low_light_mode: false
-    zones: []
-    staff_zone_colors:
-      - "#9933FF"
-      - "#FFCC00"
-    analyzer_config:
-      shoplifting:
-        proximity_px: 120
-        cooldown_seconds: 30
-
-      inventory_movement:
-        drop_threshold: 2
-        check_interval_seconds: 5.0
-        cooldown_seconds: 20
-        person_suppression: true
-        zones:
-          - label: "Shelf C1"
-            bbox: [50, 150, 700, 720]
-          - label: "Shelf C2"
-            bbox: [700, 150, 1400, 720]
-          - label: "Shelf C3"
-            bbox: [1400, 150, 1870, 720]
-          - label: "Freezer Zone"
-            bbox: [1500, 0, 1920, 600]
-
-      restricted_zone:
-        cooldown_seconds: 15
-        min_frames_inside: 3
-        restricted_zones:
-          - name: "Storage Room C"
-            polygon: [[1700, 0], [1920, 0], [1920, 500], [1700, 500]]
-            severity: "critical"
-
-      queue_length:
-        alert_threshold: 5
-        check_interval_seconds: 3.0
-        cooldown_seconds: 60
-        queue_zones:
-          - label: "Checkout Lane C"
-            bbox: [600, 650, 1350, 1080]
-            max_queue: 5
-
-      fall_detection:
-        min_fallen_frames: 5
-        cooldown_seconds: 45
-        alert_severity: "critical"
-
-  - id: "cam-04"
-    name: "Camera – Zone D (Dahua)"
-    rtsp_url: "rtsp://admin:admin@192.168.1.251:554/cam/realmonitor?channel=1&subtype=0"
-    location: "Zone D"
-    resolution:
-      width: 1920
-      height: 1080
-    fps_target: 15
-    enabled: true
-    low_light_mode: false
-    zones: []
-    staff_zone_colors:
-      - "#FF3399"
-      - "#00CCCC"
-    analyzer_config:
-      shoplifting:
-        proximity_px: 120
-        cooldown_seconds: 30
-
-      inventory_movement:
-        drop_threshold: 2
-        check_interval_seconds: 5.0
-        cooldown_seconds: 20
-        person_suppression: true
-        zones:
-          - label: "Shelf D1"
-            bbox: [50, 150, 700, 750]
-          - label: "Shelf D2"
-            bbox: [700, 150, 1400, 750]
-          - label: "Entrance Display"
-            bbox: [50, 750, 960, 1080]
-
-      restricted_zone:
-        cooldown_seconds: 15
-        min_frames_inside: 3
-        restricted_zones:
-          - name: "Manager Office D"
-            polygon: [[1650, 0], [1920, 0], [1920, 450], [1650, 450]]
-            severity: "critical"
-
-      queue_length:
-        alert_threshold: 5
-        check_interval_seconds: 3.0
-        cooldown_seconds: 60
-        queue_zones:
-          - label: "Checkout Lane D"
-            bbox: [600, 600, 1350, 1080]
-            max_queue: 5
-
-      fall_detection:
-        min_fallen_frames: 5
-        cooldown_seconds: 45
-        alert_severity: "critical"
-
-  - id: "cam-02"
-    name: "Camera – Zone B"
-    rtsp_url: "rtsp://admin:admin@192.168.1.109:554/"
-    location: "Zone B"
-    resolution:
-      width: 1920
-      height: 1080
-    fps_target: 15
-    enabled: false   # custom password needed — check http://192.168.1.109 to find/reset password
-    low_light_mode: false
-    zones: []
-    staff_zone_colors:
-      - "#33CC33"
-      - "#CC3333"
-    analyzer_config: {}
+- id: cam-01
+  name: Camera – Zone A
+  rtsp_url: rtsp://192.168.1.106:554/
+  location: Zone A
+  resolution:
+    width: 1920
+    height: 1080
+  fps_target: 15
+  enabled: true
+  low_light_mode: false
+  zones: []
+  staff_zone_colors:
+  - '#FF6600'
+  - '#0099FF'
+  analyzer_config:
+    shoplifting:
+      proximity_px: 80
+      sweep_window_seconds: 6.0
+      sweep_item_threshold: 1
+      cooldown_seconds: 30
+    inventory_movement:
+      drop_threshold: 2
+      check_interval_seconds: 5.0
+      cooldown_seconds: 20
+      person_suppression: true
+      zones:
+      - label: Shelf A1
+        bbox:
+        - 50
+        - 200
+        - 640
+        - 700
+      - label: Shelf A2
+        bbox:
+        - 640
+        - 200
+        - 1280
+        - 700
+      - label: Shelf A3
+        bbox:
+        - 1280
+        - 200
+        - 1870
+        - 700
+    restricted_zone:
+      cooldown_seconds: 30
+      min_frames_inside: 2
+      restricted_zones:
+      - name: Back Office
+        polygon:
+        - - 1600
+          - 0
+        - - 1920
+          - 0
+        - - 1920
+          - 400
+        - - 1600
+          - 400
+        severity: critical
+      - name: Staff Only
+        polygon:
+        - - 0
+          - 800
+        - - 300
+          - 800
+        - - 300
+          - 1080
+        - - 0
+          - 1080
+        severity: high
+    queue_length:
+      alert_threshold: 5
+      check_interval_seconds: 3.0
+      cooldown_seconds: 60
+      queue_zones:
+      - label: Checkout Lane A
+        bbox:
+        - 700
+        - 600
+        - 1300
+        - 1080
+        max_queue: 4
+    fall_detection:
+      min_fallen_frames: 5
+      aspect_ratio_threshold: 1.4
+      cooldown_seconds: 45
+      alert_severity: critical
+- id: cam-03
+  name: Camera – Zone C (Dahua)
+  rtsp_url: rtsp://admin:admin@192.168.1.248:554/cam/realmonitor?channel=1&subtype=0
+  location: Zone C
+  resolution:
+    width: 1920
+    height: 1080
+  fps_target: 15
+  enabled: true
+  low_light_mode: false
+  zones: []
+  staff_zone_colors:
+  - '#9933FF'
+  - '#FFCC00'
+  analyzer_config:
+    shoplifting:
+      proximity_px: 80
+      cooldown_seconds: 30
+    inventory_movement:
+      drop_threshold: 2
+      check_interval_seconds: 5.0
+      cooldown_seconds: 20
+      person_suppression: true
+      zones:
+      - label: Shelf C1
+        bbox:
+        - 50
+        - 150
+        - 700
+        - 720
+      - label: Shelf C2
+        bbox:
+        - 700
+        - 150
+        - 1400
+        - 720
+      - label: Shelf C3
+        bbox:
+        - 1400
+        - 150
+        - 1870
+        - 720
+      - label: Freezer Zone
+        bbox:
+        - 1500
+        - 0
+        - 1920
+        - 600
+      - label: Shelf 5
+        bbox:
+        - 384
+        - 829
+        - 1242
+        - 981
+    restricted_zone:
+      cooldown_seconds: 15
+      min_frames_inside: 2
+      restricted_zones:
+      - name: Storage Room C
+        polygon:
+        - - 1700
+          - 0
+        - - 1920
+          - 0
+        - - 1920
+          - 500
+        - - 1700
+          - 500
+        severity: critical
+    queue_length:
+      alert_threshold: 5
+      check_interval_seconds: 3.0
+      cooldown_seconds: 60
+      queue_zones:
+      - label: Checkout Lane C
+        bbox:
+        - 600
+        - 650
+        - 1350
+        - 1080
+        max_queue: 5
+    fall_detection:
+      min_fallen_frames: 5
+      cooldown_seconds: 45
+      alert_severity: critical
+- id: cam-04
+  name: Camera – Zone D (Dahua)
+  rtsp_url: rtsp://admin:admin@192.168.1.251:554/cam/realmonitor?channel=1&subtype=0
+  location: Zone D
+  resolution:
+    width: 1920
+    height: 1080
+  fps_target: 15
+  enabled: true
+  low_light_mode: false
+  zones: []
+  staff_zone_colors:
+  - '#FF3399'
+  - '#00CCCC'
+  analyzer_config:
+    shoplifting:
+      proximity_px: 80
+      cooldown_seconds: 30
+    inventory_movement:
+      drop_threshold: 2
+      check_interval_seconds: 5.0
+      cooldown_seconds: 20
+      person_suppression: true
+      zones:
+      - label: Shelf D1
+        bbox:
+        - 50
+        - 150
+        - 700
+        - 750
+      - label: Shelf D2
+        bbox:
+        - 700
+        - 150
+        - 1400
+        - 750
+      - label: Entrance Display
+        bbox:
+        - 50
+        - 750
+        - 960
+        - 1080
+      - label: Pen
+        bbox:
+        - 338
+        - 628
+        - 1046
+        - 994
+      - label: 3pens
+        bbox:
+        - 534
+        - 287
+        - 1086
+        - 971
+      - label: wHITEPEN
+        bbox:
+        - 202
+        - 430
+        - 996
+        - 794
+      - label: Shelf 7
+        bbox:
+        - 390
+        - 488
+        - 1100
+        - 992
+    restricted_zone:
+      cooldown_seconds: 15
+      min_frames_inside: 2
+      restricted_zones:
+      - name: Manager Office D
+        polygon:
+        - - 1650
+          - 0
+        - - 1920
+          - 0
+        - - 1920
+          - 450
+        - - 1650
+          - 450
+        severity: critical
+    queue_length:
+      alert_threshold: 5
+      check_interval_seconds: 3.0
+      cooldown_seconds: 60
+      queue_zones:
+      - label: Checkout Lane D
+        bbox:
+        - 600
+        - 600
+        - 1350
+        - 1080
+        max_queue: 5
+    fall_detection:
+      min_fallen_frames: 5
+      cooldown_seconds: 45
+      alert_severity: critical
+- id: cam-02
+  name: Camera – Zone B
+  rtsp_url: rtsp://admin:admin@192.168.1.109:554/
+  location: Zone B
+  resolution:
+    width: 1920
+    height: 1080
+  fps_target: 15
+  enabled: false
+  low_light_mode: false
+  zones: []
+  staff_zone_colors:
+  - '#33CC33'
+  - '#CC3333'
+  analyzer_config: {}

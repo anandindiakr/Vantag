@@ -9,25 +9,33 @@ import {
   Wifi,
   WifiOff,
   Radio,
+  Zap,
+  PenTool,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useVantagStore } from '../store/useVantagStore';
+import { useRegion } from '../hooks/useRegion';
+import { LanguageSelector } from './LanguageSelector';
 
 interface NavItem {
   label: string;
   to: string;
   icon: React.ReactNode;
+  dividerBefore?: boolean;
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard',  to: '/dashboard',  icon: <LayoutDashboard size={20} /> },
-  { label: 'Cameras',    to: '/cameras',    icon: <Camera size={20} /> },
-  { label: 'Incidents',  to: '/incidents',  icon: <AlertTriangle size={20} /> },
-  { label: 'Watchlist',  to: '/watchlist',  icon: <Users size={20} /> },
+  { label: 'Dashboard',    to: '/dashboard',    icon: <LayoutDashboard size={20} /> },
+  { label: 'Cameras',      to: '/cameras',      icon: <Camera size={20} /> },
+  { label: 'Incidents',    to: '/incidents',    icon: <AlertTriangle size={20} /> },
+  { label: 'Watchlist',    to: '/watchlist',    icon: <Users size={20} /> },
+  { label: 'Zone Editor',  to: '/zone-editor',  icon: <PenTool size={20} />, dividerBefore: true },
+  { label: 'Demo Center',  to: '/demo',         icon: <Zap size={20} /> },
 ];
 
 export default function Sidebar() {
   const navigate      = useNavigate();
+  const region        = useRegion();
   const wsConnected   = useVantagStore((s) => s.wsConnected);
   const mqttConnected = useVantagStore((s) => s.mqttConnected);
   const stores        = useVantagStore((s) => s.stores);
@@ -46,30 +54,35 @@ export default function Sidebar() {
         <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-vantag-red/20 ring-1 ring-vantag-red/50">
           <ShieldCheck size={20} className="text-vantag-red" />
         </div>
-        <div>
-          <span className="text-lg font-bold tracking-tight text-slate-100">Vantag</span>
+        <div className="flex-1 min-w-0">
+          <span className="text-base font-bold tracking-tight text-slate-100 truncate block">{region.brandShort}</span>
           <p className="text-xs text-slate-400 leading-none">Retail Intelligence</p>
         </div>
+        <LanguageSelector variant="dark" />
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              clsx(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150',
-                isActive
-                  ? 'bg-vantag-red/15 text-vantag-red ring-1 ring-vantag-red/30'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50'
-              )
-            }
-          >
-            {item.icon}
-            {item.label}
-          </NavLink>
+          <div key={item.to}>
+            {item.dividerBefore && (
+              <div className="my-2 border-t border-slate-700/60" />
+            )}
+            <NavLink
+              to={item.to}
+              className={({ isActive }) =>
+                clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150',
+                  isActive
+                    ? 'bg-vantag-red/15 text-vantag-red ring-1 ring-vantag-red/30'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50'
+                )
+              }
+            >
+              {item.icon}
+              {item.label}
+            </NavLink>
+          </div>
         ))}
       </nav>
 

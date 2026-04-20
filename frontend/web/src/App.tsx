@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import './i18n/index';
 import Sidebar from './components/Sidebar';
 import { useWebSocket } from './hooks/useWebSocket';
+import { useMQTT } from './hooks/useMQTT';
 
 // ── React Query client ──────────────────────────────────────────────────────
 const queryClient = new QueryClient({
@@ -23,7 +24,9 @@ const Register     = lazy(() => import('./pages/auth/Register'));
 const VerifyEmail  = lazy(() => import('./pages/auth/VerifyEmail'));
 const Onboarding   = lazy(() => import('./pages/onboarding/Onboarding'));
 const Dashboard    = lazy(() => import('./pages/Dashboard'));
-const CamerasPage  = lazy(() => import('./pages/CamerasPage'));
+const CamerasPage   = lazy(() => import('./pages/CamerasPage'));
+const DemoCenter    = lazy(() => import('./pages/DemoCenter'));
+const ZoneEditor    = lazy(() => import('./pages/ZoneEditorPage'));
 const CameraView   = lazy(() => import('./pages/CameraView'));
 const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
@@ -49,8 +52,9 @@ function Loading() {
 
 // ── App shell with sidebar (authenticated pages) ────────────────────────────
 function AppLayout() {
-  // Initialise WebSocket connection once for all dashboard pages
+  // Initialise WebSocket + MQTT connections once for all dashboard pages
   useWebSocket();
+  useMQTT();
   return (
     <div className="flex min-h-screen bg-vantag-dark">
       <Sidebar />
@@ -88,6 +92,8 @@ export default function App() {
             <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
               <Route path="/dashboard"              element={<Dashboard />} />
               <Route path="/cameras"               element={<CamerasPage />} />
+              <Route path="/demo"                  element={<DemoCenter />} />
+              <Route path="/zone-editor"           element={<ZoneEditor />} />
               <Route path="/cameras/:storeId/:cameraId" element={<CameraView />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
               <Route path="/watchlist"  element={<WatchlistPage />} />

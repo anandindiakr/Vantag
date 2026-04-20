@@ -135,6 +135,7 @@ export interface Incident {
   resolvedAt?: string;
   resolved: boolean;
   reportUrl?: string;
+  snapshotUrl?: string;
 }
 
 export type DoorState = 'locked' | 'unlocked' | 'unknown';

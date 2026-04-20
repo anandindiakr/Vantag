@@ -295,6 +295,19 @@ class VantagPipeline:
 
         self._started = True
         self._start_time = time.monotonic()
+
+        # Hydrate in-memory recent_events from SQLite (last 500 per store).
+        try:
+            from ..db import incident_store as _istore  # lazy import
+            for sid in _istore.get_all_store_ids():
+                items, _, _ = _istore.query_incidents(sid, page=1, limit=500)
+                dq = self.recent_events[sid]
+                for item in reversed(items):   # oldest first → deque order matches insertion order
+                    dq.append(item)
+            logger.info("SQLite hydration complete")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("SQLite hydration failed (non-fatal) | error=%s", exc)
+
         logger.info("VantagPipeline started | cameras=%d", len(self._camera_tasks))
 
     async def stop(self) -> None:
@@ -485,9 +498,16 @@ class VantagPipeline:
     # ------------------------------------------------------------------
 
     async def _emit_event(self, ev: dict, store_id: str) -> None:
-        """Push an event to the in-memory log, WebSocket, and MQTT."""
+        """Push an event to the in-memory log, WebSocket, MQTT, and SQLite."""
         # Append to recent events.
         self.recent_events[store_id].append(ev)
+
+        # Persist to SQLite (fire-and-forget, best-effort).
+        try:
+            from ..db import incident_store as _istore  # lazy import — avoids circular
+            await asyncio.to_thread(_istore.insert_incident, ev)
+        except Exception:  # noqa: BLE001
+            pass
 
         # WebSocket broadcast.
         if self._ws_broadcast:
