@@ -12,6 +12,7 @@ import {
   Zap,
   PenTool,
   Download,
+  HelpCircle,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useVantagStore } from '../store/useVantagStore';
@@ -33,6 +34,7 @@ const navItems: NavItem[] = [
   { label: 'Zone Editor',  to: '/zone-editor',  icon: <PenTool size={20} />, dividerBefore: true },
   { label: 'Demo Center',  to: '/demo',         icon: <Zap size={20} /> },
   { label: 'Install Edge Agent', to: '/download', icon: <Download size={20} />, dividerBefore: true },
+  { label: 'Help & Support', to: '/help', icon: <HelpCircle size={20} /> },
 ];
 
 export default function Sidebar() {

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import './i18n/index';
 import Sidebar from './components/Sidebar';
+import SupportChat from './components/SupportChat';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useMQTT } from './hooks/useMQTT';
 
@@ -32,6 +33,9 @@ const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
 const StoreDetail  = lazy(() => import('./pages/StoreDetail'));
 const DownloadPage = lazy(() => import('./pages/DownloadPage'));
+const HowItWorks   = lazy(() => import('./pages/HowItWorks'));
+const FAQ          = lazy(() => import('./pages/FAQ'));
+const HelpCenter   = lazy(() => import('./pages/HelpCenter'));
 
 // ── Auth helper ─────────────────────────────────────────────────────────────
 function isAuthenticated() {
@@ -82,6 +86,8 @@ export default function App() {
           <Routes>
             {/* Public */}
             <Route path="/" element={<Landing />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
+            <Route path="/faq" element={<FAQ />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
@@ -100,12 +106,14 @@ export default function App() {
               <Route path="/watchlist"  element={<WatchlistPage />} />
               <Route path="/stores/:id" element={<StoreDetail />} />
               <Route path="/download"   element={<DownloadPage />} />
+              <Route path="/help"       element={<HelpCenter />} />
             </Route>
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        <SupportChat />
       </BrowserRouter>
     </QueryClientProvider>
   );

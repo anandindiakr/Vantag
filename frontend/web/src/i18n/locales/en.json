@@ -5,8 +5,12 @@
     "pricing": "Pricing",
     "about": "About",
     "signin": "Sign In",
-    "get_started": "Get Started Free",
-    "back_home": "Back to Home"
+    "get_started": "Get Started",
+    "back_home": "Back to Home",
+    "home": "Home",
+    "how_it_works": "How it works",
+    "faq": "FAQ",
+    "login": "Sign In"
   },
   "hero": {
     "badge": "AI-Powered Retail Security",

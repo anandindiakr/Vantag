@@ -62,6 +62,7 @@ from .camera_probe_router import camera_probe_router
 from .demo_router import router as demo_router
 from .demo_router import set_pipeline as demo_set_pipeline
 from .zone_router import router as zone_router
+from .support_router import support_router
 
 logger = logging.getLogger(__name__)
 
@@ -255,6 +256,7 @@ app.include_router(billing_router)
 app.include_router(camera_probe_router)
 app.include_router(demo_router)
 app.include_router(zone_router)
+app.include_router(support_router)
 
 # ---------------------------------------------------------------------------
 # Health check endpoint

@@ -266,7 +266,7 @@ function PricingCard({ plan, annual }: {
    MAIN COMPONENT
 ───────────────────────────────────────────────────────── */
 export default function Landing() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const domainRegion = useRegion();
 
   // On localhost dev, allow switching between regions to preview prices/branding
@@ -366,15 +366,21 @@ export default function Landing() {
           )}
 
           <div className="flex items-center gap-4">
+            <Link to="/how-it-works" className="hidden md:inline text-sm text-white/50 hover:text-white transition-colors font-medium">
+              {t('nav.how_it_works', 'How it works')}
+            </Link>
+            <Link to="/faq" className="hidden md:inline text-sm text-white/50 hover:text-white transition-colors font-medium">
+              {t('nav.faq', 'FAQ')}
+            </Link>
             <LanguageSelector variant="dark" />
             <Link to="/login" className="text-sm text-white/50 hover:text-white transition-colors font-medium">
-              Sign In
+              {t('nav.login', 'Sign In')}
             </Link>
             <Link
               to="/register"
               className="flex items-center gap-1.5 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 rounded-full text-sm font-bold text-black transition-all"
             >
-              Get Started <ChevronRight className="w-3.5 h-3.5" />
+              {t('nav.get_started', 'Get Started')} <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
