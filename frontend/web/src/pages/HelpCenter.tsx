@@ -1,7 +1,7 @@
 /**
  * HelpCenter.tsx — logged-in help page
  */
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, Download, MessageCircle, Mail, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';

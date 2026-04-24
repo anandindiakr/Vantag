@@ -4,7 +4,7 @@
  * Floating chat widget in the bottom-right corner of every page.
  * Powered by Vantag Assistant (OpenAI GPT-4o backend at /api/support/chat).
  */
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, X, Send, Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 

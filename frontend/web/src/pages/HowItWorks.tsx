@@ -1,13 +1,10 @@
 /**
  * HowItWorks.tsx — public setup guide
  */
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
-const Step: React.FC<{ num: number; title: string; body: string; icon: string }> = ({
-  num, title, body, icon,
-}) => (
+const Step = ({ num, title, body, icon }: { num: number; title: string; body: string; icon: string }) => (
   <div className="bg-white/5 border border-white/10 rounded-xl p-6">
     <div className="flex items-center gap-3 mb-3">
       <span className="w-10 h-10 rounded-full bg-violet-600 text-white flex items-center justify-center font-bold">

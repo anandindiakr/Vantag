@@ -1,7 +1,7 @@
 /**
  * FAQ.tsx — public FAQ (pulled from /api/support/faq)
  */
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
