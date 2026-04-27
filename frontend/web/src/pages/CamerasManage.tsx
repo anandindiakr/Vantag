@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Camera, Wifi, WifiOff, Search, Plus, Trash2, TestTube2,
+  Camera, Wifi, WifiOff, Plus, Trash2, TestTube2,
   Loader2, CheckCircle2, XCircle, ArrowLeft, Network, Sparkles,
   MessageCircle,
 } from 'lucide-react';
@@ -705,9 +705,7 @@ export default function CamerasManage() {
   const [prefill, setPrefill] = useState<{ ip: string; port: number } | null>(null);
   const [formKey, setFormKey] = useState(0);
 
-  // Support chat prefill
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatPrefill, setChatPrefill] = useState('');
+  // Support chat prefill — state removed (event-driven via window dispatch)
 
   const handleDiscoveredAdd = (ip: string, port: number) => {
     setPrefill({ ip, port });
@@ -722,8 +720,6 @@ export default function CamerasManage() {
   };
 
   const handleOpenChat = (msg: string) => {
-    setChatPrefill(msg);
-    setChatOpen(true);
     // Dispatch a custom event so SupportChat can pick it up
     window.dispatchEvent(new CustomEvent('vantag:support-chat', { detail: { open: true, prefillMessage: msg } }));
   };
