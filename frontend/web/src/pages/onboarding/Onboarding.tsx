@@ -483,9 +483,17 @@ export default function Onboarding() {
               <h2 className="text-2xl font-bold mb-2">You're almost live!</h2>
               <p className="text-white/40 text-sm mb-8">Scan this QR code with your Android phone to connect it to Vantag.</p>
 
-              {/* QR placeholder — in production use qrcode.react */}
-              <div className="w-48 h-48 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <div className="text-gray-800 text-xs text-center p-4 font-mono break-all">{agentData.api_key?.slice(0, 40)}</div>
+              {/* QR code — uses public QR service so no npm dep needed */}
+              <div className="w-48 h-48 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 p-3">
+                {agentData.api_key ? (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(agentData.api_key)}`}
+                    alt="Edge Agent pairing QR code"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div className="text-gray-800 text-xs">Generating…</div>
+                )}
               </div>
 
               <div className="text-xs text-white/30 font-mono mb-8 bg-white/5 rounded-lg px-4 py-2 break-all">{agentData.api_key}</div>

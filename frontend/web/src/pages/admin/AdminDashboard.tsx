@@ -82,6 +82,27 @@ function authHeaders() {
   return { Authorization: `Bearer ${token}` };
 }
 
+async function downloadCsv(url: string, filename: string) {
+  try {
+    const r = await fetch(url, { headers: authHeaders() });
+    if (!r.ok) {
+      alert(`Export failed: ${r.status} ${r.statusText}`);
+      return;
+    }
+    const blob = await r.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 1000);
+  } catch (e: any) {
+    alert(`Export failed: ${e?.message || e}`);
+  }
+}
+
 // ── Sub-components ──────────────────────────────────────────────────────────
 
 function KpiCard({ label, value, sub, color = 'violet' }: {
@@ -531,12 +552,12 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold">Payment Events</h2>
-                <a
-                  href="/api/admin/payments/export.csv"
+                <button
+                  onClick={() => downloadCsv('/api/admin/payments/export.csv', 'payments_export.csv')}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm transition-all"
                 >
                   <Download size={14} /> Export CSV
-                </a>
+                </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -579,12 +600,12 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold">All Incidents</h2>
-                <a
-                  href="/api/admin/incidents/export.csv"
+                <button
+                  onClick={() => downloadCsv('/api/admin/incidents/export.csv', 'incidents_export.csv')}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm transition-all"
                 >
                   <Download size={14} /> Export CSV
-                </a>
+                </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
