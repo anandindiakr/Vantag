@@ -427,8 +427,7 @@ export default function Landing() {
             </h1>
 
             <p className="text-[1.1rem] text-white/50 leading-relaxed mb-10 max-w-lg font-body-alt">
-              Shoplifting, fall detection, restricted zone entry, inventory drops, queue overflows — your store,
-              protected around the clock by AI that runs on your own hardware.
+              The DIY AI security platform for <strong className="text-white/80">shops, malls, hospitals, post offices, police stations, small offices and homes</strong>. Turn any existing IP camera into a 24/7 guardian — detects shoplifting, loitering, falls, empty shelves, intrusion and more. Plug &amp; play. 30-minute setup.
             </p>
 
             <div className="flex flex-wrap gap-4 items-center mb-14">

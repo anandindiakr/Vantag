@@ -2,33 +2,236 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Vantag Retail Intelligence Platform — AI-powered retail security dashboard" />
-    <title>Vantag — Retail Intelligence Platform</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0B1020" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- ───── Primary SEO meta (overridden per-region by script below) ───── -->
+    <title>Vantag — DIY AI Security & CCTV Analytics for Shops, Malls, Hospitals, Offices</title>
+    <meta name="description" content="Vantag is the DIY AI-powered security platform that turns any IP camera into a 24/7 theft, loitering, fall & inventory monitor. Plug & play setup in 30 minutes. For retail shops, malls, hospitals, post offices, police stations, small offices & homes." />
+    <meta name="keywords" content="DIY security system, AI CCTV analytics, retail theft detection, shop security camera AI, mall surveillance software, hospital CCTV monitoring, police station surveillance, post office security, small office camera system, home security AI, inventory monitoring AI, shoplifting detection, loitering detection, empty shelf detection, edge AI surveillance, plug and play CCTV, RTSP camera AI, YOLO retail security, Vantag, Retail Nazar, JagaJaga" />
+    <meta name="author" content="Vantag Retail Intelligence" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <meta name="bingbot" content="index, follow" />
+    <meta name="rating" content="general" />
+    <meta name="distribution" content="global" />
+
+    <!-- Canonical + hreflang (filled in by script at runtime) -->
+    <link id="seo-canonical" rel="canonical" href="https://retail-vantag.com/" />
+    <link rel="alternate" hreflang="en-SG" href="https://retail-vantag.com/" />
+    <link rel="alternate" hreflang="en-IN" href="https://retailnazar.com/" />
+    <link rel="alternate" hreflang="hi-IN" href="https://retailnazar.in/" />
+    <link rel="alternate" hreflang="en-MY" href="https://retailjagajaga.com/" />
+    <link rel="alternate" hreflang="ms-MY" href="https://jagajaga.my/" />
+    <link rel="alternate" hreflang="x-default" href="https://retail-vantag.com/" />
+
+    <!-- Open Graph (Facebook, LinkedIn, WhatsApp) -->
+    <meta id="og-title" property="og:title" content="Vantag — DIY AI Security for Shops, Malls, Hospitals & Offices" />
+    <meta id="og-description" property="og:description" content="Turn any IP camera into a 24/7 AI guardian. Detects theft, loitering, falls, empty shelves & more. Plug & play. Works on your existing cameras. Set up in 30 minutes." />
+    <meta property="og:type" content="website" />
+    <meta id="og-url" property="og:url" content="https://retail-vantag.com/" />
+    <meta property="og:image" content="https://retail-vantag.com/og-cover.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta id="og-site" property="og:site_name" content="Vantag — Retail Intelligence" />
+    <meta property="og:locale" content="en_SG" />
+    <meta property="og:locale:alternate" content="en_IN" />
+    <meta property="og:locale:alternate" content="hi_IN" />
+    <meta property="og:locale:alternate" content="ms_MY" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta id="tw-title" name="twitter:title" content="Vantag — DIY AI Security for Shops, Malls, Hospitals & Offices" />
+    <meta id="tw-description" name="twitter:description" content="Turn any IP camera into an AI guardian. Theft, loitering, falls, empty shelves. Plug & play, 30-min setup." />
+    <meta name="twitter:image" content="https://retail-vantag.com/og-cover.png" />
+
+    <!-- Favicons (region-aware) -->
     <link id="fav" rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="mask-icon" href="/favicon.svg" color="#8B5CF6" />
+
+    <!-- ───── JSON-LD structured data (how Google shows rich results) ───── -->
+    <script type="application/ld+json" id="ld-organization">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Vantag Retail Intelligence",
+      "url": "https://retail-vantag.com/",
+      "logo": "https://retail-vantag.com/favicon.svg",
+      "description": "DIY AI-powered security & predictive analytics platform for shops, malls, hospitals, offices, post offices, police stations and homes.",
+      "sameAs": [
+        "https://retailnazar.com/",
+        "https://retailnazar.in/",
+        "https://retailjagajaga.com/",
+        "https://jagajaga.my/"
+      ],
+      "areaServed": [
+        {"@type":"Country","name":"Singapore"},
+        {"@type":"Country","name":"India"},
+        {"@type":"Country","name":"Malaysia"}
+      ],
+      "contactPoint": [{
+        "@type": "ContactPoint",
+        "contactType": "customer support",
+        "email": "support@retail-vantag.com",
+        "availableLanguage": ["en","hi","ta","ms"]
+      }]
+    }
+    </script>
+
+    <script type="application/ld+json" id="ld-software">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Vantag — Retail Intelligence Platform",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web, Android, Windows, Linux, NVIDIA Jetson",
+      "description": "AI-powered DIY security & retail analytics that turns any IP camera into a 24/7 guardian. Detects shoplifting, loitering, falls, empty shelves, inventory movement, camera tamper, intrusion, crowd density and more. Works for retail shops, shopping malls, hospitals, post offices, police stations, small offices and homes.",
+      "featureList": [
+        "Shoplifting & product sweeping detection",
+        "Loitering / anomalous dwell time",
+        "Empty shelf / inventory visibility",
+        "Fall detection",
+        "Zone entry violations / restricted-area monitoring",
+        "Camera tamper detection",
+        "Crowd & queue analytics",
+        "After-hours intrusion",
+        "License plate capture",
+        "One-tap door lock via MQTT",
+        "POS integration",
+        "Multi-language UI (English + local)"
+      ],
+      "offers": [
+        {"@type":"Offer","price":"39","priceCurrency":"SGD","name":"Starter (SG)","description":"Up to 5 cameras"},
+        {"@type":"Offer","price":"99","priceCurrency":"SGD","name":"Growth (SG)","description":"Up to 15 cameras"},
+        {"@type":"Offer","price":"189","priceCurrency":"SGD","name":"Pro (SG)","description":"Up to 30 cameras"},
+        {"@type":"Offer","price":"1999","priceCurrency":"INR","name":"Starter (IN)","description":"Up to 5 cameras"},
+        {"@type":"Offer","price":"4499","priceCurrency":"INR","name":"Growth (IN)","description":"Up to 15 cameras"},
+        {"@type":"Offer","price":"8999","priceCurrency":"INR","name":"Pro (IN)","description":"Up to 30 cameras"},
+        {"@type":"Offer","price":"59","priceCurrency":"MYR","name":"Starter (MY)","description":"Up to 5 cameras"},
+        {"@type":"Offer","price":"149","priceCurrency":"MYR","name":"Growth (MY)","description":"Up to 15 cameras"},
+        {"@type":"Offer","price":"299","priceCurrency":"MYR","name":"Pro (MY)","description":"Up to 30 cameras"}
+      ],
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "reviewCount": "27"
+      }
+    }
+    </script>
+
+    <script type="application/ld+json" id="ld-faq">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Does Vantag work with my existing IP cameras?",
+          "acceptedAnswer": {"@type":"Answer","text":"Yes. Vantag is camera-agnostic and works with any RTSP-compatible IP camera — Hikvision, Dahua, CP Plus, TP-Link, Reolink, generic ONVIF cameras and more. No new hardware required."}
+        },
+        {
+          "@type": "Question",
+          "name": "How long does setup take?",
+          "acceptedAnswer": {"@type":"Answer","text":"Under 30 minutes. Register your shop, pick a plan, install the Edge Agent on any Android phone, tablet or Windows PC, scan the QR code, and the system auto-discovers cameras on your LAN."}
+        },
+        {
+          "@type": "Question",
+          "name": "Does video get uploaded to the cloud?",
+          "acceptedAnswer": {"@type":"Answer","text":"No. All AI inference runs locally on your Edge device. Only lightweight event metadata and optional snapshot evidence are sent to the dashboard — your video stays on-premises."}
+        },
+        {
+          "@type": "Question",
+          "name": "Which businesses is Vantag for?",
+          "acceptedAnswer": {"@type":"Answer","text":"Retail shops of all sizes, shopping malls, hospitals, clinics, post offices, police stations, small offices, warehouses, petrol stations and homes. Anywhere you already have cameras — Vantag makes them intelligent."}
+        },
+        {
+          "@type": "Question",
+          "name": "What does it detect?",
+          "acceptedAnswer": {"@type":"Answer","text":"12 detection types: product sweeping / shoplifting, loitering (anomalous dwell), empty shelves, concealment / theft, inventory movement tracking, falls, restricted-zone entry, queue / crowd analytics, camera tamper, staff behaviour, after-hours intrusion and license plate capture."}
+        }
+      ]
+    }
+    </script>
+
+    <!-- ───── Region-aware meta swap (by hostname) ───── -->
     <script>
-      // Region-aware favicon + title swap based on hostname
       (function () {
         try {
           var h = (location.hostname || '').toLowerCase();
-          var cfg = { icon: '/favicon-sg.svg', title: 'Vantag — Retail Intelligence' };
+          var origin = location.origin;
+
+          var cfg = {
+            code: 'SG',
+            lang: 'en',
+            locale: 'en_SG',
+            brand: 'Vantag — Retail Intelligence',
+            title: 'Vantag — DIY AI Security for Shops, Malls, Hospitals & Offices | Singapore',
+            description: 'Singapore\u2019s leading DIY AI security platform. Turn any IP camera into a 24/7 guardian that detects theft, loitering, falls & inventory loss. Plug & play setup. Starts at S$39/mo.',
+            icon: '/favicon-sg.svg'
+          };
           if (h.indexOf('retailnazar') !== -1) {
-            cfg = { icon: '/favicon-in.svg', title: 'Vantag — Retail Nazar' };
+            cfg = {
+              code: 'IN',
+              lang: 'en',
+              locale: 'en_IN',
+              brand: 'Vantag — Retail Nazar',
+              title: 'Retail Nazar — DIY AI CCTV Security for Indian Shops, Malls & Offices | Vantag',
+              description: 'India\u2019s AI security platform for small & medium retailers. Detects shoplifting, loitering, empty shelves & staff fraud on your existing IP cameras. Hindi + English. From Rs. 1,999/month.',
+              icon: '/favicon-in.svg'
+            };
           } else if (h.indexOf('jagajaga') !== -1) {
-            cfg = { icon: '/favicon-my.svg', title: 'Vantag — JagaJaga' };
+            cfg = {
+              code: 'MY',
+              lang: 'ms',
+              locale: 'ms_MY',
+              brand: 'Vantag — JagaJaga',
+              title: 'JagaJaga — Sistem Keselamatan AI DIY untuk Kedai & Pejabat | Malaysia',
+              description: 'Pengawal AI 24/7 untuk kedai Malaysia. Kesan kecurian, tingkah laku mencurigakan, stok kosong & kamera rosak. Pasang sendiri dalam 30 minit. Dari RM59/bulan.',
+              icon: '/favicon-my.svg'
+            };
           }
-          var el = document.getElementById('fav');
-          if (el) el.setAttribute('href', cfg.icon);
+
+          // Apply
+          document.documentElement.setAttribute('lang', cfg.lang);
           document.title = cfg.title;
+
+          function setMeta(id, attr, value) {
+            var el = document.getElementById(id);
+            if (el) el.setAttribute(attr, value);
+          }
+          setMeta('seo-canonical', 'href', origin + '/');
+          setMeta('og-title', 'content', cfg.title);
+          setMeta('og-description', 'content', cfg.description);
+          setMeta('og-url', 'content', origin + '/');
+          setMeta('og-site', 'content', cfg.brand);
+          setMeta('tw-title', 'content', cfg.title);
+          setMeta('tw-description', 'content', cfg.description);
+          setMeta('fav', 'href', cfg.icon);
+
+          var descEl = document.querySelector('meta[name="description"]');
+          if (descEl) descEl.setAttribute('content', cfg.description);
+          var locEl = document.querySelector('meta[property="og:locale"]');
+          if (locEl) locEl.setAttribute('content', cfg.locale);
         } catch (e) {}
       })();
     </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body class="bg-vantag-dark text-white antialiased">
+    <!-- SEO-friendly noscript fallback so crawlers that don't run JS still see content -->
+    <noscript>
+      <div style="max-width:760px;margin:40px auto;padding:20px;font-family:sans-serif;color:#eee;">
+        <h1>Vantag — DIY AI Security for Shops, Malls, Hospitals & Offices</h1>
+        <p>Vantag is a plug-and-play AI security platform that turns any existing IP camera into a 24/7 guardian. It detects shoplifting, loitering, falls, empty shelves, inventory movement, camera tampering and more — for retail shops, shopping malls, hospitals, post offices, police stations, small offices and homes.</p>
+        <p>Available in Singapore (retail-vantag.com), India (retailnazar.com, retailnazar.in) and Malaysia (jagajaga.my, retailjagajaga.com). Enable JavaScript to use the interactive dashboard, or email <a href="mailto:support@retail-vantag.com">support@retail-vantag.com</a>.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

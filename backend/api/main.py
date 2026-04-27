@@ -65,6 +65,7 @@ from .support_router import support_router
 from .system_router import system_router
 from .snapshots_router import snapshots_router
 from .admin_router import admin_router
+from .seo_router import seo_router
 
 logger = logging.getLogger(__name__)
 
@@ -279,6 +280,7 @@ app.include_router(support_router)
 app.include_router(system_router)
 app.include_router(snapshots_router)
 app.include_router(admin_router)
+app.include_router(seo_router)
 
 # ---------------------------------------------------------------------------
 # Health check endpoint
