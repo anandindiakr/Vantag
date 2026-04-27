@@ -33,7 +33,6 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from .models import HealthResponse
 from .pipeline import VantagPipeline
@@ -64,6 +63,7 @@ from .demo_router import set_pipeline as demo_set_pipeline
 from .zone_router import router as zone_router
 from .support_router import support_router
 from .system_router import system_router
+from .snapshots_router import snapshots_router
 
 logger = logging.getLogger(__name__)
 
@@ -226,15 +226,16 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------------------------
-# Static files (snapshots served at /snapshots/*)
+# Static files (snapshots)
 # ---------------------------------------------------------------------------
-
+# Snapshots are NO LONGER served as unauthenticated static files.
+# Use the authenticated endpoint instead:
+#   GET /api/snapshots/{tenant_id}/{filename}    (JWT required, tenant-scoped)
+#   GET /api/snapshots/watchlist/{filename}      (JWT required)
+#   GET /api/snapshots/demo/{filename}           (JWT required)
+#
+# _SNAPSHOTS_DIR is still created so the rest of the app can write files.
 _SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-app.mount(
-    "/snapshots",
-    StaticFiles(directory=str(_SNAPSHOTS_DIR)),
-    name="snapshots",
-)
 
 # ---------------------------------------------------------------------------
 # Routers
@@ -259,6 +260,7 @@ app.include_router(demo_router)
 app.include_router(zone_router)
 app.include_router(support_router)
 app.include_router(system_router)
+app.include_router(snapshots_router)
 
 # ---------------------------------------------------------------------------
 # Health check endpoint

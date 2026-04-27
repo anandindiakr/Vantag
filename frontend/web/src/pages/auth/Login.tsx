@@ -98,6 +98,11 @@ export default function Login() {
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <div className="flex justify-end mt-1.5">
+                <Link to="/forgot-password" className="text-xs text-white/30 hover:text-violet-400 transition-colors">
+                  Forgot password?
+                </Link>
+              </div>
             </div>
             <button type="submit" id="vantag-login-submit" disabled={loading}
               className="w-full py-3.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all mt-2">

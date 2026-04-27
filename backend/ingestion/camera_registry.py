@@ -3,10 +3,18 @@ camera_registry.py
 ==================
 Loads cameras.yaml and provides typed, validated access to camera
 configuration throughout the Vantag backend.
+
+RTSP URL encryption
+-------------------
+When VANTAG_ENCRYPTION_KEY (or legacy VANTAG_FACE_KEY / FACE_ENCRYPTION_KEY)
+is set, RTSP URLs are stored encrypted in cameras.yaml using Fernet symmetric
+encryption and are decrypted lazily on read.  Plaintext URLs that are found on
+first load are auto-encrypted and the YAML is re-persisted.
 """
 
 from __future__ import annotations
 
+import base64
 import logging
 import os
 from dataclasses import dataclass, field
@@ -16,6 +24,61 @@ from typing import Dict, List, Optional, Tuple
 import yaml
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Fernet encryption helpers (optional — graceful degradation when key absent)
+# ---------------------------------------------------------------------------
+
+_FERNET_PREFIX = "fernet:"
+
+
+def _get_fernet():
+    """Return a Fernet instance if an encryption key is available, else None."""
+    key = (
+        os.getenv("VANTAG_ENCRYPTION_KEY")
+        or os.getenv("FACE_ENCRYPTION_KEY")
+        or os.getenv("VANTAG_FACE_KEY")
+        or ""
+    )
+    if not key:
+        return None
+    try:
+        from cryptography.fernet import Fernet
+        return Fernet(key.encode() if isinstance(key, str) else key)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to initialise Fernet cipher | error=%s", exc)
+        return None
+
+
+def encrypt_rtsp(url: str) -> str:
+    """Encrypt *url* with Fernet; returns the prefixed ciphertext string.
+    Falls back to plaintext if no key is configured."""
+    if url.startswith(_FERNET_PREFIX):
+        return url  # already encrypted
+    fernet = _get_fernet()
+    if fernet is None:
+        return url  # no key configured — store as-is
+    token = fernet.encrypt(url.encode()).decode()
+    return f"{_FERNET_PREFIX}{token}"
+
+
+def decrypt_rtsp(value: str) -> str:
+    """Decrypt a Fernet-encrypted RTSP URL.  Returns plaintext.
+    If the value is not encrypted or the key is missing, returns value as-is."""
+    if not value.startswith(_FERNET_PREFIX):
+        return value  # plaintext (legacy or no key)
+    fernet = _get_fernet()
+    if fernet is None:
+        logger.error(
+            "RTSP URL is encrypted but VANTAG_ENCRYPTION_KEY is not set — "
+            "camera will not connect."
+        )
+        return value
+    try:
+        return fernet.decrypt(value[len(_FERNET_PREFIX):].encode()).decode()
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to decrypt RTSP URL | error=%s", exc)
+        return value
 
 
 # ---------------------------------------------------------------------------
@@ -48,7 +111,7 @@ class CameraConfig:
     """Fully typed representation of a single camera entry from cameras.yaml."""
     id: str
     name: str
-    rtsp_url: str
+    _rtsp_url_raw: str  # may be plaintext or fernet-encrypted; use .rtsp_url
     location: str
     resolution: Resolution
     fps_target: int
@@ -58,6 +121,15 @@ class CameraConfig:
     staff_zone_colors: List[str]
     analyzer_config: Dict = field(default_factory=dict)
     """Optional per-camera config for the AI analyzer stack (zones, thresholds, etc.)."""
+
+    @property
+    def rtsp_url(self) -> str:
+        """Return the decrypted plaintext RTSP URL."""
+        return decrypt_rtsp(self._rtsp_url_raw)
+
+    @rtsp_url.setter
+    def rtsp_url(self, value: str) -> None:
+        self._rtsp_url_raw = value
 
 
 # ---------------------------------------------------------------------------
@@ -132,13 +204,26 @@ class CameraRegistry:
             raise ConfigError("cameras.yaml 'cameras' must be a list.")
 
         self._cameras = {}
+        needs_re_persist = False
         for idx, cam_raw in enumerate(cameras_raw):
             cam = self._parse_camera(cam_raw, index=idx)
             if cam.id in self._cameras:
                 raise ConfigError(f"Duplicate camera id '{cam.id}' in cameras.yaml.")
+            # Auto-encrypt any plaintext RTSP URLs found on disk
+            encrypted = encrypt_rtsp(cam._rtsp_url_raw)
+            if encrypted != cam._rtsp_url_raw:
+                cam._rtsp_url_raw = encrypted
+                needs_re_persist = True
+                logger.info(
+                    "Auto-encrypted plaintext RTSP URL | camera_id=%s", cam.id
+                )
             self._cameras[cam.id] = cam
 
         self._loaded = True
+
+        if needs_re_persist:
+            logger.info("Persisting cameras.yaml with encrypted RTSP URLs.")
+            self.persist_to_yaml()
 
     def get_camera(self, camera_id: str) -> CameraConfig:
         """Return ``CameraConfig`` for the given camera id."""
@@ -187,11 +272,14 @@ class CameraRegistry:
         """
         Register a new camera at runtime and persist to YAML.
 
+        The RTSP URL is encrypted (if a key is configured) before persisting.
         Raises ``ConfigError`` if a camera with the same id already exists.
         """
         self._ensure_loaded()
         if cam.id in self._cameras:
             raise ConfigError(f"Camera id '{cam.id}' already exists in registry.")
+        # Encrypt the RTSP URL before storing/persisting
+        cam._rtsp_url_raw = encrypt_rtsp(cam._rtsp_url_raw)
         self._cameras[cam.id] = cam
         logger.info("Camera added to registry | camera_id=%s", cam.id)
         self.persist_to_yaml()
@@ -227,7 +315,7 @@ class CameraRegistry:
             cam_dict: dict = {
                 "id": cam.id,
                 "name": cam.name,
-                "rtsp_url": cam.rtsp_url,
+                "rtsp_url": cam._rtsp_url_raw,  # persisted as encrypted value
                 "location": cam.location,
                 "resolution": {
                     "width": cam.resolution.width,
@@ -301,7 +389,7 @@ class CameraRegistry:
         return CameraConfig(
             id=cam_id,
             name=str(raw["name"]),
-            rtsp_url=str(raw["rtsp_url"]),
+            _rtsp_url_raw=str(raw["rtsp_url"]),
             location=str(raw["location"]),
             resolution=resolution,
             fps_target=int(raw["fps_target"]),

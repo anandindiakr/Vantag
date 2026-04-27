@@ -41,6 +41,9 @@ venv.bak/
 secrets.yaml
 secrets.json
 
+# Camera configs with real credentials (use cameras.example.yaml as template)
+backend/config/cameras.yaml
+
 # Model weights and TRT engines (too large for git)
 models/weights/*.pt
 models/weights/*.engine

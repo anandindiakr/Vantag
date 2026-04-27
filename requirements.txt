@@ -81,6 +81,7 @@ asyncpg>=0.29.0
 redis>=5.0.0
 razorpay>=1.4.0
 passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.1                   # required — no SHA-256 fallback (see auth_router.py)
 python-jose[cryptography]>=3.3.0
 sendgrid>=6.11.0
 email-validator>=2.1.0

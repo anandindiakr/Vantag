@@ -175,7 +175,7 @@ def _save_snapshot(incident_id: str, snapshot_b64: str) -> Optional[str]:
         img_bytes = base64.b64decode(raw)
         img_path  = _DEMO_SNAPS_DIR / f"{incident_id}.jpg"
         img_path.write_bytes(img_bytes)
-        return f"/snapshots/demo/{incident_id}.jpg"
+        return f"/api/snapshots/demo/{incident_id}.jpg"
     except Exception:  # noqa: BLE001
         return None
 

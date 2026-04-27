@@ -3,8 +3,18 @@ import { useVantagStore, VantagEvent, RiskScore, QueueStatus, DoorState } from '
 
 // Dynamically derive WS URL from the current page host so it works
 // in dev (Vite proxy → localhost:8800) and production (nginx → backend) alike.
+// Appends the JWT token as a query param for WebSocket authentication.
 const _proto  = window.location.protocol === 'https:' ? 'wss' : 'ws';
-const WS_URL  = `${_proto}://${window.location.host}/ws/events`;
+const _BASE_WS_URL = `${_proto}://${window.location.host}/ws/events`;
+
+function _getWsUrl(): string {
+  const token = localStorage.getItem('vantag_token');
+  if (token) {
+    return `${_BASE_WS_URL}?token=${encodeURIComponent(token)}`;
+  }
+  return _BASE_WS_URL;
+}
+
 const INITIAL_RECONNECT_DELAY = 1000;   // 1 s
 const MAX_RECONNECT_DELAY     = 30_000; // 30 s
 const MAX_RECONNECT_ATTEMPTS  = 20;
@@ -75,7 +85,7 @@ export function useWebSocket(): UseWebSocketReturn {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     try {
-      const ws = new WebSocket(WS_URL);
+      const ws = new WebSocket(_getWsUrl());
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -102,6 +112,11 @@ export function useWebSocket(): UseWebSocketReturn {
         setWsConnected(false);
 
         if (ev.code === 1000) return; // clean close
+        if (ev.code === 1008) {
+          // Policy Violation = auth failure — don't retry
+          setError('WebSocket authentication failed. Please refresh the page.');
+          return;
+        }
 
         if (attemptCount.current >= MAX_RECONNECT_ATTEMPTS) {
           setError('Max reconnect attempts reached. Refresh to retry.');

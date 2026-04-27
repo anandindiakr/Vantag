@@ -252,7 +252,7 @@ async def add_entry(
         ) from exc
 
     now = datetime.now(tz=timezone.utc).isoformat()
-    image_url = f"/snapshots/watchlist/{img_filename}"
+    image_url = f"/api/snapshots/watchlist/{img_filename}"
 
     entry = {
         "entry_id": entry_id,

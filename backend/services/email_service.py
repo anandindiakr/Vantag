@@ -149,3 +149,33 @@ async def send_payment_success(to: str, name: str, plan: str, amount: str, invoi
     html = _base_html(subject, body)
     text = f"Payment confirmed. Plan: {plan}. Amount: {amount}. Invoice: {invoice_no}."
     await send_email(to, subject, html, text)
+
+
+async def send_password_reset_email(to: str, name: str, reset_link: str) -> None:
+    """Send a password-reset email containing a signed link valid for 30 minutes."""
+    subject = "Reset your Vantag password"
+    body = f"""
+      <h2 style="font-size:24px;font-weight:700;margin:0 0 8px;">Reset your password</h2>
+      <p style="color:rgba(255,255,255,0.5);margin:0 0 32px;">
+        Hi {name}, we received a request to reset your Vantag account password.
+        Click the button below to choose a new password.
+      </p>
+      <div style="text-align:center;margin-bottom:32px;">
+        <a href="{reset_link}"
+           style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#4f46e5);
+                  color:#fff;text-decoration:none;padding:14px 32px;border-radius:12px;
+                  font-weight:700;font-size:15px;">
+          Reset Password →
+        </a>
+      </div>
+      <p style="color:rgba(255,255,255,0.4);font-size:13px;">
+        This link expires in <strong style="color:#fff;">30 minutes</strong>.
+        If you didn't request a password reset, you can safely ignore this email.
+      </p>
+    """
+    html = _base_html(subject, body)
+    text = (
+        f"Reset your Vantag password:\n{reset_link}\n\n"
+        "This link expires in 30 minutes. If you didn't request this, ignore this email."
+    )
+    await send_email(to, subject, html, text)

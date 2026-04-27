@@ -1,7 +1,8 @@
 """
 backend/api/auth_router.py
 ==========================
-Authentication endpoints: register, login, refresh, verify-email.
+Authentication endpoints: register, login, refresh, verify-email,
+forgot-password, reset-password.
 """
 from __future__ import annotations
 
@@ -21,16 +22,23 @@ from ..db.models.tenant import Tenant, TenantUser
 from ..services.tenant_service import create_tenant
 from ..services.email_service import generate_otp, send_verification_email, is_dev_mode
 
+# ---------------------------------------------------------------------------
+# bcrypt — hard dependency (no SHA-256 fallback)
+# ---------------------------------------------------------------------------
 try:
     import bcrypt as _bcrypt
+
     def hash_password(pw: str) -> str:
         return _bcrypt.hashpw(pw.encode("utf-8"), _bcrypt.gensalt(rounds=12)).decode("utf-8")
+
     def verify_password(pw: str, h: str) -> bool:
         return _bcrypt.checkpw(pw.encode("utf-8"), h.encode("utf-8"))
-except ImportError:
-    import hashlib
-    def hash_password(pw: str) -> str: return hashlib.sha256(pw.encode()).hexdigest()
-    def verify_password(pw: str, h: str) -> bool: return hashlib.sha256(pw.encode()).hexdigest() == h
+
+except ImportError as _bcrypt_err:
+    raise RuntimeError(
+        "bcrypt is required but not installed. "
+        "Install it with: pip install bcrypt>=4.0.1"
+    ) from _bcrypt_err
 
 try:
     from jose import jwt
@@ -308,3 +316,103 @@ async def verify_email(
 
     del _otp_store[key]
     return {"message": "Email verified successfully.", "verified": True}
+
+
+# ── Forgot-password / Reset-password ─────────────────────────────────────────
+
+_RESET_TOKEN_PURPOSE = "password_reset"
+_RESET_TOKEN_EXPIRY_MINUTES = 30
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@auth_router.post("/forgot-password", status_code=200)
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Send a password-reset email.
+
+    Always returns 200 to prevent email enumeration — the response is
+    identical whether or not the email address exists.
+    """
+    email_lower = body.email.lower()
+    result = await session.execute(
+        select(TenantUser).where(TenantUser.email == email_lower)
+    )
+    user = result.scalar_one_or_none()
+
+    if user:
+        # Get region domain for reset link
+        tenant_result = await session.execute(select(Tenant).where(Tenant.id == user.tenant_id))
+        tenant = tenant_result.scalar_one_or_none()
+        country = (tenant.country or "IN") if tenant else "IN"
+
+        from ..config.regions import get_region
+        region = get_region(country)
+        region_domain = region.get("domain", "retailnazar.com")
+
+        reset_token = make_token(
+            {"sub": user.id, "tenant_id": user.tenant_id, "purpose": _RESET_TOKEN_PURPOSE},
+            timedelta(minutes=_RESET_TOKEN_EXPIRY_MINUTES),
+        )
+        reset_link = f"https://{region_domain}/reset-password?token={reset_token}"
+
+        from ..services.email_service import send_password_reset_email
+        import asyncio
+        asyncio.create_task(
+            send_password_reset_email(email_lower, tenant.name if tenant else "there", reset_link)
+        )
+
+    return {"message": "If this email is registered, a password-reset link has been sent."}
+
+
+@auth_router.post("/reset-password", status_code=200)
+async def reset_password(
+    body: ResetPasswordRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Reset the user's password using the signed reset token.
+
+    Verifies the JWT, ensures it has purpose=password_reset, updates the
+    hashed password, and invalidates existing sessions by clearing any
+    stored refresh tokens (when session persistence is implemented).
+    """
+    jwt_secret = os.getenv("VANTAG_JWT_SECRET", "change-me")
+
+    try:
+        from jose import jwt as _jwt, JWTError
+        payload = _jwt.decode(body.token, jwt_secret, algorithms=["HS256"])
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    if payload.get("purpose") != _RESET_TOKEN_PURPOSE:
+        raise HTTPException(status_code=400, detail="Invalid reset token purpose")
+
+    user_id: str | None = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Malformed reset token")
+
+    result = await session.execute(
+        select(TenantUser).where(TenantUser.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    user.hashed_password = hash_password(body.new_password)
+    await session.commit()
+
+    return {"message": "Password has been reset successfully. Please sign in with your new password."}

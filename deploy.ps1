@@ -75,5 +75,12 @@ Write-Host "  Demo login: demo@vantag.io / demo1234" -ForegroundColor Magenta
 Write-Host ""
 Write-Host "  SSL cert  : run docker\certbot\init-letsencrypt.sh first" -ForegroundColor DarkYellow
 Write-Host "              if you haven't already." -ForegroundColor DarkYellow
+Write-Host ""
+Write-Host "  *** OPERATOR ACTION REQUIRED ***" -ForegroundColor Red
+Write-Host "  Rotate VANTAG_JWT_SECRET on the VPS before going live:" -ForegroundColor Yellow
+Write-Host "    python -c `"import secrets; print(secrets.token_hex(32))`"" -ForegroundColor Yellow
+Write-Host "  Update the secret in your systemd EnvironmentFile= or Docker --env-file." -ForegroundColor Yellow
+Write-Host "  All existing user sessions will be invalidated after rotation." -ForegroundColor Yellow
+Write-Host "  See SECURITY.md for full post-deploy checklist." -ForegroundColor Yellow
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""

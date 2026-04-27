@@ -5,6 +5,8 @@ Step-by-step onboarding wizard API (5 steps, resumable).
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select, update
@@ -17,6 +19,7 @@ from ..middleware.tenant_middleware import get_current_user_id
 from ..services.tenant_service import provision_edge_agent
 from ..config.plans import PLANS, get_plan
 from ..config.regions import get_region
+from ..services.razorpay_service import verify_payment_signature
 
 onboarding_router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
 
@@ -142,13 +145,48 @@ async def step3_payment(
     user: dict = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Verify Razorpay payment and activate subscription."""
-    # In test mode or trial: accept and mark active
-    new_status = "active" if body.razorpay_payment_id else "trial"
+    """Verify Razorpay payment and activate subscription, or start trial."""
+    from datetime import timedelta
+
+    tenant_result = await session.execute(select(Tenant).where(Tenant.id == user["tenant_id"]))
+    tenant = tenant_result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    if body.razorpay_payment_id:
+        # Payment IDs provided — require full signature verification
+        if not body.razorpay_order_id or not body.razorpay_signature:
+            raise HTTPException(
+                status_code=400,
+                detail="razorpay_order_id and razorpay_signature are required when razorpay_payment_id is provided",
+            )
+
+        country = tenant.country or "IN"
+        valid = verify_payment_signature(
+            body.razorpay_order_id,
+            body.razorpay_payment_id,
+            body.razorpay_signature,
+            country,
+        )
+        if not valid:
+            raise HTTPException(status_code=403, detail="Payment signature verification failed")
+
+        new_status = "active"
+        update_values: dict = {"status": new_status, "onboarding_step": 4}
+    else:
+        # No payment — force trial mode; do NOT mark as active
+        trial_end = datetime.now(timezone.utc) + timedelta(days=14)
+        new_status = "trial"
+        update_values = {
+            "status": new_status,
+            "trial_ends_at": trial_end,
+            "onboarding_step": 4,
+        }
+
     await session.execute(
         update(Tenant)
         .where(Tenant.id == user["tenant_id"])
-        .values(status=new_status, onboarding_step=4)
+        .values(**update_values)
     )
     await session.commit()
     return {"step": 3, "next": 4, "status": new_status}
@@ -182,7 +220,6 @@ async def step4_camera_setup(
             camera_id=camera_id,
             name=cam.name or f"Camera {i}",
             ip_address=cam.ip,
-            rtsp_url=cam.rtsp_url,
             brand=cam.brand,
             location=cam.location or f"Zone {i}",
             enabled=True,
@@ -190,6 +227,9 @@ async def step4_camera_setup(
             staff_zone_colors=["#FF6600", "#0099FF"],
             zones=[],
         )
+        # Encrypt RTSP URL at rest
+        if cam.rtsp_url:
+            config.set_rtsp_url(cam.rtsp_url)
         session.add(config)
         saved.append({"camera_id": camera_id, "ip": cam.ip, "status": "pending"})
 
@@ -208,6 +248,7 @@ async def step5_install_agent(
 ) -> dict:
     """Provision edge agent API key and return QR config."""
     import json, base64
+    from .edge_router import generate_registration_token
 
     agent = await provision_edge_agent(
         session,
@@ -235,12 +276,16 @@ async def step5_install_agent(
     )
     await session.commit()
 
+    # Generate a one-time registration token for the downloadable edge agent
+    reg_token = generate_registration_token(user["tenant_id"])
+
     return {
         "step": 5,
         "completed": True,
         "agent_id": agent.id,
         "api_key": agent.api_key,
         "qr_data": qr_data,
+        "registration_token": reg_token,
         "download_links": {
             "android": "https://play.google.com/store/apps/details?id=com.vantag.edgeagent",
             "windows": "https://download.vantag.in/edge-agent-setup.exe",

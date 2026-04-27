@@ -5,8 +5,14 @@ WebSocket event streaming for the Vantag platform.
 
 Endpoints
 ---------
-GET /ws/events                      – broadcast stream of all events
-GET /ws/store/{store_id}/events     – store-filtered event stream
+GET /ws/events                      – broadcast stream of all events (JWT required)
+GET /ws/store/{store_id}/events     – store-filtered event stream (JWT required)
+
+Authentication
+--------------
+Clients MUST pass a valid JWT via the ``?token=<jwt>`` query parameter.
+Connections with a missing or invalid token are rejected with close code
+1008 (Policy Violation) before ``ws.accept()`` is called.
 
 Protocol
 --------
@@ -21,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from typing import Dict, Optional, Set
 
@@ -34,6 +41,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["WebSocket"])
 
 # ---------------------------------------------------------------------------
+# JWT validation (reuses the same secret as HTTP middleware)
+# ---------------------------------------------------------------------------
+
+_JWT_SECRET = os.getenv("VANTAG_JWT_SECRET", "change-me")
+_JWT_ALGORITHM = "HS256"
+
+
+def _validate_ws_token(token: str) -> dict | None:
+    """Validate a JWT token string; return claims dict or None on failure."""
+    try:
+        from jose import jwt
+        return jwt.decode(token, _JWT_SECRET, algorithms=[_JWT_ALGORITHM])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Connection Manager
 # ---------------------------------------------------------------------------
 
@@ -45,48 +69,54 @@ class ConnectionManager:
     Manages active WebSocket connections and broadcasts events.
 
     Connections are tracked in two sets:
-    * ``_global_connections``  — receive every event.
+    * ``_global_connections``  — receive every event (keyed by ws → tenant_id).
     * ``_store_connections``   — receive events filtered by store_id.
 
-    Thread/task safety: all mutation happens in the async event loop, so no
-    additional locking is required beyond using standard asyncio primitives.
+    All broadcast methods filter events by ``tenant_id`` so that tenants only
+    receive their own events.
     """
 
     def __init__(self) -> None:
-        self._global_connections: Set[WebSocket] = set()
-        self._store_connections: Dict[str, Set[WebSocket]] = {}
+        # ws → tenant_id mapping for global connections
+        self._global_connections: Dict[WebSocket, str] = {}
+        # store_id → {ws → tenant_id}
+        self._store_connections: Dict[str, Dict[WebSocket, str]] = {}
 
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 
-    async def connect(self, ws: WebSocket, store_id: Optional[str] = None) -> None:
+    async def connect(
+        self, ws: WebSocket, tenant_id: str, store_id: Optional[str] = None
+    ) -> None:
         """Accept the WebSocket and register it for the appropriate stream."""
         await ws.accept()
         if store_id:
-            self._store_connections.setdefault(store_id, set()).add(ws)
+            self._store_connections.setdefault(store_id, {})[ws] = tenant_id
             logger.info(
-                "WS client connected | store=%s total_store=%d",
+                "WS client connected | store=%s tenant=%s total_store=%d",
                 store_id,
+                tenant_id,
                 len(self._store_connections[store_id]),
             )
         else:
-            self._global_connections.add(ws)
+            self._global_connections[ws] = tenant_id
             logger.info(
-                "WS client connected (global) | total=%d",
+                "WS client connected (global) | tenant=%s total=%d",
+                tenant_id,
                 len(self._global_connections),
             )
 
     async def disconnect(self, ws: WebSocket, store_id: Optional[str] = None) -> None:
         """Unregister a WebSocket (called on normal and abnormal close)."""
         if store_id:
-            bucket = self._store_connections.get(store_id, set())
-            bucket.discard(ws)
+            bucket = self._store_connections.get(store_id, {})
+            bucket.pop(ws, None)
             if not bucket:
                 self._store_connections.pop(store_id, None)
             logger.info("WS client disconnected | store=%s", store_id)
         else:
-            self._global_connections.discard(ws)
+            self._global_connections.pop(ws, None)
             logger.info(
                 "WS client disconnected (global) | remaining=%d",
                 len(self._global_connections),
@@ -98,17 +128,19 @@ class ConnectionManager:
 
     async def broadcast(self, message: dict) -> None:
         """
-        Send *message* as JSON to all connected clients (global + matching
-        store-filtered connections).
+        Send *message* as JSON to all connected clients whose ``tenant_id``
+        matches the event's ``tenant_id`` field (or all global clients if the
+        event carries no ``tenant_id``).
         """
         raw = json.dumps(message, default=str)
+        event_tenant_id: Optional[str] = message.get("tenant_id")
         store_id: Optional[str] = message.get("store_id")
 
-        await self._send_to_set(raw, self._global_connections)
+        await self._send_to_tenant_map(raw, self._global_connections, event_tenant_id)
 
         if store_id:
-            bucket = self._store_connections.get(store_id, set())
-            await self._send_to_set(raw, bucket)
+            bucket = self._store_connections.get(store_id, {})
+            await self._send_to_tenant_map(raw, bucket, event_tenant_id)
 
     async def broadcast_event(self, event: WebSocketEvent) -> None:
         """Convenience wrapper that serialises a ``WebSocketEvent`` first."""
@@ -118,22 +150,33 @@ class ConnectionManager:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    async def _send_to_set(self, raw: str, connections: Set[WebSocket]) -> None:
-        """Send *raw* JSON string to every WebSocket in *connections*.
+    async def _send_to_tenant_map(
+        self,
+        raw: str,
+        connections: Dict[WebSocket, str],
+        event_tenant_id: Optional[str],
+    ) -> None:
+        """Send *raw* to each WebSocket whose tenant matches *event_tenant_id*.
 
+        If *event_tenant_id* is None/empty, send to all connections (backward
+        compat for internal pipeline events that don't carry a tenant).
         Stale / closed connections are silently removed.
         """
-        dead: Set[WebSocket] = set()
-        for ws in list(connections):
+        dead: list[WebSocket] = []
+        for ws, ws_tenant in list(connections.items()):
+            # Tenant filtering: skip if event belongs to a different tenant
+            if event_tenant_id and ws_tenant != event_tenant_id:
+                continue
             try:
                 if ws.client_state == WebSocketState.CONNECTED:
                     await ws.send_text(raw)
                 else:
-                    dead.add(ws)
+                    dead.append(ws)
             except Exception as exc:  # noqa: BLE001
                 logger.debug("WS send failed | error=%s", exc)
-                dead.add(ws)
-        connections.difference_update(dead)
+                dead.append(ws)
+        for ws in dead:
+            connections.pop(ws, None)
 
     @property
     def global_connection_count(self) -> int:
@@ -158,13 +201,11 @@ manager = ConnectionManager()
 
 async def _keepalive_loop(ws: WebSocket, store_id: Optional[str] = None) -> None:
     """Send ping frames every ``_PING_INTERVAL`` seconds until the socket closes."""
-    ping_msg = json.dumps({"type": "ping", "timestamp": None})
     while True:
         await asyncio.sleep(_PING_INTERVAL)
         try:
             if ws.client_state != WebSocketState.CONNECTED:
                 break
-            # Update timestamp on each ping.
             await ws.send_text(
                 json.dumps({"type": "ping", "timestamp": time.time()})
             )
@@ -180,33 +221,44 @@ async def _keepalive_loop(ws: WebSocket, store_id: Optional[str] = None) -> None
 @router.websocket("/ws/events")
 async def ws_events(ws: WebSocket) -> None:
     """
-    Global WebSocket stream – broadcasts every behavioral event in real-time.
+    Global WebSocket stream — authenticated, tenant-scoped.
 
-    Messages are JSON-encoded ``WebSocketEvent`` objects.  A ``{"type": "ping"}``
-    heartbeat is sent every 30 seconds to keep the connection alive through
-    proxies and load balancers.
+    Requires ``?token=<jwt>`` query parameter.  Connections with a missing or
+    invalid token are rejected with close code 1008 before accept().
     """
-    await manager.connect(ws)
+    token = ws.query_params.get("token")
+    if not token:
+        await ws.close(code=1008, reason="Authentication required: missing ?token=")
+        return
+
+    claims = _validate_ws_token(token)
+    if not claims:
+        await ws.close(code=1008, reason="Authentication failed: invalid or expired token")
+        return
+
+    tenant_id: str = claims.get("tenant_id", "")
+    if not tenant_id:
+        await ws.close(code=1008, reason="Authentication failed: token missing tenant_id")
+        return
+
+    await manager.connect(ws, tenant_id=tenant_id)
     keepalive = asyncio.create_task(_keepalive_loop(ws))
     try:
         while True:
-            # Keep the receive loop alive so disconnect events are detected.
             try:
                 data = await asyncio.wait_for(ws.receive_text(), timeout=_PING_INTERVAL + 5)
-                # Handle pong / client-originated messages gracefully.
                 try:
                     parsed = json.loads(data)
                     if parsed.get("type") == "pong":
-                        logger.debug("Received pong from global client")
+                        logger.debug("Received pong from global client | tenant=%s", tenant_id)
                 except json.JSONDecodeError:
                     pass
             except asyncio.TimeoutError:
-                # No message from client – that's fine, server pushes events.
                 pass
     except WebSocketDisconnect:
-        logger.info("Global WS client disconnected normally.")
+        logger.info("Global WS client disconnected normally | tenant=%s", tenant_id)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Global WS client error | error=%s", exc)
+        logger.warning("Global WS client error | tenant=%s error=%s", tenant_id, exc)
     finally:
         keepalive.cancel()
         await manager.disconnect(ws)
@@ -215,12 +267,28 @@ async def ws_events(ws: WebSocket) -> None:
 @router.websocket("/ws/store/{store_id}/events")
 async def ws_store_events(ws: WebSocket, store_id: str) -> None:
     """
-    Store-filtered WebSocket stream.
+    Store-filtered WebSocket stream — authenticated, tenant-scoped.
 
-    Only events whose ``store_id`` matches the path parameter are forwarded
-    to this connection.
+    Requires ``?token=<jwt>`` query parameter.  Only events whose ``store_id``
+    matches the path parameter AND whose ``tenant_id`` matches the JWT are
+    forwarded to this connection.
     """
-    await manager.connect(ws, store_id=store_id)
+    token = ws.query_params.get("token")
+    if not token:
+        await ws.close(code=1008, reason="Authentication required: missing ?token=")
+        return
+
+    claims = _validate_ws_token(token)
+    if not claims:
+        await ws.close(code=1008, reason="Authentication failed: invalid or expired token")
+        return
+
+    tenant_id: str = claims.get("tenant_id", "")
+    if not tenant_id:
+        await ws.close(code=1008, reason="Authentication failed: token missing tenant_id")
+        return
+
+    await manager.connect(ws, tenant_id=tenant_id, store_id=store_id)
     keepalive = asyncio.create_task(_keepalive_loop(ws, store_id=store_id))
     try:
         while True:
@@ -229,15 +297,16 @@ async def ws_store_events(ws: WebSocket, store_id: str) -> None:
                 try:
                     parsed = json.loads(data)
                     if parsed.get("type") == "pong":
-                        logger.debug("Received pong from store client | store=%s", store_id)
+                        logger.debug("Received pong from store client | store=%s tenant=%s", store_id, tenant_id)
                 except json.JSONDecodeError:
                     pass
             except asyncio.TimeoutError:
                 pass
     except WebSocketDisconnect:
-        logger.info("Store WS client disconnected | store=%s", store_id)
+        logger.info("Store WS client disconnected | store=%s tenant=%s", store_id, tenant_id)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Store WS client error | store=%s error=%s", store_id, exc)
+        logger.warning("Store WS client error | store=%s tenant=%s error=%s", store_id, tenant_id, exc)
     finally:
         keepalive.cancel()
         await manager.disconnect(ws, store_id=store_id)
+

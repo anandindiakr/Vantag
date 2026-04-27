@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.database import get_session
@@ -104,7 +105,7 @@ async def razorpay_webhook(
     session: AsyncSession = Depends(get_session),
     x_razorpay_signature: str = Header(None, alias="X-Razorpay-Signature"),
 ) -> dict:
-    """Razorpay webhook handler for all payment events."""
+    """Razorpay webhook handler for all payment events (idempotent)."""
     body = await request.body()
 
     if not verify_webhook_signature(body, x_razorpay_signature or "", country.upper()):
@@ -114,16 +115,31 @@ async def razorpay_webhook(
     payload = json.loads(body)
     event_type = payload.get("event", "unknown")
 
-    # Log the event
+    # Extract idempotency key from Razorpay payload
+    event_id = payload.get("id") or payload.get("payload", {}).get("id")
+
+    # Check for duplicate event before inserting
+    if event_id:
+        existing = await session.execute(
+            select(PaymentEvent).where(PaymentEvent.razorpay_event_id == event_id)
+        )
+        if existing.scalar_one_or_none():
+            return {"status": "duplicate_ignored", "event": event_type}
+
     pe = PaymentEvent(
         id=str(uuid.uuid4()),
         event_type=event_type,
-        razorpay_event_id=payload.get("id"),
+        razorpay_event_id=event_id,
         payload=payload,
         processed=False,
     )
     session.add(pe)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Race condition: another worker inserted the same event_id simultaneously
+        await session.rollback()
+        return {"status": "duplicate_ignored", "event": event_type}
 
     return {"received": True, "event": event_type}
 
