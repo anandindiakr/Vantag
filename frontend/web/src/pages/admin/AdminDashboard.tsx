@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Users, CreditCard, AlertTriangle,
   Network, ShieldAlert, CheckCircle, XCircle,
   RefreshCw, Download, Search, Ban, Play, Trash2,
-  ChevronRight, Activity, TrendingUp, Globe, Bell,
+  ChevronRight, Activity, Globe, Bell,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
