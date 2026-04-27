@@ -15,11 +15,13 @@ import {
   HelpCircle,
   Settings2,
   HeartPulse,
+  ShieldAlert,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useVantagStore } from '../store/useVantagStore';
 import { useRegion } from '../hooks/useRegion';
 import { LanguageSelector } from './LanguageSelector';
+import { useEffect } from 'react';
 
 interface NavItem {
   label: string;
@@ -47,11 +49,21 @@ export default function Sidebar() {
   const wsConnected   = useVantagStore((s) => s.wsConnected);
   const mqttConnected = useVantagStore((s) => s.mqttConnected);
   const stores        = useVantagStore((s) => s.stores);
+  const isSuperAdmin  = useVantagStore((s) => s.isSuperAdmin);
+  const setIsSuperAdmin = useVantagStore((s) => s.setIsSuperAdmin);
   const activeCount   = stores.filter((s) => s.active).length;
+
+  // Restore super-admin from localStorage on mount (page refresh)
+  useEffect(() => {
+    if (localStorage.getItem('vantag_is_super_admin') === 'true') {
+      setIsSuperAdmin(true);
+    }
+  }, [setIsSuperAdmin]);
 
   const handleLogout = () => {
     localStorage.removeItem('vantag_token');
     localStorage.removeItem('vantag_tenant');
+    localStorage.removeItem('vantag_is_super_admin');
     navigate('/');
   };
 
@@ -92,6 +104,27 @@ export default function Sidebar() {
             </NavLink>
           </div>
         ))}
+
+        {/* Admin Panel link — only for super-admins */}
+        {isSuperAdmin && (
+          <>
+            <div className="my-2 border-t border-slate-700/60" />
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150',
+                  isActive
+                    ? 'bg-red-900/30 text-red-400 ring-1 ring-red-500/40'
+                    : 'text-red-400/70 hover:text-red-400 hover:bg-red-900/20'
+                )
+              }
+            >
+              <ShieldAlert size={20} />
+              Admin Panel
+            </NavLink>
+          </>
+        )}
       </nav>
 
       {/* Connection Status */}

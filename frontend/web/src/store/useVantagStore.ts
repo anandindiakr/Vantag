@@ -164,6 +164,7 @@ interface VantagStore {
   incidents: Incident[];
   wsConnected: boolean;
   mqttConnected: boolean;
+  isSuperAdmin: boolean;
 
   // Actions
   setStores: (stores: Store[]) => void;
@@ -182,6 +183,7 @@ interface VantagStore {
   setWsConnected: (connected: boolean) => void;
   setMqttConnected: (connected: boolean) => void;
   clearEvents: () => void;
+  setIsSuperAdmin: (val: boolean) => void;
 }
 
 // ─── Store Implementation ─────────────────────────────────────────────────────
@@ -204,6 +206,7 @@ export const useVantagStore = create<VantagStore>()(
       incidents: [],
       wsConnected: false,
       mqttConnected: false,
+      isSuperAdmin: false,
 
       // ── Actions ──
       setStores: (stores) => set({ stores }, false, 'setStores'),
@@ -300,6 +303,8 @@ export const useVantagStore = create<VantagStore>()(
         set({ mqttConnected: connected }, false, 'setMqttConnected'),
 
       clearEvents: () => set({ recentEvents: [] }, false, 'clearEvents'),
+
+      setIsSuperAdmin: (val) => set({ isSuperAdmin: val }, false, 'setIsSuperAdmin'),
     })),
     { name: 'VantagStore' }
   )

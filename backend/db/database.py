@@ -76,6 +76,7 @@ async def init_db() -> None:
     from .models import camera as _camera  # noqa: F401
     from .models import event as _event  # noqa: F401
     from .models import billing as _billing  # noqa: F401
+    from .models import admin as _admin  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

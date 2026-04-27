@@ -47,7 +47,7 @@ export default function HowItWorks() {
           />
           <Step num={2} icon="💳"
             title={t('how.s2.title', 'Pay in your currency')}
-            body={t('how.s2.body', 'Razorpay supports INR, SGD and MYR. Monthly or annual. Cancel anytime.')}
+            body={t('how.s2.body', 'Secure payments in INR, SGD and MYR. Monthly or annual. Cancel anytime.')}
           />
           <Step num={3} icon="⬇️"
             title={t('how.s3.title', 'Download the Edge Agent')}
@@ -65,26 +65,6 @@ export default function HowItWorks() {
             title={t('how.s6.title', 'Live alerts start')}
             body={t('how.s6.body', 'Theft, loitering, falls, empty shelves — real-time alerts + evidence snapshots on your phone.')}
           />
-        </div>
-
-        {/* Architecture diagram */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 mb-20">
-          <h2 className="text-3xl font-bold mb-6 text-center">
-            {t('how.arch_title', 'Architecture at a glance')}
-          </h2>
-          <pre className="text-center text-violet-300 font-mono text-xs md:text-sm overflow-x-auto">
-{`  ┌─ Retailer's LAN ──────────────┐       ┌─── Vantag Cloud (VPS) ───┐
-  │                               │       │                          │
-  │  [IP Camera] ─┐               │       │   Dashboard / Web / App  │
-  │  [IP Camera] ─┤               │       │           ▲              │
-  │  [IP Camera] ─┼─▶ Edge Agent ─┼──TLS──┼──▶ FastAPI + PostgreSQL  │
-  │  [IP Camera] ─┘   (YOLOv8)    │       │           │              │
-  │                               │       │      Mosquitto MQTT      │
-  │  Video stays LOCAL            │       │                          │
-  │  Only events + snapshots      │       │  Razorpay · Let's Encrypt│
-  │  leave the LAN (low BW)       │       │                          │
-  └───────────────────────────────┘       └──────────────────────────┘`}
-          </pre>
         </div>
 
         <div className="text-center">

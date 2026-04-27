@@ -6,10 +6,12 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useRegion } from '../../hooks/useRegion';
 import { LanguageSelector } from '../../components/LanguageSelector';
+import { useVantagStore } from '../../store/useVantagStore';
 
 export default function Login() {
   const nav = useNavigate();
   const region = useRegion();
+  const setIsSuperAdmin = useVantagStore((s) => s.setIsSuperAdmin);
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -27,6 +29,14 @@ export default function Login() {
       const { data } = await axios.post('/api/auth/login', form);
       localStorage.setItem('vantag_token', data.access_token);
       localStorage.setItem('vantag_tenant', JSON.stringify({ id: data.tenant_id, name: data.name, plan: data.plan_id, step: data.onboarding_step }));
+      // Persist super-admin flag
+      if (data.is_super_admin) {
+        localStorage.setItem('vantag_is_super_admin', 'true');
+        setIsSuperAdmin(true);
+      } else {
+        localStorage.removeItem('vantag_is_super_admin');
+        setIsSuperAdmin(false);
+      }
       if (data.onboarding_step < 6) {
         nav('/onboarding');
       } else {

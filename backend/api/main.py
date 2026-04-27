@@ -64,6 +64,7 @@ from .zone_router import router as zone_router
 from .support_router import support_router
 from .system_router import system_router
 from .snapshots_router import snapshots_router
+from .admin_router import admin_router
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,7 @@ _pipeline: VantagPipeline | None = None
 _mqtt_client: MQTTClient | None = None
 _door_controller: DoorController | None = None
 _app_start_time: float = time.monotonic()
+_alert_monitor_task = None
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +110,7 @@ _app_start_time: float = time.monotonic()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Manage application-wide resource lifecycle."""
-    global _pipeline, _mqtt_client, _door_controller, _app_start_time  # noqa: PLW0603
+    global _pipeline, _mqtt_client, _door_controller, _app_start_time, _alert_monitor_task  # noqa: PLW0603
 
     logger.info("Vantag API starting up...")
 
@@ -180,6 +182,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception as exc:
         logger.warning("DB init skipped (may already exist): %s", exc)
 
+    # Start background alert monitor
+    try:
+        from ..services.alert_monitor import start_alert_monitor, set_ws_broadcast
+        set_ws_broadcast(ws_manager.broadcast)
+        _alert_monitor_task = await start_alert_monitor(interval=60)
+        logger.info("Alert monitor started.")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Alert monitor failed to start: %s", exc)
+
     # ------------------------------------------------------------------
     # Yield control to FastAPI.
     # ------------------------------------------------------------------
@@ -189,6 +200,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Shutdown.
     # ------------------------------------------------------------------
     logger.info("Vantag API shutting down...")
+    if _alert_monitor_task:
+        try:
+            from ..services.alert_monitor import stop_alert_monitor
+            await stop_alert_monitor(_alert_monitor_task)
+        except Exception:  # noqa: BLE001
+            pass
     if _pipeline:
         await _pipeline.stop()
     logger.info("Vantag API shutdown complete.")
@@ -261,6 +278,7 @@ app.include_router(zone_router)
 app.include_router(support_router)
 app.include_router(system_router)
 app.include_router(snapshots_router)
+app.include_router(admin_router)
 
 # ---------------------------------------------------------------------------
 # Health check endpoint

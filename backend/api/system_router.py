@@ -112,15 +112,45 @@ async def _probe_redis() -> tuple[bool, str, Optional[float]]:
         return False, f"Error: {exc}", lat
 
 
+def _resolve_razorpay_keys(region: str) -> tuple[str, str]:
+    """
+    Resolve Razorpay key_id and key_secret for a region, accepting multiple
+    env-var aliases so users can use whichever naming convention their .env has.
+
+    Aliases tried (in order) for region='SG':
+      RAZORPAY_KEY_ID_SG, RAZORPAY_SG_KEY_ID, RZP_SG_KEY_ID
+    Aliases tried for region='IN':
+      RAZORPAY_KEY_ID_IN, RAZORPAY_IN_KEY_ID, RZP_IN_KEY_ID
+    """
+    r = region.upper()
+    key_aliases = [
+        f"RAZORPAY_KEY_ID_{r}",
+        f"RAZORPAY_{r}_KEY_ID",
+        f"RZP_{r}_KEY_ID",
+    ]
+    secret_aliases = [
+        f"RAZORPAY_KEY_SECRET_{r}",
+        f"RAZORPAY_{r}_KEY_SECRET",
+        f"RZP_{r}_KEY_SECRET",
+    ]
+    key_id = next((os.getenv(k, "") for k in key_aliases if os.getenv(k, "")), "")
+    key_secret = next((os.getenv(k, "") for k in secret_aliases if os.getenv(k, "")), "")
+    return key_id, key_secret
+
+
 async def _probe_razorpay(region: str) -> tuple[bool, str, Optional[float]]:
     """HEAD the Razorpay API root to verify key validity for the given region."""
-    key_env = f"RAZORPAY_KEY_ID_{region.upper()}"
-    secret_env = f"RAZORPAY_KEY_SECRET_{region.upper()}"
-    key_id = os.getenv(key_env, "")
-    key_secret = os.getenv(secret_env, "")
+    key_id, key_secret = _resolve_razorpay_keys(region)
 
-    if not key_id or not key_secret:
-        return False, "No API key", None
+    if not key_id:
+        return False, "No API key configured", None
+
+    # Validate key format: live keys start with rzp_live_, test with rzp_test_
+    if not (key_id.startswith("rzp_live_") or key_id.startswith("rzp_test_")):
+        return False, "Key present but invalid format (expected rzp_live_* or rzp_test_*)", None
+
+    if not key_secret:
+        return False, "Key present but secret missing", None
 
     t0 = time.monotonic()
     try:
@@ -131,10 +161,11 @@ async def _probe_razorpay(region: str) -> tuple[bool, str, Optional[float]]:
                 auth=(key_id, key_secret),
             )
         lat = round((time.monotonic() - t0) * 1000, 1)
-        if resp.status_code in (200, 401):
-            ok = resp.status_code == 200
-            return ok, f"HTTP {resp.status_code}", lat
-        return True, "Keys valid", lat
+        if resp.status_code == 401:
+            return False, "HTTP 401 — invalid key or secret", lat
+        if resp.status_code == 200:
+            return True, "Keys valid", lat
+        return True, f"HTTP {resp.status_code}", lat
     except ImportError:
         return False, "httpx not installed", None
     except Exception as exc:  # noqa: BLE001

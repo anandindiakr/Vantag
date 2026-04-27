@@ -22,6 +22,23 @@ from ..db.models.tenant import Tenant, TenantUser
 from ..services.tenant_service import create_tenant
 from ..services.email_service import generate_otp, send_verification_email, is_dev_mode
 
+
+async def _fire_signup_notifications(tenant_name: str, region: str) -> None:
+    """Fire signup alert + notify support email (non-blocking, best-effort)."""
+    try:
+        from ..services.alert_monitor import create_signup_alert
+        await create_signup_alert(tenant_name, region)
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from ..services.email_service import send_email
+        subject = f"New Vantag signup: {tenant_name} ({region})"
+        body_text = f"New tenant signed up:\n  Name: {tenant_name}\n  Region: {region}"
+        body_html = f"<p><strong>New tenant signed up:</strong><br>Name: {tenant_name}<br>Region: {region}</p>"
+        await send_email("support@retail-vantag.com", subject, body_html, body_text)
+    except Exception:  # noqa: BLE001
+        pass
+
 # ---------------------------------------------------------------------------
 # bcrypt — hard dependency (no SHA-256 fallback)
 # ---------------------------------------------------------------------------
@@ -110,8 +127,13 @@ async def register(
     )
     await session.commit()
 
+    # Fire signup alert (non-blocking)
+    import asyncio as _asyncio
+    _asyncio.create_task(_fire_signup_notifications(tenant.name, tenant.country))
+
     access = make_token(
-        {"sub": user.id, "tenant_id": tenant.id, "email": user.email, "role": user.role},
+        {"sub": user.id, "tenant_id": tenant.id, "email": user.email,
+         "role": user.role, "is_super_admin": False},
         timedelta(hours=JWT_EXPIRE_HOURS),
     )
     refresh = make_token(
@@ -172,7 +194,8 @@ async def login(
                 raise HTTPException(status_code=404, detail="Tenant not found")
 
             access = make_token(
-                {"sub": user.id, "tenant_id": tenant.id, "email": user.email, "role": user.role},
+                {"sub": user.id, "tenant_id": tenant.id, "email": user.email,
+                 "role": user.role, "is_super_admin": user.is_super_admin},
                 timedelta(hours=JWT_EXPIRE_HOURS),
             )
             refresh = make_token(
@@ -191,6 +214,7 @@ async def login(
                 "name": tenant.name,
                 "language": tenant.language,
                 "country": tenant.country,
+                "is_super_admin": user.is_super_admin,
             }
     except HTTPException:
         raise

@@ -794,7 +794,7 @@ export default function Landing() {
           </div>
 
           <p className="text-center text-xs font-mono-alt text-white/25 mt-8 tracking-wide">
-            14-day free trial on all plans · Cancel anytime · Razorpay / Stripe accepted
+            14-day free trial on all plans · Cancel anytime · Secure payment processing
           </p>
         </div>
       </Section>

@@ -54,12 +54,20 @@ async def get_current_user_id(
         "tenant_id": payload.get("tenant_id"),
         "role": payload.get("role", "viewer"),
         "email": payload.get("email"),
+        "is_super_admin": bool(payload.get("is_super_admin", False)),
     }
 
 
 async def require_admin(user: dict = Depends(get_current_user_id)) -> dict:
     if user.get("role") not in ("owner", "admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+async def require_super_admin(user: dict = Depends(get_current_user_id)) -> dict:
+    """Dependency that only allows super-admin users (platform owners)."""
+    if not user.get("is_super_admin"):
+        raise HTTPException(status_code=403, detail="Super-admin access required")
     return user
 
 

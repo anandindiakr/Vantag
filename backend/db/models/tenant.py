@@ -38,6 +38,7 @@ class Tenant(Base):
     onboarding_token: Mapped[str | None] = mapped_column(String(200))
     razorpay_customer_id: Mapped[str | None] = mapped_column(String(200))
     trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -58,6 +59,7 @@ class TenantUser(Base):
     role: Mapped[str] = mapped_column(String(20), default="owner")  # owner/admin/viewer
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_super_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     email_verify_token: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 

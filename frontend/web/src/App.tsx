@@ -40,14 +40,26 @@ const HowItWorks   = lazy(() => import('./pages/HowItWorks'));
 const FAQ          = lazy(() => import('./pages/FAQ'));
 const HelpCenter   = lazy(() => import('./pages/HelpCenter'));
 const HealthCheck  = lazy(() => import('./pages/HealthCheck'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 
-// ── Auth helper ─────────────────────────────────────────────────────────────
+// ── Auth helpers ─────────────────────────────────────────────────────────────
 function isAuthenticated() {
   return !!localStorage.getItem('vantag_token');
 }
 
+function isSuperAdmin() {
+  return localStorage.getItem('vantag_is_super_admin') === 'true';
+}
+
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated() ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+/** Guard for /admin/* — must be authenticated AND super-admin */
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  if (!isSuperAdmin()) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
 }
 
 // ── Loading spinner ─────────────────────────────────────────────────────────
@@ -100,6 +112,10 @@ export default function App() {
 
             {/* Onboarding — auth required, no sidebar */}
             <Route path="/onboarding" element={<PrivateRoute><Onboarding /></PrivateRoute>} />
+
+            {/* Admin panel — super-admin only */}
+            <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+            <Route path="/admin/*" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
             {/* App shell — auth required, with sidebar + WebSocket */}
             <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
