@@ -2,9 +2,9 @@
 // Grid of all cameras with auto-refreshing live snapshots and real-time alerts.
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Camera, Wifi, WifiOff, AlertTriangle, Maximize2, RefreshCw } from 'lucide-react';
+import { Camera, Wifi, WifiOff, AlertTriangle, Maximize2, RefreshCw, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { useCameras } from '../hooks/useApi';
 import { useVantagStore } from '../store/useVantagStore';
@@ -141,12 +141,20 @@ export default function CamerasPage() {
             {online} online · {offline} offline · snapshots refresh every {SNAPSHOT_REFRESH_MS / 1000}s
           </p>
         </div>
-        <button
-          onClick={() => refetch()}
-          className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm transition-all"
-        >
-          <RefreshCw className="w-4 h-4" /> Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/cameras/manage"
+            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-semibold text-white transition-all"
+          >
+            <Plus className="w-4 h-4" /> Add Camera
+          </Link>
+          <button
+            onClick={() => refetch()}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm transition-all"
+          >
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Status bar */}
@@ -171,7 +179,13 @@ export default function CamerasPage() {
       ) : cameras.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-white/20 gap-4">
           <Camera className="w-12 h-12" />
-          <p className="text-sm">No cameras found. Add cameras in Settings.</p>
+          <p className="text-sm">No cameras found.</p>
+          <Link
+            to="/cameras/manage"
+            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-semibold text-white transition-all"
+          >
+            <Plus className="w-4 h-4" /> Add Your First Camera
+          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

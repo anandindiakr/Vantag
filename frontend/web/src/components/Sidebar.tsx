@@ -13,6 +13,8 @@ import {
   PenTool,
   Download,
   HelpCircle,
+  Settings2,
+  HeartPulse,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useVantagStore } from '../store/useVantagStore';
@@ -29,10 +31,12 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Dashboard',    to: '/dashboard',    icon: <LayoutDashboard size={20} /> },
   { label: 'Cameras',      to: '/cameras',      icon: <Camera size={20} /> },
+  { label: 'Manage Cameras', to: '/cameras/manage', icon: <Settings2 size={20} /> },
   { label: 'Incidents',    to: '/incidents',    icon: <AlertTriangle size={20} /> },
   { label: 'Watchlist',    to: '/watchlist',    icon: <Users size={20} /> },
   { label: 'Zone Editor',  to: '/zone-editor',  icon: <PenTool size={20} />, dividerBefore: true },
   { label: 'Demo Center',  to: '/demo',         icon: <Zap size={20} /> },
+  { label: 'Health Check', to: '/health-check', icon: <HeartPulse size={20} />, dividerBefore: true },
   { label: 'Install Edge Agent', to: '/download', icon: <Download size={20} />, dividerBefore: true },
   { label: 'Help & Support', to: '/help', icon: <HelpCircle size={20} /> },
 ];

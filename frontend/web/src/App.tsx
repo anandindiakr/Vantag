@@ -26,6 +26,7 @@ const VerifyEmail  = lazy(() => import('./pages/auth/VerifyEmail'));
 const Onboarding   = lazy(() => import('./pages/onboarding/Onboarding'));
 const Dashboard    = lazy(() => import('./pages/Dashboard'));
 const CamerasPage   = lazy(() => import('./pages/CamerasPage'));
+const CamerasManage = lazy(() => import('./pages/CamerasManage'));
 const DemoCenter    = lazy(() => import('./pages/DemoCenter'));
 const ZoneEditor    = lazy(() => import('./pages/ZoneEditorPage'));
 const CameraView   = lazy(() => import('./pages/CameraView'));
@@ -36,6 +37,7 @@ const DownloadPage = lazy(() => import('./pages/DownloadPage'));
 const HowItWorks   = lazy(() => import('./pages/HowItWorks'));
 const FAQ          = lazy(() => import('./pages/FAQ'));
 const HelpCenter   = lazy(() => import('./pages/HelpCenter'));
+const HealthCheck  = lazy(() => import('./pages/HealthCheck'));
 
 // ── Auth helper ─────────────────────────────────────────────────────────────
 function isAuthenticated() {
@@ -99,6 +101,7 @@ export default function App() {
             <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
               <Route path="/dashboard"              element={<Dashboard />} />
               <Route path="/cameras"               element={<CamerasPage />} />
+              <Route path="/cameras/manage"        element={<CamerasManage />} />
               <Route path="/demo"                  element={<DemoCenter />} />
               <Route path="/zone-editor"           element={<ZoneEditor />} />
               <Route path="/cameras/:storeId/:cameraId" element={<CameraView />} />
@@ -107,6 +110,7 @@ export default function App() {
               <Route path="/stores/:id" element={<StoreDetail />} />
               <Route path="/download"   element={<DownloadPage />} />
               <Route path="/help"       element={<HelpCenter />} />
+              <Route path="/health-check" element={<HealthCheck />} />
             </Route>
 
             {/* Fallback */}

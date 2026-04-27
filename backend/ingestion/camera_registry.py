@@ -7,12 +7,15 @@ configuration throughout the Vantag backend.
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +178,83 @@ class CameraRegistry:
             raise ConfigError(
                 f"cameras.yaml is missing required global fields: {missing}"
             )
+
+    # ------------------------------------------------------------------
+    # Mutation API (runtime add/remove + YAML persistence)
+    # ------------------------------------------------------------------
+
+    def add_camera(self, cam: CameraConfig) -> None:
+        """
+        Register a new camera at runtime and persist to YAML.
+
+        Raises ``ConfigError`` if a camera with the same id already exists.
+        """
+        self._ensure_loaded()
+        if cam.id in self._cameras:
+            raise ConfigError(f"Camera id '{cam.id}' already exists in registry.")
+        self._cameras[cam.id] = cam
+        logger.info("Camera added to registry | camera_id=%s", cam.id)
+        self.persist_to_yaml()
+
+    def remove_camera(self, camera_id: str) -> CameraConfig:
+        """
+        Remove a camera from the registry and persist to YAML.
+
+        Returns the removed ``CameraConfig``.
+        Raises ``KeyError`` if the camera does not exist.
+        """
+        self._ensure_loaded()
+        if camera_id not in self._cameras:
+            raise KeyError(f"No camera with id '{camera_id}' in registry.")
+        cam = self._cameras.pop(camera_id)
+        logger.info("Camera removed from registry | camera_id=%s", camera_id)
+        self.persist_to_yaml()
+        return cam
+
+    def persist_to_yaml(self) -> None:
+        """
+        Write the current in-memory registry state back to the YAML config file.
+
+        Preserves the ``global:`` block and rewrites the ``cameras:`` list.
+        Uses ``VANTAG_CAMERAS_YAML`` env var path if set.
+        """
+        target = Path(
+            os.environ.get("VANTAG_CAMERAS_YAML") or self._config_path
+        )
+
+        cameras_list: List[dict] = []
+        for cam in self._cameras.values():
+            cam_dict: dict = {
+                "id": cam.id,
+                "name": cam.name,
+                "rtsp_url": cam.rtsp_url,
+                "location": cam.location,
+                "resolution": {
+                    "width": cam.resolution.width,
+                    "height": cam.resolution.height,
+                },
+                "fps_target": cam.fps_target,
+                "enabled": cam.enabled,
+                "low_light_mode": cam.low_light_mode,
+                "zones": [
+                    {"name": z.name, "points": [list(p) for p in z.points]}
+                    for z in cam.zones
+                ],
+                "staff_zone_colors": cam.staff_zone_colors,
+                "analyzer_config": cam.analyzer_config,
+            }
+            cameras_list.append(cam_dict)
+
+        full_doc: dict = {"global": dict(self._global), "cameras": cameras_list}
+
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("w", encoding="utf-8") as fh:
+                yaml.safe_dump(full_doc, fh, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            logger.info("cameras.yaml persisted | path=%s cameras=%d", target, len(cameras_list))
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to persist cameras.yaml | error=%s", exc)
+            raise
 
     @staticmethod
     def _parse_camera(raw: dict, index: int) -> CameraConfig:
