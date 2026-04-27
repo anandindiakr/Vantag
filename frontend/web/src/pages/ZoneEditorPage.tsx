@@ -3,6 +3,7 @@ import { RefreshCw, Save, Trash2, CheckCircle, Loader2, AlertCircle, Undo2 } fro
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { api } from '../hooks/useApi';
+import InfoTooltip from '../components/InfoTooltip';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -452,8 +453,9 @@ export default function ZoneEditorPage() {
 
       {/* ── Step 1: Zone type cards ───────────────────────────────────────── */}
       <div className="space-y-2">
-        <p className="text-sm font-semibold text-slate-300">
+        <p className="text-sm font-semibold text-slate-300 flex items-center gap-1">
           Step 1 — What do you want to mark on the camera?
+          <InfoTooltip text="Zones tell the AI where to watch. Mark shelves for inventory tracking, restricted areas for security, and queue lanes for checkout monitoring." />
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {(Object.entries(ZONE_META) as [ZoneType, typeof ZONE_META['shelf']][]).map(([type, meta]) => {
@@ -494,10 +496,11 @@ export default function ZoneEditorPage() {
 
       {/* ── Step 2: Camera + canvas ──────────────────────────────────────── */}
       <div className="space-y-2">
-        <p className="text-sm font-semibold text-slate-300">
+        <p className="text-sm font-semibold text-slate-300 flex items-center gap-1">
           Step 2 — {mode
             ? `Drag a ${ZONE_META[mode].label} box on the camera image below`
             : 'Select a zone type above, then drag on the camera image'}
+          <InfoTooltip text="Click and drag on the camera image to draw a zone box. You can draw multiple zones of any type. Changes are saved when you click 'Save All Zones'." />
         </p>
 
         {/* Camera picker + snapshot */}

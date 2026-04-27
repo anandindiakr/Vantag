@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { useRegion } from '../../hooks/useRegion';
 import { REGIONS as REGION_MAP } from '../../config/regions';
 import { LanguageSelector } from '../../components/LanguageSelector';
+import InfoTooltip from '../../components/InfoTooltip';
 
 const COUNTRIES = [
   { code: 'IN', name: '🇮🇳 India' },
@@ -83,25 +84,37 @@ export default function Register() {
           <p className="text-white/40 text-sm text-center mb-8">14-day free trial · No credit card required</p>
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <label className="text-sm text-white/60 block mb-1.5">Shop Name</label>
+              <label className="text-sm text-white/60 flex items-center mb-1.5">
+                Shop Name
+                <InfoTooltip text="Enter your store or business name. This appears on your dashboard and reports." />
+              </label>
               <input required value={form.name} onChange={e => up('name', e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
                 placeholder="My Retail Shop" />
             </div>
             <div>
-              <label className="text-sm text-white/60 block mb-1.5">Email</label>
+              <label className="text-sm text-white/60 flex items-center mb-1.5">
+                Email
+                <InfoTooltip text="Your work email address. We'll send alerts and important notifications here." />
+              </label>
               <input type="email" required value={form.email} onChange={e => up('email', e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
                 placeholder="owner@shop.com" />
             </div>
             <div>
-              <label className="text-sm text-white/60 block mb-1.5">Phone Number</label>
+              <label className="text-sm text-white/60 flex items-center mb-1.5">
+                Phone Number
+                <InfoTooltip text="Your mobile number for SMS alerts. Include country code, e.g. +91 98765 43210." />
+              </label>
               <input type="tel" value={form.phone} onChange={e => up('phone', e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
                 placeholder="+91 98765 43210" />
             </div>
             <div>
-              <label className="text-sm text-white/60 block mb-1.5">Country</label>
+              <label className="text-sm text-white/60 flex items-center mb-1.5">
+                Country
+                <InfoTooltip text="Select the country where your store operates. This sets your currency and compliance defaults." />
+              </label>
               <select value={form.country} onChange={e => up('country', e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500/50 transition-colors">
                 {COUNTRIES.map(c => <option key={c.code} value={c.code} className="bg-gray-900">{c.name}</option>)}
@@ -117,7 +130,10 @@ export default function Register() {
               )}
             </div>
             <div>
-              <label className="text-sm text-white/60 block mb-1.5">Password</label>
+              <label className="text-sm text-white/60 flex items-center mb-1.5">
+                Password
+                <InfoTooltip text="Choose a strong password with at least 8 characters. You'll use this to log in to your Vantag dashboard." />
+              </label>
               <div className="relative">
                 <input type={showPw ? 'text' : 'password'} required value={form.password} onChange={e => up('password', e.target.value)}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 pr-12 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"

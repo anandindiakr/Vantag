@@ -3,6 +3,11 @@
  * ================
  * Floating chat widget in the bottom-right corner of every page.
  * Powered by Vantag Assistant (OpenAI GPT-4o backend at /api/support/chat).
+ *
+ * Can be opened and pre-seeded with a message from any page by dispatching:
+ *   window.dispatchEvent(new CustomEvent('vantag:support-chat', {
+ *     detail: { open: true, prefillMessage: 'Your message here' }
+ *   }))
  */
 import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, X, Send, Mail } from 'lucide-react';
@@ -27,6 +32,21 @@ export default function SupportChat() {
   const [loading, setLoading] = useState(false);
   const [escalate, setEscalate] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Listen for external open/prefill events (e.g. from CamerasManage "Need help?" button)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ open?: boolean; prefillMessage?: string }>).detail;
+      if (detail?.open) {
+        setOpen(true);
+      }
+      if (detail?.prefillMessage) {
+        setInput(detail.prefillMessage);
+      }
+    };
+    window.addEventListener('vantag:support-chat', handler);
+    return () => window.removeEventListener('vantag:support-chat', handler);
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });

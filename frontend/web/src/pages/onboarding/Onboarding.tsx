@@ -5,6 +5,7 @@ import { Shield, Store, CreditCard, Camera, Smartphone, CheckCircle, ChevronRigh
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useRazorpay } from '../../hooks/useRazorpay';
+import InfoTooltip from '../../components/InfoTooltip';
 
 // ── helpers ───────────────────────────────────────────────────────────────
 const token = () => localStorage.getItem('vantag_token') || '';
@@ -223,14 +224,20 @@ export default function Onboarding() {
               <p className="text-white/40 text-sm mb-8">This helps us personalise Vantag for your business.</p>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm text-white/60 block mb-1.5">Shop Name *</label>
+                  <label className="text-sm text-white/60 flex items-center mb-1.5">
+                    Shop Name *
+                    <InfoTooltip text="The official name of your store or outlet. This appears on reports and alerts." />
+                  </label>
                   <input required value={shopForm.shop_name} onChange={e => setShopForm(f => ({...f, shop_name: e.target.value}))}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500/50 transition-colors"
                     placeholder="My Grocery Store" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm text-white/60 block mb-1.5">Country *</label>
+                    <label className="text-sm text-white/60 flex items-center mb-1.5">
+                      Country *
+                      <InfoTooltip text="The country where your store is located. Affects currency, language, and compliance settings." />
+                    </label>
                     <select value={country} onChange={e => setCountry(e.target.value)}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500/50 transition-colors">
                       <option value="IN" className="bg-gray-900">🇮🇳 India</option>
@@ -239,26 +246,38 @@ export default function Onboarding() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-sm text-white/60 block mb-1.5">City</label>
+                    <label className="text-sm text-white/60 flex items-center mb-1.5">
+                      City
+                      <InfoTooltip text="Your store's city. Used for location context in reports." />
+                    </label>
                     <input value={shopForm.city} onChange={e => setShopForm(f => ({...f, city: e.target.value}))}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500/50 transition-colors"
                       placeholder="Mumbai" />
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm text-white/60 block mb-1.5">Full Address</label>
+                  <label className="text-sm text-white/60 flex items-center mb-1.5">
+                    Full Address
+                    <InfoTooltip text="Street address of your store. Helps identify your location in multi-branch setups." />
+                  </label>
                   <input value={shopForm.address} onChange={e => setShopForm(f => ({...f, address: e.target.value}))}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500/50 transition-colors"
                     placeholder="123 Market Street" />
                 </div>
                 <div>
-                  <label className="text-sm text-white/60 block mb-1.5">Phone Number</label>
+                  <label className="text-sm text-white/60 flex items-center mb-1.5">
+                    Phone Number
+                    <InfoTooltip text="Your contact number for alerts. Include country code, e.g. +91 98765 43210." />
+                  </label>
                   <input type="tel" value={shopForm.phone} onChange={e => setShopForm(f => ({...f, phone: e.target.value}))}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500/50 transition-colors"
                     placeholder="+91 98765 43210" />
                 </div>
                 <div>
-                  <label className="text-sm text-white/60 block mb-1.5">Dashboard Language</label>
+                  <label className="text-sm text-white/60 flex items-center mb-1.5">
+                    Dashboard Language
+                    <InfoTooltip text="The language Vantag will use for your dashboard, alerts, and reports." />
+                  </label>
                   <select value={shopForm.language} onChange={e => setShopForm(f => ({...f, language: e.target.value}))}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500/50 transition-colors">
                     <option value="en" className="bg-gray-900">English</option>
