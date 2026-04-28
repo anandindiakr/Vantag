@@ -224,10 +224,31 @@
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body class="bg-vantag-dark text-white antialiased">
-    <!-- SEO-friendly noscript fallback so crawlers that don't run JS still see content -->
+    <!-- Always-present H1 for SEO crawlers (Bing, Google, AI bots that snapshot
+         HTML before JS executes). Visually hidden but fully accessible. -->
+    <h1 id="seo-h1" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">
+      Vantag — DIY AI Security & CCTV Analytics Platform for Shops, Malls, Hospitals, Post Offices, Police Stations, Small Offices and Homes
+    </h1>
+    <script>
+      // Region-aware H1 text so each domain has keyword-rich wording
+      (function () {
+        try {
+          var h = (location.hostname || '').toLowerCase();
+          var text = 'Vantag — DIY AI Security & CCTV Analytics Platform for Shops, Malls, Hospitals, Post Offices, Police Stations, Small Offices and Homes';
+          if (h.indexOf('retailnazar') !== -1) {
+            text = 'Retail Nazar by Vantag — AI-Powered CCTV Security for Indian Retail Shops, Malls, Hospitals, Offices, Post Offices and Police Stations';
+          } else if (h.indexOf('jagajaga') !== -1) {
+            text = 'Vantag JagaJaga — AI Security & Surveillance Platform for Malaysian Shops, Malls, Clinics, Offices and Homes';
+          }
+          var el = document.getElementById('seo-h1');
+          if (el) el.textContent = text;
+        } catch (e) {}
+      })();
+    </script>
+    <!-- Also expose core marketing copy for crawlers even before React hydrates -->
     <noscript>
       <div style="max-width:760px;margin:40px auto;padding:20px;font-family:sans-serif;color:#eee;">
-        <h1>Vantag — DIY AI Security for Shops, Malls, Hospitals & Offices</h1>
+        <h2>Vantag — DIY AI Security for Shops, Malls, Hospitals & Offices</h2>
         <p>Vantag is a plug-and-play AI security platform that turns any existing IP camera into a 24/7 guardian. It detects shoplifting, loitering, falls, empty shelves, inventory movement, camera tampering and more — for retail shops, shopping malls, hospitals, post offices, police stations, small offices and homes.</p>
         <p>Available in Singapore (retail-vantag.com), India (retailnazar.com, retailnazar.in) and Malaysia (jagajaga.my, retailjagajaga.com). Enable JavaScript to use the interactive dashboard, or email <a href="mailto:support@retail-vantag.com">support@retail-vantag.com</a>.</p>
       </div>
