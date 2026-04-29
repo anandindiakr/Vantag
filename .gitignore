@@ -85,6 +85,7 @@ _docgen/
 _docgen_deploy/
 *.docx
 !Vantag_Production_Deployment_Guide.docx
+!docs/**/*.docx
 
 # IDE
 .vscode/
