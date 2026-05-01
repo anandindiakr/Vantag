@@ -41,6 +41,8 @@ const FAQ          = lazy(() => import('./pages/FAQ'));
 const HelpCenter   = lazy(() => import('./pages/HelpCenter'));
 const HealthCheck  = lazy(() => import('./pages/HealthCheck'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const PrivacyPolicy  = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 
 // ── Auth helpers ─────────────────────────────────────────────────────────────
 function isAuthenticated() {
@@ -109,6 +111,8 @@ export default function App() {
             <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
 
             {/* Onboarding — auth required, no sidebar */}
             <Route path="/onboarding" element={<PrivateRoute><Onboarding /></PrivateRoute>} />

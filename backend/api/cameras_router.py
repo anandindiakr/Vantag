@@ -145,7 +145,7 @@ def _encode_jpeg(frame: np.ndarray, quality: int = 85) -> bytes:
     response_model=List[CameraResponse],
     summary="List all cameras with health status",
 )
-async def list_cameras() -> List[CameraResponse]:
+async def list_cameras(user: dict = Depends(get_current_user_id)) -> List[CameraResponse]:
     """Return all cameras registered in the system along with their health state."""
     pipeline = _get_pipeline()
     try:
@@ -176,7 +176,7 @@ async def list_cameras() -> List[CameraResponse]:
     response_model=CameraResponse,
     summary="Get camera detail and configuration",
 )
-async def get_camera(camera_id: str) -> CameraResponse:
+async def get_camera(camera_id: str, user: dict = Depends(get_current_user_id)) -> CameraResponse:
     """Return full configuration and current health state for a single camera."""
     pipeline = _get_pipeline()
     try:
@@ -204,7 +204,7 @@ async def get_camera(camera_id: str) -> CameraResponse:
     summary="Get latest frame as JPEG",
     responses={200: {"content": {"image/jpeg": {}}}},
 )
-async def get_snapshot(camera_id: str) -> Response:
+async def get_snapshot(camera_id: str, user: dict = Depends(get_current_user_id)) -> Response:
     """
     Return the most recent captured frame for a camera as a JPEG image.
 
@@ -256,7 +256,7 @@ async def get_snapshot(camera_id: str) -> Response:
     response_model=CameraResponse,
     summary="Update zone polygon configuration",
 )
-async def update_zones(camera_id: str, body: ZoneUpdateRequest) -> CameraResponse:
+async def update_zones(camera_id: str, body: ZoneUpdateRequest, user: dict = Depends(get_current_user_id)) -> CameraResponse:
     """
     Replace the zone polygon configuration for a camera.
 
@@ -303,7 +303,7 @@ async def update_zones(camera_id: str, body: ZoneUpdateRequest) -> CameraRespons
     summary="MJPEG live stream",
     responses={200: {"content": {"multipart/x-mixed-replace; boundary=frame": {}}}},
 )
-async def mjpeg_stream(camera_id: str, request: Request) -> StreamingResponse:
+async def mjpeg_stream(camera_id: str, request: Request, user: dict = Depends(get_current_user_id)) -> StreamingResponse:
     """
     Stream live MJPEG video from a camera.
 
