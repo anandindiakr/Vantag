@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Vantag - fix all P0 blockers on production VPS.
 # Safe to re-run: every step is idempotent.
-set -e
+# NOTE: intentionally no 'set -e' so a single failing step does not abort the rest.
+set -u
 echo "====================================================="
 echo "  Vantag P0 blocker auto-fix"
 echo "  Started: $(date)"
@@ -21,9 +22,32 @@ cd /var/www/vantag
 
 echo ""
 echo "[3/6] Restart backend (applies /api/cameras auth fix)..."
-systemctl restart vantag-backend
-sleep 3
-systemctl is-active vantag-backend && echo "  backend: OK" || echo "  backend: FAILED - check 'journalctl -u vantag-backend -n 50'"
+# Auto-detect backend service name (names vary across installs)
+BACKEND_SVC=""
+for cand in vantag-backend vantag-api vantag vantag-web vantag.service; do
+  if systemctl list-unit-files 2>/dev/null | grep -q "^${cand%.service}.service"; then
+    BACKEND_SVC="${cand%.service}"
+    break
+  fi
+done
+if [ -z "$BACKEND_SVC" ]; then
+  # Fallback: any service whose unit references /var/www/vantag or uvicorn
+  BACKEND_SVC=$(systemctl list-units --type=service --all --no-legend 2>/dev/null \
+    | awk '{print $1}' | while read u; do
+        if systemctl cat "$u" 2>/dev/null | grep -qE "/var/www/vantag|uvicorn|gunicorn.*vantag"; then
+          echo "${u%.service}"; break
+        fi
+      done)
+fi
+if [ -n "$BACKEND_SVC" ]; then
+  echo "  detected backend service: $BACKEND_SVC"
+  systemctl restart "$BACKEND_SVC" || echo "  WARN: restart failed, continuing"
+  sleep 3
+  systemctl is-active "$BACKEND_SVC" && echo "  backend: OK" || echo "  backend: NOT ACTIVE - check 'journalctl -u $BACKEND_SVC -n 50'"
+else
+  echo "  WARN: no backend systemd service found. If you run it manually (e.g. python main.py),"
+  echo "        kill and restart it yourself. Continuing with the rest of the fixes..."
+fi
 
 echo ""
 echo "[4/6] Create Edge Agent downloads directory..."
