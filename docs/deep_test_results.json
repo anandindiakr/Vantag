@@ -1,0 +1,191 @@
+{
+  "run_at": "2026-05-01T11:16:21.287961Z",
+  "tests": [
+    {
+      "name": "GET /",
+      "status": "PASS",
+      "detail": "\u2192 200"
+    },
+    {
+      "name": "GET /pricing",
+      "status": "PASS",
+      "detail": "\u2192 200"
+    },
+    {
+      "name": "GET /login",
+      "status": "PASS",
+      "detail": "\u2192 200"
+    },
+    {
+      "name": "GET /register",
+      "status": "PASS",
+      "detail": "\u2192 200"
+    },
+    {
+      "name": "GET /privacy",
+      "status": "PASS",
+      "detail": "\u2192 200"
+    },
+    {
+      "name": "GET /terms",
+      "status": "PASS",
+      "detail": "\u2192 200"
+    },
+    {
+      "name": "GET /help",
+      "status": "PASS",
+      "detail": "\u2192 200"
+    },
+    {
+      "name": "GET /setup",
+      "status": "PASS",
+      "detail": "\u2192 200"
+    },
+    {
+      "name": "GET /api/health",
+      "status": "FAIL",
+      "detail": "\u2192 404"
+    },
+    {
+      "name": "GET /health",
+      "status": "PASS",
+      "detail": "\u2192 200"
+    },
+    {
+      "name": "GET /api/version returns JSON",
+      "status": "PASS",
+      "detail": "\u2192 404"
+    },
+    {
+      "name": "Login wrong credentials \u2192 401/400",
+      "status": "PASS",
+      "detail": "\u2192 422"
+    },
+    {
+      "name": "No stack trace in error body",
+      "status": "PASS",
+      "detail": "body_len=335"
+    },
+    {
+      "name": "Register invalid email \u2192 4xx",
+      "status": "PASS",
+      "detail": "\u2192 422"
+    },
+    {
+      "name": "GET /api/tenants/me no-token \u2192 401",
+      "status": "PASS",
+      "detail": "\u2192 401"
+    },
+    {
+      "name": "GET /api/admin/tenants no-token \u2192 401/403",
+      "status": "PASS",
+      "detail": "\u2192 401"
+    },
+    {
+      "name": "GET /api/cameras no-token \u2192 401",
+      "status": "FAIL",
+      "detail": "\u2192 200"
+    },
+    {
+      "name": "HSTS max-age >= 1y",
+      "status": "PASS",
+      "detail": "\u2192 max-age=31536000; includeSubDomains"
+    },
+    {
+      "name": "X-Content-Type-Options nosniff",
+      "status": "PASS",
+      "detail": "\u2192 nosniff"
+    },
+    {
+      "name": "X-Frame-Options set",
+      "status": "PASS",
+      "detail": "\u2192 SAMEORIGIN"
+    },
+    {
+      "name": "Referrer-Policy set",
+      "status": "PASS",
+      "detail": "\u2192 strict-origin-when-cross-origin"
+    },
+    {
+      "name": "Permissions-Policy set",
+      "status": "PASS",
+      "detail": "\u2192 camera=(self), microphone=(), geolocation=(self)"
+    },
+    {
+      "name": "Server header does NOT leak version",
+      "status": "FAIL",
+      "detail": "\u2192 nginx/1.24.0 (Ubuntu)"
+    },
+    {
+      "name": "Login rate-limit triggers 429 after 6 attempts",
+      "status": "PASS",
+      "detail": "codes=[401, 401, 401, 401, 401, 401] (429 observed=False)"
+    },
+    {
+      "name": "/privacy contains 'privacy'/'terms' content",
+      "status": "FAIL",
+      "detail": "code=200, len=15155"
+    },
+    {
+      "name": "/terms contains 'privacy'/'terms' content",
+      "status": "FAIL",
+      "detail": "code=200, len=15155"
+    },
+    {
+      "name": "GET /downloads/windows",
+      "status": "FAIL",
+      "detail": "\u2192 404"
+    },
+    {
+      "name": "GET /downloads/android",
+      "status": "FAIL",
+      "detail": "\u2192 404"
+    },
+    {
+      "name": "GET /downloads/linux",
+      "status": "FAIL",
+      "detail": "\u2192 404"
+    },
+    {
+      "name": "GET /api/agent/download/windows",
+      "status": "FAIL",
+      "detail": "\u2192 404"
+    },
+    {
+      "name": "GET /api/agent/download/android",
+      "status": "FAIL",
+      "detail": "\u2192 404"
+    },
+    {
+      "name": "/ws returns 400/426 on plain HTTP",
+      "status": "FAIL",
+      "detail": "\u2192 404"
+    },
+    {
+      "name": "MQTT TLS port 8883 reachable",
+      "status": "FAIL",
+      "detail": ""
+    },
+    {
+      "name": "MQTT plain 1883 NOT public (should be FAIL=closed)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "PostgreSQL 5432 NOT public",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Redis 6379 NOT public",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "summary": {
+    "total": 36,
+    "passed": 24,
+    "failed": 12,
+    "pct": 66.7
+  }
+}

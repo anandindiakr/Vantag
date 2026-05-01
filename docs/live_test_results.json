@@ -1,0 +1,470 @@
+{
+  "run_at": "2026-05-01T11:15:22.377737Z",
+  "domains": {
+    "retail-vantag.com": {
+      "region": "SG",
+      "checks": {
+        "tls_valid": "PASS",
+        "root_200": "PASS",
+        "hsts": "PASS",
+        "x_content_type": "PASS",
+        "x_frame_options": "PASS",
+        "referrer_policy": "PASS",
+        "health_200": "PASS",
+        "robots_exists": "PASS",
+        "robots_disallow_admin": "PASS",
+        "sitemap_exists": "PASS",
+        "sitemap_https": "PASS",
+        "og_image": "PASS",
+        "seo_title_present": "PASS",
+        "seo_desc_len_ok": "PASS",
+        "seo_h1_in_raw_html": "PASS",
+        "privacy_link": "FAIL",
+        "terms_link": "FAIL"
+      },
+      "dns_a": "187.127.112.32",
+      "tls": {
+        "expires": "Jul 19 07:10:16 2026 GMT",
+        "days_left": 78,
+        "issuer": "Let's Encrypt"
+      },
+      "root": {
+        "code": 200,
+        "headers": {
+          "Server": "nginx/1.24.0 (Ubuntu)",
+          "Date": "Fri, 01 May 2026 11:15:21 GMT",
+          "Content-Type": "text/html",
+          "Content-Length": "15255",
+          "Last-Modified": "Tue, 28 Apr 2026 04:08:32 GMT",
+          "Connection": "close",
+          "ETag": "\"69f032c0-3b97\"",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "SAMEORIGIN",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Permissions-Policy": "camera=(self), microphone=(), geolocation=(self)",
+          "Accept-Ranges": "bytes"
+        },
+        "body_bytes": 15255
+      },
+      "health_code": 200,
+      "robots_head": "# Vantag Retail Intelligence \u2014 robots.txt\nUser-agent: *\nAllow: /\n\n# Block authenticated / private areas (no value to search crawlers)\nDisallow: /dashboard\nDisallow: /admin\nDisallow: /onboarding\nDisallow: /cameras\nDisallow: /cameras-manage\nD",
+      "sitemap_head": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n        xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n  <url>\n    <loc>https://retail-vantag.com/</loc>\n    <lastmod>2026-05-01</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n    <xhtml:link rel=\"alternate\" hreflang=\"en-SG\" href=\"https://retail-vantag.com/\" />\n    <xhtml:lin",
+      "og_cover": {
+        "code": 200,
+        "content_type": "image/png"
+      },
+      "html_bytes": 15155,
+      "seo": {
+        "title": "Vantag \u2014 DIY AI Security for Shops & Offices",
+        "title_len": 44,
+        "desc_len": 132,
+        "desc_preview": "DIY AI security for shops, malls, hospitals & offices. Any IP camera becomes a 24/7 guardian. Theft, loitering, falls. 30-min setup.",
+        "h1_preview": "Vantag \u2014 DIY AI Security & CCTV Analytics Platform for Shops, Malls, Hospitals, Post Offices, Police Stations, Small Off",
+        "h1_present": true
+      }
+    },
+    "retailnazar.com": {
+      "region": "IN",
+      "checks": {
+        "tls_valid": "PASS",
+        "root_200": "PASS",
+        "hsts": "PASS",
+        "x_content_type": "PASS",
+        "x_frame_options": "PASS",
+        "referrer_policy": "PASS",
+        "health_200": "PASS",
+        "robots_exists": "PASS",
+        "robots_disallow_admin": "PASS",
+        "sitemap_exists": "PASS",
+        "sitemap_https": "PASS",
+        "og_image": "PASS",
+        "seo_title_present": "PASS",
+        "seo_desc_len_ok": "PASS",
+        "seo_h1_in_raw_html": "PASS",
+        "privacy_link": "FAIL",
+        "terms_link": "FAIL"
+      },
+      "dns_a": "187.127.112.32",
+      "tls": {
+        "expires": "Jul 19 07:10:16 2026 GMT",
+        "days_left": 78,
+        "issuer": "Let's Encrypt"
+      },
+      "root": {
+        "code": 200,
+        "headers": {
+          "Server": "nginx/1.24.0 (Ubuntu)",
+          "Date": "Fri, 01 May 2026 11:15:23 GMT",
+          "Content-Type": "text/html",
+          "Content-Length": "15255",
+          "Last-Modified": "Tue, 28 Apr 2026 04:08:32 GMT",
+          "Connection": "close",
+          "ETag": "\"69f032c0-3b97\"",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "SAMEORIGIN",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Permissions-Policy": "camera=(self), microphone=(), geolocation=(self)",
+          "Accept-Ranges": "bytes"
+        },
+        "body_bytes": 15255
+      },
+      "health_code": 200,
+      "robots_head": "# Vantag Retail Intelligence \u2014 robots.txt\nUser-agent: *\nAllow: /\n\n# Block authenticated / private areas (no value to search crawlers)\nDisallow: /dashboard\nDisallow: /admin\nDisallow: /onboarding\nDisallow: /cameras\nDisallow: /cameras-manage\nD",
+      "sitemap_head": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n        xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n  <url>\n    <loc>https://retailnazar.com/</loc>\n    <lastmod>2026-05-01</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n    <xhtml:link rel=\"alternate\" hreflang=\"en-SG\" href=\"https://retail-vantag.com/\" />\n    <xhtml:link ",
+      "og_cover": {
+        "code": 200,
+        "content_type": "image/png"
+      },
+      "html_bytes": 15155,
+      "seo": {
+        "title": "Vantag \u2014 DIY AI Security for Shops & Offices",
+        "title_len": 44,
+        "desc_len": 132,
+        "desc_preview": "DIY AI security for shops, malls, hospitals & offices. Any IP camera becomes a 24/7 guardian. Theft, loitering, falls. 30-min setup.",
+        "h1_preview": "Vantag \u2014 DIY AI Security & CCTV Analytics Platform for Shops, Malls, Hospitals, Post Offices, Police Stations, Small Off",
+        "h1_present": true
+      }
+    },
+    "retailnazar.in": {
+      "region": "IN",
+      "checks": {
+        "tls_valid": "PASS",
+        "root_200": "PASS",
+        "hsts": "PASS",
+        "x_content_type": "PASS",
+        "x_frame_options": "PASS",
+        "referrer_policy": "PASS",
+        "health_200": "PASS",
+        "robots_exists": "PASS",
+        "robots_disallow_admin": "PASS",
+        "sitemap_exists": "PASS",
+        "sitemap_https": "PASS",
+        "og_image": "PASS",
+        "seo_title_present": "PASS",
+        "seo_desc_len_ok": "PASS",
+        "seo_h1_in_raw_html": "PASS",
+        "privacy_link": "FAIL",
+        "terms_link": "FAIL"
+      },
+      "dns_a": "187.127.112.32",
+      "tls": {
+        "expires": "Jul 19 07:10:16 2026 GMT",
+        "days_left": 78,
+        "issuer": "Let's Encrypt"
+      },
+      "root": {
+        "code": 200,
+        "headers": {
+          "Server": "nginx/1.24.0 (Ubuntu)",
+          "Date": "Fri, 01 May 2026 11:15:27 GMT",
+          "Content-Type": "text/html",
+          "Content-Length": "15255",
+          "Last-Modified": "Tue, 28 Apr 2026 04:08:32 GMT",
+          "Connection": "close",
+          "ETag": "\"69f032c0-3b97\"",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "SAMEORIGIN",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Permissions-Policy": "camera=(self), microphone=(), geolocation=(self)",
+          "Accept-Ranges": "bytes"
+        },
+        "body_bytes": 15255
+      },
+      "health_code": 200,
+      "robots_head": "# Vantag Retail Intelligence \u2014 robots.txt\nUser-agent: *\nAllow: /\n\n# Block authenticated / private areas (no value to search crawlers)\nDisallow: /dashboard\nDisallow: /admin\nDisallow: /onboarding\nDisallow: /cameras\nDisallow: /cameras-manage\nD",
+      "sitemap_head": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n        xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n  <url>\n    <loc>https://retailnazar.in/</loc>\n    <lastmod>2026-05-01</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n    <xhtml:link rel=\"alternate\" hreflang=\"en-SG\" href=\"https://retail-vantag.com/\" />\n    <xhtml:link r",
+      "og_cover": {
+        "code": 200,
+        "content_type": "image/png"
+      },
+      "html_bytes": 15155,
+      "seo": {
+        "title": "Vantag \u2014 DIY AI Security for Shops & Offices",
+        "title_len": 44,
+        "desc_len": 132,
+        "desc_preview": "DIY AI security for shops, malls, hospitals & offices. Any IP camera becomes a 24/7 guardian. Theft, loitering, falls. 30-min setup.",
+        "h1_preview": "Vantag \u2014 DIY AI Security & CCTV Analytics Platform for Shops, Malls, Hospitals, Post Offices, Police Stations, Small Off",
+        "h1_present": true
+      }
+    },
+    "retailnazar.info": {
+      "region": "IN",
+      "checks": {
+        "tls_valid": "PASS",
+        "root_200": "PASS",
+        "hsts": "PASS",
+        "x_content_type": "PASS",
+        "x_frame_options": "PASS",
+        "referrer_policy": "PASS",
+        "health_200": "PASS",
+        "robots_exists": "PASS",
+        "robots_disallow_admin": "PASS",
+        "sitemap_exists": "PASS",
+        "sitemap_https": "PASS",
+        "og_image": "PASS",
+        "seo_title_present": "PASS",
+        "seo_desc_len_ok": "PASS",
+        "seo_h1_in_raw_html": "PASS",
+        "privacy_link": "FAIL",
+        "terms_link": "FAIL"
+      },
+      "dns_a": "187.127.112.32",
+      "tls": {
+        "expires": "Jul 19 07:10:16 2026 GMT",
+        "days_left": 78,
+        "issuer": "Let's Encrypt"
+      },
+      "root": {
+        "code": 200,
+        "headers": {
+          "Server": "nginx/1.24.0 (Ubuntu)",
+          "Date": "Fri, 01 May 2026 11:15:29 GMT",
+          "Content-Type": "text/html",
+          "Content-Length": "15255",
+          "Last-Modified": "Tue, 28 Apr 2026 04:08:32 GMT",
+          "Connection": "close",
+          "ETag": "\"69f032c0-3b97\"",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "SAMEORIGIN",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Permissions-Policy": "camera=(self), microphone=(), geolocation=(self)",
+          "Accept-Ranges": "bytes"
+        },
+        "body_bytes": 15255
+      },
+      "health_code": 200,
+      "robots_head": "# Vantag Retail Intelligence \u2014 robots.txt\nUser-agent: *\nAllow: /\n\n# Block authenticated / private areas (no value to search crawlers)\nDisallow: /dashboard\nDisallow: /admin\nDisallow: /onboarding\nDisallow: /cameras\nDisallow: /cameras-manage\nD",
+      "sitemap_head": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n        xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n  <url>\n    <loc>https://retailnazar.info/</loc>\n    <lastmod>2026-05-01</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n    <xhtml:link rel=\"alternate\" hreflang=\"en-SG\" href=\"https://retail-vantag.com/\" />\n    <xhtml:link",
+      "og_cover": {
+        "code": 200,
+        "content_type": "image/png"
+      },
+      "html_bytes": 15155,
+      "seo": {
+        "title": "Vantag \u2014 DIY AI Security for Shops & Offices",
+        "title_len": 44,
+        "desc_len": 132,
+        "desc_preview": "DIY AI security for shops, malls, hospitals & offices. Any IP camera becomes a 24/7 guardian. Theft, loitering, falls. 30-min setup.",
+        "h1_preview": "Vantag \u2014 DIY AI Security & CCTV Analytics Platform for Shops, Malls, Hospitals, Post Offices, Police Stations, Small Off",
+        "h1_present": true
+      }
+    },
+    "jagajaga.my": {
+      "region": "MY",
+      "checks": {
+        "tls_valid": "PASS",
+        "root_200": "PASS",
+        "hsts": "PASS",
+        "x_content_type": "PASS",
+        "x_frame_options": "PASS",
+        "referrer_policy": "PASS",
+        "health_200": "PASS",
+        "robots_exists": "PASS",
+        "robots_disallow_admin": "PASS",
+        "sitemap_exists": "PASS",
+        "sitemap_https": "PASS",
+        "og_image": "PASS",
+        "seo_title_present": "PASS",
+        "seo_desc_len_ok": "PASS",
+        "seo_h1_in_raw_html": "PASS",
+        "privacy_link": "FAIL",
+        "terms_link": "FAIL"
+      },
+      "dns_a": "187.127.112.32",
+      "tls": {
+        "expires": "Jul 19 07:10:16 2026 GMT",
+        "days_left": 78,
+        "issuer": "Let's Encrypt"
+      },
+      "root": {
+        "code": 200,
+        "headers": {
+          "Server": "nginx/1.24.0 (Ubuntu)",
+          "Date": "Fri, 01 May 2026 11:15:31 GMT",
+          "Content-Type": "text/html",
+          "Content-Length": "15255",
+          "Last-Modified": "Tue, 28 Apr 2026 04:08:32 GMT",
+          "Connection": "close",
+          "ETag": "\"69f032c0-3b97\"",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "SAMEORIGIN",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Permissions-Policy": "camera=(self), microphone=(), geolocation=(self)",
+          "Accept-Ranges": "bytes"
+        },
+        "body_bytes": 15255
+      },
+      "health_code": 200,
+      "robots_head": "# Vantag Retail Intelligence \u2014 robots.txt\nUser-agent: *\nAllow: /\n\n# Block authenticated / private areas (no value to search crawlers)\nDisallow: /dashboard\nDisallow: /admin\nDisallow: /onboarding\nDisallow: /cameras\nDisallow: /cameras-manage\nD",
+      "sitemap_head": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n        xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n  <url>\n    <loc>https://jagajaga.my/</loc>\n    <lastmod>2026-05-01</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n    <xhtml:link rel=\"alternate\" hreflang=\"en-SG\" href=\"https://retail-vantag.com/\" />\n    <xhtml:link rel=",
+      "og_cover": {
+        "code": 200,
+        "content_type": "image/png"
+      },
+      "html_bytes": 15155,
+      "seo": {
+        "title": "Vantag \u2014 DIY AI Security for Shops & Offices",
+        "title_len": 44,
+        "desc_len": 132,
+        "desc_preview": "DIY AI security for shops, malls, hospitals & offices. Any IP camera becomes a 24/7 guardian. Theft, loitering, falls. 30-min setup.",
+        "h1_preview": "Vantag \u2014 DIY AI Security & CCTV Analytics Platform for Shops, Malls, Hospitals, Post Offices, Police Stations, Small Off",
+        "h1_present": true
+      }
+    },
+    "retailjagajaga.com": {
+      "region": "MY",
+      "checks": {
+        "tls_valid": "PASS",
+        "root_200": "PASS",
+        "hsts": "PASS",
+        "x_content_type": "PASS",
+        "x_frame_options": "PASS",
+        "referrer_policy": "PASS",
+        "health_200": "PASS",
+        "robots_exists": "PASS",
+        "robots_disallow_admin": "PASS",
+        "sitemap_exists": "PASS",
+        "sitemap_https": "PASS",
+        "og_image": "PASS",
+        "seo_title_present": "PASS",
+        "seo_desc_len_ok": "PASS",
+        "seo_h1_in_raw_html": "PASS",
+        "privacy_link": "FAIL",
+        "terms_link": "FAIL"
+      },
+      "dns_a": "187.127.112.32",
+      "tls": {
+        "expires": "Jul 19 07:10:16 2026 GMT",
+        "days_left": 78,
+        "issuer": "Let's Encrypt"
+      },
+      "root": {
+        "code": 200,
+        "headers": {
+          "Server": "nginx/1.24.0 (Ubuntu)",
+          "Date": "Fri, 01 May 2026 11:15:33 GMT",
+          "Content-Type": "text/html",
+          "Content-Length": "15255",
+          "Last-Modified": "Tue, 28 Apr 2026 04:08:32 GMT",
+          "Connection": "close",
+          "ETag": "\"69f032c0-3b97\"",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "SAMEORIGIN",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Permissions-Policy": "camera=(self), microphone=(), geolocation=(self)",
+          "Accept-Ranges": "bytes"
+        },
+        "body_bytes": 15255
+      },
+      "health_code": 200,
+      "robots_head": "# Vantag Retail Intelligence \u2014 robots.txt\nUser-agent: *\nAllow: /\n\n# Block authenticated / private areas (no value to search crawlers)\nDisallow: /dashboard\nDisallow: /admin\nDisallow: /onboarding\nDisallow: /cameras\nDisallow: /cameras-manage\nD",
+      "sitemap_head": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n        xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n  <url>\n    <loc>https://retailjagajaga.com/</loc>\n    <lastmod>2026-05-01</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n    <xhtml:link rel=\"alternate\" hreflang=\"en-SG\" href=\"https://retail-vantag.com/\" />\n    <xhtml:li",
+      "og_cover": {
+        "code": 200,
+        "content_type": "image/png"
+      },
+      "html_bytes": 15155,
+      "seo": {
+        "title": "Vantag \u2014 DIY AI Security for Shops & Offices",
+        "title_len": 44,
+        "desc_len": 132,
+        "desc_preview": "DIY AI security for shops, malls, hospitals & offices. Any IP camera becomes a 24/7 guardian. Theft, loitering, falls. 30-min setup.",
+        "h1_preview": "Vantag \u2014 DIY AI Security & CCTV Analytics Platform for Shops, Malls, Hospitals, Post Offices, Police Stations, Small Off",
+        "h1_present": true
+      }
+    }
+  },
+  "summary": {
+    "tls_valid": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "root_200": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "hsts": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "x_content_type": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "x_frame_options": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "referrer_policy": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "health_200": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "robots_exists": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "robots_disallow_admin": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "sitemap_exists": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "sitemap_https": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "og_image": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "seo_title_present": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "seo_desc_len_ok": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "seo_h1_in_raw_html": {
+      "PASS": 6,
+      "FAIL": 0,
+      "WARN": 0
+    },
+    "privacy_link": {
+      "PASS": 0,
+      "FAIL": 6,
+      "WARN": 0
+    },
+    "terms_link": {
+      "PASS": 0,
+      "FAIL": 6,
+      "WARN": 0
+    }
+  }
+}
