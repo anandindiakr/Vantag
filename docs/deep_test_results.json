@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-05-01T11:16:21.287961Z",
+  "run_at": "2026-05-01T13:57:08.685398Z",
   "tests": [
     {
       "name": "GET /",
@@ -83,8 +83,8 @@
     },
     {
       "name": "GET /api/cameras no-token \u2192 401",
-      "status": "FAIL",
-      "detail": "\u2192 200"
+      "status": "PASS",
+      "detail": "\u2192 401"
     },
     {
       "name": "HSTS max-age >= 1y",
@@ -113,8 +113,8 @@
     },
     {
       "name": "Server header does NOT leak version",
-      "status": "FAIL",
-      "detail": "\u2192 nginx/1.24.0 (Ubuntu)"
+      "status": "PASS",
+      "detail": "\u2192 nginx"
     },
     {
       "name": "Login rate-limit triggers 429 after 6 attempts",
@@ -163,7 +163,7 @@
     },
     {
       "name": "MQTT TLS port 8883 reachable",
-      "status": "FAIL",
+      "status": "PASS",
       "detail": ""
     },
     {
@@ -184,8 +184,8 @@
   ],
   "summary": {
     "total": 36,
-    "passed": 24,
-    "failed": 12,
-    "pct": 66.7
+    "passed": 27,
+    "failed": 9,
+    "pct": 75.0
   }
 }
