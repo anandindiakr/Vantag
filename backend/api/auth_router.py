@@ -23,6 +23,39 @@ from ..services.tenant_service import create_tenant
 from ..services.email_service import generate_otp, send_verification_email, is_dev_mode
 
 
+# ── Disposable email domain blocklist ──────────────────────────────────────
+# Common throwaway / temp-mail providers. Block at registration to ensure
+# every account has a real, recoverable mailbox.
+_DISPOSABLE_DOMAINS = frozenset({
+    "mailinator.com", "guerrillamail.com", "guerrillamail.info", "guerrillamail.biz",
+    "guerrillamail.de", "guerrillamail.net", "guerrillamail.org", "sharklasers.com",
+    "10minutemail.com", "10minutemail.net", "tempmail.com", "tempmail.net",
+    "temp-mail.org", "temp-mail.io", "tempmailo.com", "tmpmail.org",
+    "throwawaymail.com", "yopmail.com", "yopmail.fr", "yopmail.net",
+    "trashmail.com", "trashmail.de", "trashmail.net", "fakeinbox.com",
+    "fakemail.net", "getnada.com", "nada.email", "mohmal.com", "maildrop.cc",
+    "dispostable.com", "mintemail.com", "mytrashmail.com", "spamgourmet.com",
+    "mail-temporaire.fr", "jetable.org", "moakt.com", "emailondeck.com",
+    "tempinbox.com", "spambox.us", "incognitomail.org", "mail.tm",
+    "mailtothis.com", "burnermail.io", "anonbox.net", "dropmail.me",
+    "getairmail.com", "discard.email", "linshiyou.com", "tempemail.net",
+    "tempr.email", "20minutemail.com", "33mail.com", "deadaddress.com",
+    "vantag.io",  # internal demo seed domain - block external registrations
+})
+
+
+def _validate_business_email(email: str) -> None:
+    """Reject disposable / temporary email providers."""
+    domain = (email or "").strip().lower().rsplit("@", 1)[-1]
+    if not domain or "." not in domain:
+        raise HTTPException(status_code=400, detail="Invalid email address")
+    if domain in _DISPOSABLE_DOMAINS:
+        raise HTTPException(
+            status_code=400,
+            detail="Disposable email addresses are not allowed. Please register with a real, work or personal email.",
+        )
+
+
 async def _fire_signup_notifications(tenant_name: str, region: str) -> None:
     """Fire signup alert + notify support email (non-blocking, best-effort)."""
     try:
@@ -107,6 +140,9 @@ async def register(
     body: RegisterRequest,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
+    # Reject disposable / temporary email domains
+    _validate_business_email(body.email)
+
     # Check duplicate email
     existing = await session.execute(
         select(TenantUser).where(TenantUser.email == body.email.lower())
@@ -219,35 +255,10 @@ async def login(
     except HTTPException:
         raise
     except Exception:
-        # DB unreachable — fall through to demo fallback below
-        pass
+        # DB unreachable — fail closed, do not fall back to demo accounts
+        raise HTTPException(status_code=503, detail="Authentication service temporarily unavailable")
 
-    # ── Demo / offline fallback ──────────────────────────────────────────────
-    # Used only when the user is NOT in the DB (dev / edge deployment).
-    demo = _DEMO_ACCOUNTS.get(email_lower)
-    if demo and body.password == demo["password"]:
-        access = make_token(
-            {"sub": demo["user_id"], "tenant_id": demo["tenant_id"],
-             "email": email_lower, "role": demo["role"]},
-            timedelta(hours=JWT_EXPIRE_HOURS),
-        )
-        refresh = make_token(
-            {"sub": demo["user_id"], "tenant_id": demo["tenant_id"], "type": "refresh"},
-            timedelta(days=REFRESH_EXPIRE_DAYS),
-        )
-        return {
-            "access_token": access,
-            "refresh_token": refresh,
-            "token_type": "bearer",
-            "tenant_id": demo["tenant_id"],
-            "onboarding_step": demo["onboarding_step"],
-            "plan_id": demo["plan_id"],
-            "status": demo["status"],
-            "name": demo["name"],
-            "language": demo["language"],
-            "country": demo["country"],
-        }
-
+    # Demo / guest accounts have been removed. All access requires a registered, verified user.
     raise HTTPException(status_code=401, detail="Invalid email or password")
 
 

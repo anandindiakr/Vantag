@@ -443,7 +443,7 @@ export default function Landing() {
                 to="/login"
                 className="flex items-center gap-2 px-6 py-4 rounded-2xl text-sm font-semibold border border-white/10 text-white/70 hover:text-white hover:border-white/25 transition-all"
               >
-                <Play className="w-4 h-4" /> Live Demo
+                <Play className="w-4 h-4" /> Sign In
               </Link>
             </div>
 
