@@ -34,8 +34,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from .models import CameraResponse, CameraStatus, ZonePolygon, ZoneUpdateRequest
 from ..middleware.tenant_middleware import get_current_user_id
+from ..db.database import get_session
+from ..db.models.camera import CameraConfig
 
 logger = logging.getLogger(__name__)
 
@@ -846,6 +851,203 @@ async def auto_detect_rtsp_path(
         tried=total,
         message="Could not auto-detect. Contact support chat for help.",
     )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/cameras/scan-request  (edge-mode auto-scan trigger)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/scan-request",
+    summary="Ask the tenant's edge agent to run a LAN camera discovery scan",
+)
+async def request_camera_scan(user: dict = Depends(get_current_user_id)) -> dict:
+    """Flag the tenant's edge agent to run an on-demand LAN camera scan.
+
+    The agent picks up the flag on its next heartbeat (within a few seconds),
+    scans its store network, and POSTs discovered cameras back to the backend,
+    which surface in the dashboard's auto-detected list.
+    """
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
+    from .edge_router import request_camera_scan as _flag_scan
+    _flag_scan(tenant_id)
+    return {"ok": True, "message": "Scan requested. Your edge agent will scan shortly."}
+
+
+# ---------------------------------------------------------------------------
+# GET /api/cameras/discovered  (edge-mode auto-detected list)
+# ---------------------------------------------------------------------------
+
+
+class DiscoveredCamera(BaseModel):
+    camera_id: str
+    name: str
+    ip: Optional[str] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    conn_status: str = "pending"
+    port: Optional[int] = None
+    rtsp_path: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    needs_credentials: bool = False
+    confidence: Optional[float] = None
+
+
+@router.get(
+    "/discovered",
+    response_model=List[DiscoveredCamera],
+    summary="List edge-agent auto-detected cameras awaiting confirmation",
+)
+async def list_discovered_cameras(
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> List[DiscoveredCamera]:
+    """Return cameras the tenant's edge agent found on the store LAN that have
+    not yet been confirmed (``enabled=False``)."""
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
+
+    rows = (
+        await session.execute(
+            select(CameraConfig).where(
+                CameraConfig.tenant_id == tenant_id,
+                CameraConfig.enabled == False,  # noqa: E712
+                CameraConfig.camera_id.like("disc-%"),
+            )
+        )
+    ).scalars().all()
+
+    out: List[DiscoveredCamera] = []
+    for row in rows:
+        probe = row.probe_result or {}
+        out.append(
+            DiscoveredCamera(
+                camera_id=row.camera_id,
+                name=row.name or (row.brand or f"Camera {row.ip_address}"),
+                ip=row.ip_address,
+                brand=row.brand,
+                model=row.model,
+                conn_status=row.conn_status or "pending",
+                port=probe.get("port"),
+                rtsp_path=probe.get("rtsp_path"),
+                thumbnail_url=probe.get("thumbnail_url"),
+                needs_credentials=bool(probe.get("needs_credentials")),
+                confidence=probe.get("confidence"),
+            )
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# POST /api/cameras/discovered/{camera_id}/confirm
+# ---------------------------------------------------------------------------
+
+
+class ConfirmDiscoveredRequest(BaseModel):
+    name: Optional[str] = None
+    location: str
+    username: Optional[str] = None
+    password: Optional[str] = None
+    fps: int = 15
+    resolution: str = "1920x1080"
+    low_light_mode: bool = False
+
+
+@router.post(
+    "/discovered/{camera_id}/confirm",
+    response_model=CameraResponse,
+    summary="Confirm an auto-detected camera and add it to the live pipeline",
+)
+async def confirm_discovered_camera(
+    camera_id: str,
+    body: ConfirmDiscoveredRequest,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> CameraResponse:
+    """Promote an edge-discovered camera to an active, monitored camera.
+
+    Applies any credentials the user supplies, registers the camera in the live
+    inference pipeline, and flips the DB row to ``enabled=True``.
+    """
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
+
+    row = (
+        await session.execute(
+            select(CameraConfig).where(
+                CameraConfig.tenant_id == tenant_id,
+                CameraConfig.camera_id == camera_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Discovered camera not found")
+
+    probe = row.probe_result or {}
+    port = probe.get("port") or 554
+    path = probe.get("rtsp_path") or "/"
+    if not path.startswith("/"):
+        path = f"/{path}"
+
+    # Build the final RTSP URL: prefer user credentials, else any stored URL.
+    if body.username and body.password and row.ip_address:
+        rtsp_url = f"rtsp://{body.username}:{body.password}@{row.ip_address}:{port}{path}"
+    else:
+        rtsp_url = row.get_rtsp_url() or (
+            f"rtsp://{row.ip_address}:{port}{path}" if row.ip_address else None
+        )
+    if not rtsp_url:
+        raise HTTPException(status_code=400, detail="No RTSP URL available for this camera")
+
+    # Parse resolution
+    try:
+        w_str, h_str = body.resolution.split("x")
+        width, height = int(w_str), int(h_str)
+    except (ValueError, AttributeError):
+        width, height = 1920, 1080
+
+    cam_name = body.name or row.name or (row.brand or f"Camera {row.ip_address}")
+
+    # Register in the live pipeline (mirrors create_camera).
+    pipeline = _get_pipeline()
+    from ..ingestion.camera_registry import CameraConfig as RegCameraConfig, Resolution, ConfigError
+
+    reg_id = f"cam-{uuid.uuid4().hex[:8]}"
+    new_cam = RegCameraConfig(
+        id=reg_id,
+        name=cam_name,
+        rtsp_url=rtsp_url,
+        location=body.location,
+        resolution=Resolution(width=width, height=height),
+        fps_target=body.fps,
+        enabled=True,
+        low_light_mode=body.low_light_mode,
+        zones=[],
+        staff_zone_colors=[],
+        analyzer_config={},
+    )
+    try:
+        pipeline.registry.add_camera(new_cam)
+    except ConfigError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Failed to register camera: {exc}") from exc
+
+    # Flip the DB row to confirmed/enabled and persist final details.
+    row.enabled = True
+    row.name = cam_name
+    row.location = body.location
+    row.conn_status = "online"
+    row.set_rtsp_url(rtsp_url)
+    await session.commit()
+
+    logger.info("Discovered camera confirmed | camera_id=%s name=%s", camera_id, cam_name)
+    return _build_camera_response(new_cam, None)
 
 
 # ---------------------------------------------------------------------------

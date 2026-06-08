@@ -215,6 +215,225 @@ function AutoScanSection({ onAdd }: { onAdd: (ip: string, port: number) => void 
   );
 }
 
+// ─── Section A2: Edge-Agent Auto-Discovery (cameras on the store LAN) ──────────
+
+interface EdgeDiscoveredCamera {
+  camera_id: string;
+  name: string;
+  ip: string | null;
+  brand: string | null;
+  model: string | null;
+  conn_status: string;
+  port: number | null;
+  rtsp_path: string | null;
+  thumbnail_url: string | null;
+  needs_credentials: boolean;
+  confidence: number | null;
+}
+
+function EdgeDiscoveryCard({
+  cam,
+  onConfirmed,
+}: {
+  cam: EdgeDiscoveredCamera;
+  onConfirmed: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [name, setName] = useState(cam.name);
+  const [location, setLocation] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleConfirm = async () => {
+    if (!location.trim()) {
+      toast.error('Please enter a location / store name.');
+      return;
+    }
+    if (cam.needs_credentials && (!username.trim() || !password.trim())) {
+      toast.error('This camera needs a username and password.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post(`/cameras/discovered/${cam.camera_id}/confirm`, {
+        name: name.trim() || cam.name,
+        location: location.trim(),
+        username: username.trim() || undefined,
+        password: password.trim() || undefined,
+      });
+      toast.success(`${name || cam.ip} added and is now monitored.`);
+      onConfirmed();
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Failed to confirm camera.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const online = cam.conn_status === 'online';
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+      <div className="aspect-video bg-black/40 flex items-center justify-center">
+        {cam.thumbnail_url ? (
+          <img src={cam.thumbnail_url} alt={cam.name} className="w-full h-full object-cover" />
+        ) : (
+          <Camera className="w-8 h-8 text-white/20" />
+        )}
+      </div>
+      <div className="p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-white truncate">{cam.name}</p>
+          <span
+            className={clsx(
+              'text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap',
+              online ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300',
+            )}
+          >
+            {online ? 'Stream OK' : 'Needs login'}
+          </span>
+        </div>
+        <p className="text-xs text-white/40 truncate">
+          {cam.ip}
+          {cam.port ? `:${cam.port}` : ''}
+          {cam.brand ? ` · ${cam.brand}` : ''}
+        </p>
+
+        {!open ? (
+          <button
+            onClick={() => setOpen(true)}
+            className="w-full mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-violet-600/20 hover:bg-violet-600/40 border border-violet-500/30 rounded-lg text-xs font-medium text-violet-300 transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" /> Confirm &amp; Add
+          </button>
+        ) : (
+          <div className="space-y-2 pt-1">
+            <TextInput value={name} onChange={setName} placeholder="Camera name" />
+            <TextInput value={location} onChange={setLocation} placeholder="Location / store *" />
+            {cam.needs_credentials && (
+              <>
+                <TextInput value={username} onChange={setUsername} placeholder="Camera username *" />
+                <TextInput value={password} onChange={setPassword} placeholder="Camera password *" type="password" />
+              </>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirm}
+                disabled={saving}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-lg text-xs font-semibold text-white transition-all"
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                {saving ? 'Adding…' : 'Add Camera'}
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                disabled={saving}
+                className="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-white/60 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EdgeDiscoverySection() {
+  const qc = useQueryClient();
+  const [requesting, setRequesting] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const [cameras, setCameras] = useState<EdgeDiscoveredCamera[]>([]);
+
+  const fetchDiscovered = async () => {
+    try {
+      const res = await api.get<EdgeDiscoveredCamera[]>('/cameras/discovered');
+      setCameras(res.data ?? []);
+      return res.data ?? [];
+    } catch {
+      return [];
+    }
+  };
+
+  const handleAutoScan = async () => {
+    setRequesting(true);
+    try {
+      await api.post('/cameras/scan-request', {});
+      toast.success('Scan requested. Your edge agent is scanning the store network…');
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Could not request a scan.');
+      setRequesting(false);
+      return;
+    }
+    setRequesting(false);
+    setPolling(true);
+    // Poll for discovered cameras for up to ~60s.
+    let attempts = 0;
+    const before = cameras.length;
+    const timer = setInterval(async () => {
+      attempts += 1;
+      const found = await fetchDiscovered();
+      if (found.length > before || attempts >= 15) {
+        clearInterval(timer);
+        setPolling(false);
+        if (found.length > before) {
+          toast.success(`Found ${found.length} camera(s) on your network.`);
+        } else if (attempts >= 15) {
+          toast('No new cameras yet. Make sure the edge agent is running.', { icon: '🔍' });
+        }
+      }
+    }, 4000);
+  };
+
+  const handleConfirmed = () => {
+    void fetchDiscovered();
+    void qc.invalidateQueries({ queryKey: queryKeys.cameras });
+  };
+
+  return (
+    <SectionCard title="A — Auto-Discover Cameras (Edge Agent)">
+      <p className="text-sm text-white/50 mb-4">
+        Click below and your on-site Edge Agent will scan the store network and find your
+        cameras automatically — no IP address or RTSP path needed.
+      </p>
+      <div className="flex flex-wrap gap-3 mb-4">
+        <button
+          onClick={handleAutoScan}
+          disabled={requesting || polling}
+          className="flex items-center gap-2 px-5 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-sm font-semibold text-white transition-all whitespace-nowrap"
+        >
+          {requesting || polling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {polling ? 'Scanning your network…' : requesting ? 'Requesting…' : 'Auto-Scan with Edge Agent'}
+        </button>
+        <button
+          onClick={() => void fetchDiscovered()}
+          disabled={polling}
+          className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-50 rounded-xl text-sm font-medium text-white/70 transition-all whitespace-nowrap"
+        >
+          <Network className="w-4 h-4" /> Refresh List
+        </button>
+      </div>
+
+      {polling && (
+        <div className="flex items-center gap-3 text-sm text-white/50 py-2">
+          <Loader2 className="w-5 h-5 animate-spin text-violet-400" />
+          Waiting for the edge agent to report discovered cameras…
+        </div>
+      )}
+
+      {cameras.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+          {cameras.map((cam) => (
+            <EdgeDiscoveryCard key={cam.camera_id} cam={cam} onConfirmed={handleConfirmed} />
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
 // ─── Section B: Manual Add Form (with brand presets + auto-detect + tooltips) ──
 
 function ManualAddSectionWrapper({
@@ -743,7 +962,10 @@ export default function CamerasManage() {
       </div>
 
       <div className="space-y-6">
-        {/* A — Auto Scan */}
+        {/* A — Edge-Agent Auto-Discovery (store LAN) */}
+        <EdgeDiscoverySection />
+
+        {/* A2 — VPS-side network scan (fallback for LAN-local deployments) */}
         <AutoScanSection onAdd={handleDiscoveredAdd} />
 
         {/* B — Manual Add */}

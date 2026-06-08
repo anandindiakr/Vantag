@@ -19,6 +19,7 @@ import base64
 import os
 import time
 import uuid
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,6 +35,8 @@ from ..db.models.event import DetectionEvent
 from ..middleware.tenant_middleware import get_current_user_id
 
 edge_router = APIRouter(prefix="/api/edge", tags=["edge-agent"])
+
+logger = logging.getLogger("vantag.edge")
 
 # ---------------------------------------------------------------------------
 # Live pipeline wiring (populated by main.py via set_pipeline) + snapshot store
@@ -152,6 +155,21 @@ def _get_redis():
 
 # In-memory fallback for environments without Redis (dev / edge-only)
 _bootstrap_tokens: dict[str, str] = {}  # token → tenant_id
+
+# In-memory per-tenant "please run a LAN camera scan" flags. Single uvicorn
+# process, so a plain dict is sufficient (mirrors _bootstrap_tokens). The agent
+# consumes the flag on its next heartbeat.
+_scan_requests: dict[str, bool] = {}  # tenant_id → scan_requested
+
+
+def request_camera_scan(tenant_id: str) -> None:
+    """Mark that the given tenant's agent should run a discovery scan."""
+    _scan_requests[tenant_id] = True
+
+
+def consume_camera_scan(tenant_id: str) -> bool:
+    """Return True (and clear) if a scan was requested for this tenant."""
+    return _scan_requests.pop(tenant_id, False)
 
 
 def _store_bootstrap_token(token: str, tenant_id: str) -> None:
@@ -293,7 +311,112 @@ async def heartbeat(
                 .values(conn_status=cam_status, last_connected_at=now if cam_status == "online" else None)
             )
     await session.commit()
-    return {"ok": True, "server_time": now.isoformat()}
+    return {
+        "ok": True,
+        "server_time": now.isoformat(),
+        "scan_requested": consume_camera_scan(agent.tenant_id),
+    }
+
+
+class DiscoveredCameraItem(BaseModel):
+    ip: str
+    port: int = 554
+    brand: str | None = None
+    model: str | None = None
+    rtsp_path: str | None = None
+    rtsp_url: str | None = None
+    thumbnail_b64: str | None = None
+    onvif: bool = False
+    confidence: float | None = None
+    needs_credentials: bool = False
+    used_default_credential: bool = False
+
+
+class DiscoveredCamerasBody(BaseModel):
+    cameras: list[DiscoveredCameraItem] = []
+
+
+@edge_router.post("/cameras/discovered")
+async def ingest_discovered_cameras(
+    body: DiscoveredCamerasBody,
+    agent: EdgeAgent = Depends(_verify_agent),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Receive LAN-discovered cameras from the edge agent and upsert them as
+    ``CameraConfig`` rows (``enabled=False`` — awaiting user confirmation).
+
+    The agent runs the scan on the tenant's private store network; the backend
+    persists the results so they surface in the dashboard's auto-detected list.
+    """
+    upserted = 0
+    for cam in body.cameras:
+        if not cam.ip:
+            continue
+        camera_id = "disc-" + cam.ip.replace(".", "-")
+
+        # Save the thumbnail (if any) so the dashboard can render a preview.
+        thumb_url = None
+        if cam.thumbnail_b64:
+            thumb_url = _save_edge_snapshot(agent.tenant_id, camera_id, cam.thumbnail_b64)
+
+        frame_ok = bool(cam.rtsp_url and cam.thumbnail_b64)
+        probe = {
+            "port": cam.port,
+            "rtsp_path": cam.rtsp_path,
+            "onvif": cam.onvif,
+            "confidence": cam.confidence,
+            "needs_credentials": cam.needs_credentials,
+            "used_default_credential": cam.used_default_credential,
+            "thumbnail_url": thumb_url,
+            "discovered_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        existing = (
+            await session.execute(
+                select(CameraConfig).where(
+                    CameraConfig.tenant_id == agent.tenant_id,
+                    CameraConfig.camera_id == camera_id,
+                )
+            )
+        ).scalar_one_or_none()
+
+        if existing is None:
+            row = CameraConfig(
+                tenant_id=agent.tenant_id,
+                camera_id=camera_id,
+                name=cam.brand or f"Camera {cam.ip}",
+                ip_address=cam.ip,
+                brand=cam.brand,
+                model=cam.model,
+                conn_status="online" if frame_ok else "pending",
+                probe_result=probe,
+                enabled=False,
+            )
+            if cam.rtsp_url:
+                row.set_rtsp_url(cam.rtsp_url)
+            session.add(row)
+            upserted += 1
+        else:
+            # Only refresh discovery metadata; never override an already
+            # user-confirmed (enabled) camera's connection details.
+            existing.ip_address = cam.ip
+            if cam.brand:
+                existing.brand = cam.brand
+            if cam.model:
+                existing.model = cam.model
+            existing.probe_result = probe
+            if not existing.enabled:
+                existing.conn_status = "online" if frame_ok else "pending"
+                if cam.rtsp_url:
+                    existing.set_rtsp_url(cam.rtsp_url)
+            upserted += 1
+
+    await session.commit()
+    logger.info(
+        "Edge agent reported %d discovered camera(s) | tenant=%s",
+        upserted, agent.tenant_id,
+    )
+    return {"ok": True, "upserted": upserted}
 
 
 @edge_router.post("/events")

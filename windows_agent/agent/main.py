@@ -24,6 +24,7 @@ from .mqtt_client import VantagMqttClient
 from .camera_worker import CameraWorker, CameraConfig
 from .inference import YoloInference
 from .tray_icon import VantagTrayIcon
+from . import discovery
 
 # ── Logging setup ────────────────────────────────────────────────────────────
 LOG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Vantag")
@@ -47,6 +48,34 @@ _mqtt: VantagMqttClient = None
 _inference: YoloInference = None
 _workers: list[CameraWorker] = []
 _recent_events: list[dict] = []   # in-memory event log for tray tooltip
+_scan_lock = threading.Lock()     # guards against concurrent discovery scans
+
+
+def run_discovery_and_report(reason: str = "startup"):
+    """Run a LAN camera discovery scan and POST results to the backend.
+
+    Runs in a background thread. Guarded by ``_scan_lock`` so overlapping
+    triggers (startup + scan_requested) never run two scans at once.
+    """
+    if _api is None:
+        return
+    if not _scan_lock.acquire(blocking=False):
+        log.info("Discovery scan already running — skipping %s trigger", reason)
+        return
+    try:
+        log.info("Camera discovery scan started (%s)…", reason)
+        cameras = discovery.run_discovery()
+        log.info("Discovery found %d candidate camera(s)", len(cameras))
+        resp = _api.report_discovered(cameras)
+        if resp is None:
+            log.warning("Failed to report discovered cameras to backend")
+        else:
+            log.info("Reported %d discovered camera(s) to backend", len(cameras))
+    except Exception as e:  # noqa: BLE001
+        log.warning("Discovery scan failed: %s", e)
+    finally:
+        _scan_lock.release()
+
 
 
 def _on_event(event: dict):
@@ -127,12 +156,20 @@ def start_monitoring():
             cam_id = w.config.id
             camera_statuses[cam_id] = "online" if w.is_connected else "offline"
             fps_per_camera[cam_id] = round(w.current_fps, 1)
-        _api.heartbeat({
+        resp = _api.heartbeat({
             "camera_statuses": camera_statuses,
             "fps_per_camera": fps_per_camera,
             "cpu_percent": psutil.cpu_percent(interval=None),
             "memory_percent": psutil.virtual_memory().percent,
         })
+        # Backend may request an on-demand LAN camera scan
+        if isinstance(resp, dict) and resp.get("scan_requested"):
+            threading.Thread(
+                target=run_discovery_and_report,
+                args=("scan_requested",),
+                daemon=True,
+                name="discovery-ondemand",
+            ).start()
 
     schedule.every(30).seconds.do(send_heartbeat)
     threading.Thread(
@@ -198,6 +235,14 @@ def main():
 
     # Auto-start monitoring
     start_monitoring()
+
+    # First-boot convenience: run one LAN camera discovery scan in the background
+    threading.Thread(
+        target=run_discovery_and_report,
+        args=("startup",),
+        daemon=True,
+        name="discovery-startup",
+    ).start()
 
     # System tray
     tray = VantagTrayIcon(

@@ -66,8 +66,12 @@ class VantagApiClient:
             log.warning(f"post_event failed: {e}")
             return False
 
-    def heartbeat(self, status: dict) -> bool:
-        """Send agent heartbeat. Returns True on success."""
+    def heartbeat(self, status: dict) -> Optional[dict]:
+        """Send agent heartbeat. Returns the parsed response dict, or None on failure.
+
+        The response may include a ``scan_requested`` flag that the agent uses to
+        trigger an on-demand camera discovery scan.
+        """
         try:
             resp = self._session.post(
                 f"{self.base_url}/api/edge/heartbeat",
@@ -75,10 +79,34 @@ class VantagApiClient:
                 timeout=10,
             )
             resp.raise_for_status()
-            return True
+            try:
+                return resp.json()
+            except Exception:  # noqa: BLE001
+                return {}
         except Exception as e:
             log.warning(f"heartbeat failed: {e}")
-            return False
+            return None
+
+    def report_discovered(self, cameras: list) -> Optional[dict]:
+        """Report auto-discovered LAN cameras to the backend.
+
+        POSTs to ``/api/edge/cameras/discovered`` with the X-API-Key session.
+        Returns the parsed response dict, or None on failure.
+        """
+        try:
+            resp = self._session.post(
+                f"{self.base_url}/api/edge/cameras/discovered",
+                json={"cameras": cameras},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            try:
+                return resp.json()
+            except Exception:  # noqa: BLE001
+                return {}
+        except Exception as e:
+            log.warning(f"report_discovered failed: {e}")
+            return None
 
     def get_config(self) -> Optional[dict]:
         """Fetch latest config from backend."""
