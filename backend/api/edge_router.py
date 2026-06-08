@@ -729,11 +729,23 @@ async def download_agent(
         )
     ).scalars().all()
 
-    backend_url = str(request.base_url).rstrip("/")
+    # Behind an nginx reverse-proxy, request.base_url resolves to the internal
+    # address (http://127.0.0.1:8000).  Use the forwarded headers that nginx
+    # sends (X-Forwarded-Proto + Host) to build the correct public URL so the
+    # downloaded config.json points the store-LAN agent at the real domain.
+    proto = request.headers.get("X-Forwarded-Proto", "https")
+    host = request.headers.get("Host", request.url.netloc)
+    backend_url = f"{proto}://{host}"
+    # MQTT broker is on the same VPS — strip the port from the Host header to
+    # get just the hostname (retail-vantag.com / retailnazar.com / etc.)
+    mqtt_host = host.split(":")[0]
+
     config = {
         "api_key": agent.api_key,
         "agent_id": agent.id,
         "backend_url": backend_url,
+        "mqtt_host": mqtt_host,
+        "mqtt_port": int(os.getenv("MQTT_PORT", "1883")),
         "tenant_id": tenant_id,
         "cameras": [
             {
