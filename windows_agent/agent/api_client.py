@@ -34,7 +34,7 @@ class VantagApiClient:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self._session = _build_session(base_url)
-        self._session.headers["X-Agent-Key"] = api_key
+        self._session.headers["X-API-Key"] = api_key
 
     def register(self, device_type: str = "windows") -> dict:
         """Register this agent with the backend and get full config."""
@@ -44,7 +44,7 @@ class VantagApiClient:
             json={
                 "api_key": self.api_key,
                 "device_type": device_type,
-                "device_model": platform.node(),
+                "device_name": platform.node(),
                 "os_version": platform.version(),
             },
             timeout=15,

@@ -14,11 +14,15 @@ GET  /api/edge/config                – poll latest camera config (X-API-Key)
 """
 from __future__ import annotations
 
+import asyncio
+import base64
 import os
+import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,8 +31,105 @@ from ..db.database import get_session
 from ..db.models.tenant import EdgeAgent, Tenant
 from ..db.models.camera import CameraConfig
 from ..db.models.event import DetectionEvent
+from ..middleware.tenant_middleware import get_current_user_id
 
 edge_router = APIRouter(prefix="/api/edge", tags=["edge-agent"])
+
+# ---------------------------------------------------------------------------
+# Live pipeline wiring (populated by main.py via set_pipeline) + snapshot store
+# ---------------------------------------------------------------------------
+
+# Populated by main.py via set_pipeline() — same shared instance used by
+# demo_router / stores_router so edge incidents fan out to the live dashboard.
+_pipeline = None  # type: ignore[assignment]
+
+# Snapshot root that snapshots_router serves at
+# /api/snapshots/{tenant_id}/{camera_id}/{filename}
+_SNAPSHOTS_ROOT = Path(__file__).resolve().parent.parent.parent / "snapshots"
+
+
+def set_pipeline(p) -> None:  # type: ignore[no-untyped-def]
+    global _pipeline  # noqa: PLW0603
+    _pipeline = p
+
+
+def _save_edge_snapshot(tenant_id: str, camera_id: str, b64: str) -> str | None:
+    """Decode a base64 JPEG from the edge agent and persist it under the
+    snapshots root so the JWT-scoped snapshots endpoint can serve it.
+
+    Returns the public ``/api/snapshots/...`` URL, or None on failure.
+    """
+    if not b64:
+        return None
+    try:
+        # Strip an optional data-URI prefix ("data:image/jpeg;base64,....")
+        if "," in b64 and b64.strip().lower().startswith("data:"):
+            b64 = b64.split(",", 1)[1]
+        raw = base64.b64decode(b64)
+        cam_dir = _SNAPSHOTS_ROOT / str(tenant_id) / str(camera_id)
+        cam_dir.mkdir(parents=True, exist_ok=True)
+        fname = f"{uuid.uuid4().hex}.jpg"
+        (cam_dir / fname).write_bytes(raw)
+        return f"/api/snapshots/{tenant_id}/{camera_id}/{fname}"
+    except Exception:  # noqa: BLE001
+        return None
+
+
+async def _emit_edge_event(event: dict, store_id: str) -> None:
+    """Fan a canonical edge event into the live pipeline, mirroring
+    demo_router._inject(): recent_events + risk buffer + SQLite persist +
+    WebSocket broadcast. No-op if the pipeline is not wired yet.
+    """
+    pipe = _pipeline
+    if pipe is None:
+        return
+    event_type = event["type"]
+    # Risk weight per event type (same scale demo_router uses)
+    weights = {
+        "face_match": 40, "shoplifting": 30, "tamper": 25,
+        "fall_detected": 25, "fall": 25, "restricted_zone": 20,
+        "loitering": 15, "inventory_movement": 10, "queue": 10,
+        "queue_breach": 10,
+    }
+    weight = weights.get(event_type, 10)
+
+    # 1) recent_events deque (read by stores_router.list_incidents)
+    try:
+        pipe.recent_events[store_id].appendleft(event)
+    except Exception:  # noqa: BLE001
+        pass
+    # 2) risk-score buffer: (event_type, weight, monotonic) keyed by store_id
+    try:
+        async with pipe._event_buffer_lock:
+            pipe._event_buffer[store_id].append(
+                (event_type, weight, time.monotonic())
+            )
+    except Exception:  # noqa: BLE001
+        pass
+    # 3) persist to SQLite incident store (audit history)
+    try:
+        from ..db import incident_store as _istore  # lazy import
+
+        await asyncio.to_thread(_istore.insert_incident, event)
+    except Exception:  # noqa: BLE001
+        pass
+    # 4) WebSocket broadcast to the dashboard
+    try:
+        if pipe._ws_broadcast:
+            await pipe._ws_broadcast({
+                "type":         "incident",
+                "incident_id":  event["incident_id"],
+                "store_id":     store_id,
+                "camera_id":    event["camera_id"],
+                "event_type":   event_type,
+                "severity":     event["severity"],
+                "description":  event["description"],
+                "occurred_at":  event["timestamp"],
+                "snapshot_url": event.get("snapshot_url"),
+                "is_demo":      False,
+            })
+    except Exception:  # noqa: BLE001
+        pass
 
 # ---------------------------------------------------------------------------
 # Bootstrap token store (Redis if available, in-memory fallback for dev)
@@ -201,13 +302,36 @@ async def ingest_event(
     agent: EdgeAgent = Depends(_verify_agent),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Receive a detection event from the edge agent."""
+    """Receive a detection event from the edge agent and fan it out to the
+    live dashboard pipeline (recent_events + risk buffer + SQLite + WebSocket).
+    """
+    # 1) Decode + persist the snapshot JPEG so the dashboard can display it.
     snapshot_url = None
     if body.snapshot_b64:
-        # In production: save to object storage (S3/R2), return URL
-        # Use the authenticated snapshot endpoint path
-        snapshot_url = f"/api/snapshots/{agent.tenant_id}/{body.camera_id}/{uuid.uuid4()}.jpg"
+        snapshot_url = _save_edge_snapshot(
+            agent.tenant_id, body.camera_id, body.snapshot_b64
+        )
 
+    # 2) Derive the store_id the dashboard keys incidents by (from the
+    #    camera's location, mirroring stores_router._camera_store_id).
+    location = body.location
+    if location is None:
+        try:
+            cam = (
+                await session.execute(
+                    select(CameraConfig).where(
+                        CameraConfig.tenant_id == agent.tenant_id,
+                        CameraConfig.camera_id == body.camera_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if cam is not None:
+                location = cam.location
+        except Exception:  # noqa: BLE001
+            location = None
+    store_id = (location or "auto-detected").split("–")[0].strip().lower().replace(" ", "_")
+
+    # 3) Persist the audit row in the per-tenant detection_events table.
     event = DetectionEvent(
         id=str(uuid.uuid4()),
         tenant_id=agent.tenant_id,
@@ -217,12 +341,38 @@ async def ingest_event(
         severity=body.severity,
         confidence=body.confidence,
         risk_score=body.risk_score,
-        location=body.location,
+        location=location,
         snapshot_url=snapshot_url,
-        metadata=body.metadata,
+        event_meta=body.metadata,
     )
     session.add(event)
     await session.commit()
+
+    # 4) Build the canonical incident dict and fan it into the live pipeline.
+    description = (
+        (body.metadata or {}).get("description")
+        if isinstance(body.metadata, dict)
+        else None
+    ) or f"{body.event_type.replace('_', ' ').title()} detected on {body.camera_id}"
+    incident = {
+        "incident_id": event.id,
+        "type": body.event_type,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "store_id": store_id,
+        "camera_id": body.camera_id,
+        "severity": body.severity,
+        "confidence": body.confidence,
+        "risk_score": body.risk_score,
+        "description": description,
+        "snapshot_url": snapshot_url,
+        "metadata": body.metadata or {},
+        "acknowledged": False,
+        "is_demo": False,
+    }
+    try:
+        await _emit_edge_event(incident, store_id)
+    except Exception:  # noqa: BLE001
+        pass
 
     return {"ok": True, "event_id": event.id}
 
@@ -305,5 +455,178 @@ async def bootstrap_register_cameras(
         cam.set_rtsp_url(f"rtsp://{ip}:554/stream1")
         session.add(cam)
         created += 1
+
+    # Provision (or reuse) an EdgeAgent credential so the downloaded agent has
+    # something to authenticate every heartbeat/event call with (X-API-Key).
+    existing_agent = (
+        await session.execute(
+            select(EdgeAgent).where(EdgeAgent.tenant_id == tenant_id)
+        )
+    ).scalars().first()
+    if existing_agent is not None:
+        agent = existing_agent
+    else:
+        from ..services.tenant_service import provision_edge_agent
+
+        agent = await provision_edge_agent(
+            session,
+            tenant_id,
+            device_type="windows",
+            device_name="Edge Agent (bootstrap)",
+        )
     await session.commit()
-    return {"registered": created, "total": len(body.cameras)}
+    return {
+        "registered": created,
+        "total": len(body.cameras),
+        "agent_id": agent.id,
+        "api_key": agent.api_key,
+        "store_id": "auto-detected",
+    }
+
+
+# ─── Downloadable, runnable Edge Agent package ──────────────────────────────
+agent_download_router = APIRouter(prefix="/api/agent", tags=["edge-agent"])
+
+# Repo root → vantag/  (edge_router.py is at vantag/backend/api/edge_router.py)
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_AGENT_PKG_DIR = _REPO_ROOT / "windows_agent"
+
+_RUN_BAT = """@echo off
+REM Vantag Edge Agent launcher (Windows)
+cd /d "%~dp0"
+where python >nul 2>nul || (echo Python 3.10+ is required. Install from python.org && pause && exit /b 1)
+if not exist .venv (python -m venv .venv)
+call .venv\\Scripts\\activate.bat
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+python -m agent.main
+pause
+"""
+
+_RUN_SH = """#!/usr/bin/env bash
+# Vantag Edge Agent launcher (Linux/macOS)
+set -e
+cd "$(dirname "$0")"
+command -v python3 >/dev/null 2>&1 || { echo "Python 3.10+ is required."; exit 1; }
+[ -d .venv ] || python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+python -m agent.main
+"""
+
+_README = """# Vantag Edge Agent
+
+This package is pre-configured for your account. To run:
+
+## Windows
+Double-click `run.bat` (or run it from a terminal). It creates a virtual
+environment, installs dependencies, and starts the agent.
+
+## Linux / macOS
+    chmod +x run.sh
+    ./run.sh
+
+The bundled `config.json` already contains your `api_key`, `agent_id`, the
+backend URL, and your detected cameras. Add or edit cameras there if needed,
+then restart the agent.
+
+Cameras will turn ONLINE in your dashboard within ~30 seconds, and real AI
+detections will appear on the Incidents page with snapshot evidence.
+"""
+
+
+def _build_agent_zip(config: dict, platform: str) -> bytes:
+    import io
+    import json
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # Bundle the agent python package (windows_agent/agent/*.py).
+        pkg = _AGENT_PKG_DIR / "agent"
+        if pkg.exists():
+            for path in pkg.rglob("*.py"):
+                arc = Path("agent") / path.relative_to(pkg)
+                zf.write(path, str(arc))
+        # requirements.txt (from the agent dir, fall back to a minimal set).
+        req = _AGENT_PKG_DIR / "requirements.txt"
+        if req.exists():
+            zf.write(req, "requirements.txt")
+        else:
+            zf.writestr(
+                "requirements.txt",
+                "opencv-python-headless\nonnxruntime\nnumpy\nrequests\npaho-mqtt\npsutil\n",
+            )
+        # Prefilled config.json (sits next to the package; loaded by config.load()).
+        zf.writestr("config.json", json.dumps(config, indent=2))
+        # Launchers + readme.
+        zf.writestr("run.bat", _RUN_BAT)
+        zf.writestr("run.sh", _RUN_SH)
+        zf.writestr("README.md", _README)
+    return buf.getvalue()
+
+
+@agent_download_router.get("/download")
+async def download_agent(
+    request: Request,
+    platform: str = "windows",
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+):
+    """Build and return a credentialed, ready-to-run Edge Agent zip."""
+    from fastapi import Response
+
+    tenant_id = user["tenant_id"]
+
+    # Provision (or reuse) the caller's EdgeAgent credential.
+    agent = (
+        await session.execute(
+            select(EdgeAgent).where(EdgeAgent.tenant_id == tenant_id)
+        )
+    ).scalars().first()
+    if agent is None:
+        from ..services.tenant_service import provision_edge_agent
+
+        agent = await provision_edge_agent(
+            session,
+            tenant_id,
+            device_type=platform,
+            device_name="Edge Agent (download)",
+        )
+        await session.commit()
+
+    # Load this tenant's cameras to prefill the agent config.
+    cams = (
+        await session.execute(
+            select(CameraConfig).where(
+                CameraConfig.tenant_id == tenant_id,
+                CameraConfig.enabled == True,  # noqa: E712
+            )
+        )
+    ).scalars().all()
+
+    backend_url = str(request.base_url).rstrip("/")
+    config = {
+        "api_key": agent.api_key,
+        "agent_id": agent.id,
+        "backend_url": backend_url,
+        "tenant_id": tenant_id,
+        "cameras": [
+            {
+                "camera_id": c.camera_id,
+                "name": c.name,
+                "rtsp_url": c.get_rtsp_url() if hasattr(c, "get_rtsp_url") else None,
+                "fps_target": getattr(c, "fps_target", 10),
+            }
+            for c in cams
+        ],
+    }
+
+    data = _build_agent_zip(config, platform)
+    fname = f"vantag-edge-agent-{platform}.zip"
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )

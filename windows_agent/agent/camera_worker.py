@@ -42,18 +42,38 @@ class DetectionAnalyzer:
         last = self._last_event.get(event_type, 0)
         return (time.time() - last) >= self.cooldown_sec
 
+    # Map the agent's internal analyzer vocab to the backend/pipeline vocabulary.
+    _EVENT_TYPE_MAP = {
+        "sweep": "shoplifting",
+        "dwell": "restricted_zone",
+        "empty_shelf": "inventory_movement",
+    }
+    _SEVERITY_MAP = {
+        "shoplifting": "high",
+        "restricted_zone": "medium",
+        "inventory_movement": "medium",
+    }
+
     def _emit(self, event_type: str, confidence: float, boxes: list, frame: np.ndarray) -> Optional[dict]:
         if not self._can_emit(event_type):
             return None
         self._last_event[event_type] = time.time()
-        thumbnail_b64 = self._encode_thumbnail(frame)
+        snapshot_b64 = self._encode_thumbnail(frame)
+        canonical_type = self._EVENT_TYPE_MAP.get(event_type, event_type)
+        severity = self._SEVERITY_MAP.get(canonical_type, "medium")
+        if confidence >= 0.85 and severity == "medium":
+            severity = "high"
         return {
             "camera_id": self.camera_id,
-            "event_type": event_type,
+            "event_type": canonical_type,
+            "severity": severity,
             "confidence": round(confidence, 3),
-            "timestamp": int(time.time() * 1000),
-            "thumbnail_b64": thumbnail_b64,
-            "bounding_boxes": [b.to_dict() for b in boxes],
+            "snapshot_b64": snapshot_b64,
+            "metadata": {
+                "timestamp": int(time.time() * 1000),
+                "raw_event_type": event_type,
+                "bounding_boxes": [b.to_dict() for b in boxes],
+            },
         }
 
     def _encode_thumbnail(self, frame: np.ndarray) -> str:

@@ -55,7 +55,8 @@ from ..db.database import init_db
 from .auth_router import auth_router
 from .onboarding_router import onboarding_router
 from .tenants_router import tenants_router
-from .edge_router import edge_router
+from .edge_router import edge_router, agent_download_router
+from .edge_router import set_pipeline as edge_set_pipeline
 from .billing_router import billing_router
 from .camera_probe_router import camera_probe_router
 from .demo_router import router as demo_router
@@ -142,6 +143,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     cameras_set_pipeline(_pipeline)
     reports_set_pipeline(_pipeline)
     demo_set_pipeline(_pipeline)
+    edge_set_pipeline(_pipeline)
 
     # ------------------------------------------------------------------
     # 3b. Initialise webhook engine and POS integration.
@@ -272,6 +274,7 @@ app.include_router(auth_router)
 app.include_router(onboarding_router)
 app.include_router(tenants_router)
 app.include_router(edge_router)
+app.include_router(agent_download_router)
 app.include_router(billing_router)
 app.include_router(camera_probe_router)
 app.include_router(demo_router)

@@ -19,6 +19,35 @@ const CodeBlock: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 export default function DownloadPage() {
   const apiKey = localStorage.getItem('vantag_tenant_id') || 'YOUR_TENANT_ID';
   const apiUrl = window.location.origin;
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const downloadAgent = async (platform: 'windows' | 'linux' | 'mac') => {
+    setError(null);
+    setBusy(platform);
+    try {
+      const token = localStorage.getItem('vantag_token');
+      const res = await fetch(`/api/agent/download?platform=${platform}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        throw new Error(`Download failed (${res.status}). Please log in again.`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vantag-edge-agent-${platform}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setError(e?.message || 'Download failed.');
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white p-8 max-w-5xl mx-auto">
@@ -35,45 +64,50 @@ export default function DownloadPage() {
       </p>
 
       {/* ── Download buttons ─────────────────────────────────────────────── */}
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-500/15 border border-red-500/30 text-red-200 text-sm">
+          {error}
+        </div>
+      )}
       <section className="grid md:grid-cols-3 gap-4 mb-12">
-        <a
-          href="/downloads/vantag-agent-windows.zip"
-          download
-          className="bg-gradient-to-br from-violet-600 to-purple-700 hover:from-violet-500 hover:to-purple-600 rounded-xl p-6 text-center transition-all"
+        <button
+          onClick={() => downloadAgent('windows')}
+          disabled={busy !== null}
+          className="bg-gradient-to-br from-violet-600 to-purple-700 hover:from-violet-500 hover:to-purple-600 rounded-xl p-6 text-center transition-all disabled:opacity-50"
         >
           <div className="text-5xl mb-3">🪟</div>
           <div className="font-bold text-lg">Windows</div>
           <div className="text-sm text-white/70 mt-1">Windows 10/11 · 64-bit</div>
           <div className="text-xs mt-3 px-3 py-1 bg-white/10 rounded-full inline-block">
-            Download .zip
+            {busy === 'windows' ? 'Preparing…' : 'Download .zip'}
           </div>
-        </a>
+        </button>
 
-        <a
-          href="/downloads/vantag-agent-linux.tar.gz"
-          download
-          className="bg-gradient-to-br from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 rounded-xl p-6 text-center transition-all"
+        <button
+          onClick={() => downloadAgent('linux')}
+          disabled={busy !== null}
+          className="bg-gradient-to-br from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 rounded-xl p-6 text-center transition-all disabled:opacity-50"
         >
           <div className="text-5xl mb-3">🐧</div>
           <div className="font-bold text-lg">Linux / Raspberry Pi</div>
           <div className="text-sm text-white/70 mt-1">Ubuntu, Debian, Raspbian</div>
           <div className="text-xs mt-3 px-3 py-1 bg-white/10 rounded-full inline-block">
-            Download .tar.gz
+            {busy === 'linux' ? 'Preparing…' : 'Download .zip'}
           </div>
-        </a>
+        </button>
 
-        <a
-          href="/downloads/vantag-agent-mac.zip"
-          download
-          className="bg-gradient-to-br from-slate-600 to-slate-800 hover:from-slate-500 hover:to-slate-700 rounded-xl p-6 text-center transition-all"
+        <button
+          onClick={() => downloadAgent('mac')}
+          disabled={busy !== null}
+          className="bg-gradient-to-br from-slate-600 to-slate-800 hover:from-slate-500 hover:to-slate-700 rounded-xl p-6 text-center transition-all disabled:opacity-50"
         >
           <div className="text-5xl mb-3">🍎</div>
           <div className="font-bold text-lg">macOS</div>
           <div className="text-sm text-white/70 mt-1">Intel + Apple Silicon</div>
           <div className="text-xs mt-3 px-3 py-1 bg-white/10 rounded-full inline-block">
-            Download .zip
+            {busy === 'mac' ? 'Preparing…' : 'Download .zip'}
           </div>
-        </a>
+        </button>
       </section>
 
       {/* ── Installation steps ───────────────────────────────────────────── */}
@@ -94,25 +128,30 @@ export default function DownloadPage() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <span className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center font-bold">2</span>
-              <h3 className="font-bold text-lg">Run the installer</h3>
+              <h3 className="font-bold text-lg">Run the launcher</h3>
             </div>
             <div className="ml-11">
-              <p className="text-white/60 mb-2">Open a terminal in the extracted folder and run:</p>
-              <CodeBlock>{`# Windows (PowerShell):
-.\\install.ps1
+              <p className="text-white/60 mb-2">Open the extracted folder and run the launcher for your platform:</p>
+              <CodeBlock>{`# Windows: double-click
+run.bat
 
 # Linux / Mac:
-./install.sh`}</CodeBlock>
+chmod +x run.sh
+./run.sh`}</CodeBlock>
+              <p className="text-white/60 mt-2">It auto-creates a Python environment, installs dependencies, and starts the agent.</p>
             </div>
           </div>
 
           <div>
             <div className="flex items-center gap-3 mb-2">
               <span className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center font-bold">3</span>
-              <h3 className="font-bold text-lg">Paste your credentials</h3>
+              <h3 className="font-bold text-lg">Credentials are already filled in</h3>
             </div>
             <div className="ml-11">
-              <p className="text-white/60 mb-2">When prompted, paste these values (they are unique to your account):</p>
+              <p className="text-white/60 mb-2">
+                The bundled <code className="bg-black/40 px-1.5 py-0.5 rounded">config.json</code> already
+                contains your API key, agent ID, and backend URL — no manual entry needed:
+              </p>
               <CodeBlock>{`Vantag Cloud URL : ${apiUrl}
 Tenant ID        : ${apiKey}`}</CodeBlock>
             </div>

@@ -42,13 +42,20 @@ class AgentConfig:
     @classmethod
     def load(cls) -> "AgentConfig":
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        if CONFIG_FILE.exists():
-            try:
-                raw = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-                cams = [CameraConfig(**c) for c in raw.pop("cameras", [])]
-                return cls(**raw, cameras=cams)
-            except Exception as e:
-                print(f"[Config] Failed to load config: {e} — using defaults")
+        # 1) Prefer the per-user config in %APPDATA%/Vantag/config.json.
+        # 2) Fall back to a config.json shipped next to the agent package
+        #    (used by the pre-filled download bundle so it runs out-of-the-box).
+        candidates = [CONFIG_FILE]
+        local_cfg = Path(__file__).resolve().parent.parent / "config.json"
+        candidates.append(local_cfg)
+        for path in candidates:
+            if path.exists():
+                try:
+                    raw = json.loads(path.read_text(encoding="utf-8"))
+                    cams = [CameraConfig(**c) for c in raw.pop("cameras", [])]
+                    return cls(**raw, cameras=cams)
+                except Exception as e:
+                    print(f"[Config] Failed to load config from {path}: {e}")
         return cls()
 
     def save(self) -> None:

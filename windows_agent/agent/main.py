@@ -56,6 +56,19 @@ def _on_event(event: dict):
     log.info(f"EVENT [{event['event_type']}] cam={event['camera_id']} conf={event['confidence']}")
 
 
+def _map_remote_camera(c: dict) -> CameraConfig:
+    """Map a backend camera dict (camera_id/resolution_width/...) to the agent's CameraConfig."""
+    return CameraConfig(
+        id=c.get("camera_id") or c.get("id") or "",
+        name=c.get("name") or c.get("camera_id") or "Camera",
+        rtsp_url=c.get("rtsp_url", ""),
+        location=c.get("location", ""),
+        enabled=c.get("enabled", True),
+        width=c.get("resolution_width") or c.get("width") or 1280,
+        height=c.get("resolution_height") or c.get("height") or 720,
+    )
+
+
 def start_monitoring():
     global _workers, _inference, _mqtt
 
@@ -64,7 +77,7 @@ def start_monitoring():
     # Load or refresh config from backend
     remote = _api.get_config()
     if remote and remote.get("cameras"):
-        cams = [CameraConfig(**c) for c in remote["cameras"]]
+        cams = [_map_remote_camera(c) for c in remote["cameras"]]
         _config.cameras = cams
         _config.save()
 
@@ -108,14 +121,17 @@ def start_monitoring():
         if _api is None:
             return
         import psutil
+        camera_statuses = {}
+        fps_per_camera = {}
+        for w in _workers:
+            cam_id = w.config.id
+            camera_statuses[cam_id] = "online" if w.is_connected else "offline"
+            fps_per_camera[cam_id] = round(w.current_fps, 1)
         _api.heartbeat({
-            "device_id": _config.agent_id,
-            "online": True,
-            "camera_count": len(_workers),
-            "fps": sum(w.current_fps for w in _workers) / max(len(_workers), 1),
-            "cpu_pct": psutil.cpu_percent(interval=None),
-            "ram_mb": psutil.virtual_memory().used / 1024 / 1024,
-            "battery_pct": -1,
+            "camera_statuses": camera_statuses,
+            "fps_per_camera": fps_per_camera,
+            "cpu_percent": psutil.cpu_percent(interval=None),
+            "memory_percent": psutil.virtual_memory().percent,
         })
 
     schedule.every(30).seconds.do(send_heartbeat)
