@@ -172,6 +172,73 @@ async def list_cameras(user: dict = Depends(get_current_user_id)) -> List[Camera
 
 
 # ---------------------------------------------------------------------------
+# GET /api/cameras/discovered  (edge-mode auto-detected list)
+# NOTE: must be declared BEFORE the dynamic "/{camera_id}" route below,
+# otherwise FastAPI matches "/discovered" against "/{camera_id}".
+# ---------------------------------------------------------------------------
+
+
+class DiscoveredCamera(BaseModel):
+    camera_id: str
+    name: str
+    ip: Optional[str] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    conn_status: str = "pending"
+    port: Optional[int] = None
+    rtsp_path: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    needs_credentials: bool = False
+    confidence: Optional[float] = None
+
+
+@router.get(
+    "/discovered",
+    response_model=List[DiscoveredCamera],
+    summary="List edge-agent auto-detected cameras awaiting confirmation",
+)
+async def list_discovered_cameras(
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> List[DiscoveredCamera]:
+    """Return cameras the tenant's edge agent found on the store LAN that have
+    not yet been confirmed (``enabled=False``)."""
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
+
+    rows = (
+        await session.execute(
+            select(CameraConfig).where(
+                CameraConfig.tenant_id == tenant_id,
+                CameraConfig.enabled == False,  # noqa: E712
+                CameraConfig.camera_id.like("disc-%"),
+            )
+        )
+    ).scalars().all()
+
+    out: List[DiscoveredCamera] = []
+    for row in rows:
+        probe = row.probe_result or {}
+        out.append(
+            DiscoveredCamera(
+                camera_id=row.camera_id,
+                name=row.name or (row.brand or f"Camera {row.ip_address}"),
+                ip=row.ip_address,
+                brand=row.brand,
+                model=row.model,
+                conn_status=row.conn_status or "pending",
+                port=probe.get("port"),
+                rtsp_path=probe.get("rtsp_path"),
+                thumbnail_url=probe.get("thumbnail_url"),
+                needs_credentials=bool(probe.get("needs_credentials")),
+                confidence=probe.get("confidence"),
+            )
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------
 # GET /api/cameras/{camera_id}
 # ---------------------------------------------------------------------------
 
@@ -875,71 +942,6 @@ async def request_camera_scan(user: dict = Depends(get_current_user_id)) -> dict
     from .edge_router import request_camera_scan as _flag_scan
     _flag_scan(tenant_id)
     return {"ok": True, "message": "Scan requested. Your edge agent will scan shortly."}
-
-
-# ---------------------------------------------------------------------------
-# GET /api/cameras/discovered  (edge-mode auto-detected list)
-# ---------------------------------------------------------------------------
-
-
-class DiscoveredCamera(BaseModel):
-    camera_id: str
-    name: str
-    ip: Optional[str] = None
-    brand: Optional[str] = None
-    model: Optional[str] = None
-    conn_status: str = "pending"
-    port: Optional[int] = None
-    rtsp_path: Optional[str] = None
-    thumbnail_url: Optional[str] = None
-    needs_credentials: bool = False
-    confidence: Optional[float] = None
-
-
-@router.get(
-    "/discovered",
-    response_model=List[DiscoveredCamera],
-    summary="List edge-agent auto-detected cameras awaiting confirmation",
-)
-async def list_discovered_cameras(
-    user: dict = Depends(get_current_user_id),
-    session: AsyncSession = Depends(get_session),
-) -> List[DiscoveredCamera]:
-    """Return cameras the tenant's edge agent found on the store LAN that have
-    not yet been confirmed (``enabled=False``)."""
-    tenant_id = user.get("tenant_id")
-    if not tenant_id:
-        raise HTTPException(status_code=400, detail="No tenant in session")
-
-    rows = (
-        await session.execute(
-            select(CameraConfig).where(
-                CameraConfig.tenant_id == tenant_id,
-                CameraConfig.enabled == False,  # noqa: E712
-                CameraConfig.camera_id.like("disc-%"),
-            )
-        )
-    ).scalars().all()
-
-    out: List[DiscoveredCamera] = []
-    for row in rows:
-        probe = row.probe_result or {}
-        out.append(
-            DiscoveredCamera(
-                camera_id=row.camera_id,
-                name=row.name or (row.brand or f"Camera {row.ip_address}"),
-                ip=row.ip_address,
-                brand=row.brand,
-                model=row.model,
-                conn_status=row.conn_status or "pending",
-                port=probe.get("port"),
-                rtsp_path=probe.get("rtsp_path"),
-                thumbnail_url=probe.get("thumbnail_url"),
-                needs_credentials=bool(probe.get("needs_credentials")),
-                confidence=probe.get("confidence"),
-            )
-        )
-    return out
 
 
 # ---------------------------------------------------------------------------
