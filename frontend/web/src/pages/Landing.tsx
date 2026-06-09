@@ -854,7 +854,7 @@ export default function Landing() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`text-[11px] font-mono-alt px-2.5 py-1 rounded border transition-all cursor-pointer select-none
-                      ${r.code === region.code
+                      ${r.code === region.region
                         ? 'border-cyan-500/40 text-cyan-400 bg-cyan-500/10 font-semibold pointer-events-none'
                         : 'border-white/10 text-white/40 hover:border-white/30 hover:text-white/70 hover:bg-white/5'
                       }`}
@@ -893,7 +893,7 @@ export default function Landing() {
                 <a
                   href="https://retail-vantag.com"
                   target="_blank" rel="noopener noreferrer"
-                  className={`flex items-center gap-2 font-body-alt transition-colors ${region.code === 'SG' ? 'text-cyan-400 font-semibold' : 'text-white/40 hover:text-white/80'}`}
+                  className={`flex items-center gap-2 font-body-alt transition-colors ${region.region === 'SG' ? 'text-cyan-400 font-semibold' : 'text-white/40 hover:text-white/80'}`}
                 >
                   🇸🇬 <span>Vantag</span>
                   <span className="font-mono-alt text-[10px] text-white/20">Singapore</span>
@@ -901,7 +901,7 @@ export default function Landing() {
                 <a
                   href="https://retailnazar.com"
                   target="_blank" rel="noopener noreferrer"
-                  className={`flex items-center gap-2 font-body-alt transition-colors ${region.code === 'IN' ? 'text-cyan-400 font-semibold' : 'text-white/40 hover:text-white/80'}`}
+                  className={`flex items-center gap-2 font-body-alt transition-colors ${region.region === 'IN' ? 'text-cyan-400 font-semibold' : 'text-white/40 hover:text-white/80'}`}
                 >
                   🇮🇳 <span>Retail Nazar</span>
                   <span className="font-mono-alt text-[10px] text-white/20">India</span>
@@ -909,7 +909,7 @@ export default function Landing() {
                 <a
                   href="https://jagajaga.my"
                   target="_blank" rel="noopener noreferrer"
-                  className={`flex items-center gap-2 font-body-alt transition-colors ${region.code === 'MY' ? 'text-cyan-400 font-semibold' : 'text-white/40 hover:text-white/80'}`}
+                  className={`flex items-center gap-2 font-body-alt transition-colors ${region.region === 'MY' ? 'text-cyan-400 font-semibold' : 'text-white/40 hover:text-white/80'}`}
                 >
                   🇲🇾 <span>JagaJaga</span>
                   <span className="font-mono-alt text-[10px] text-white/20">Malaysia</span>
