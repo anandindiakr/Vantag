@@ -154,7 +154,7 @@ class LoiteringDetector:
             xs = [pos[0] for pos in positions]
             ys = [pos[1] for pos in positions]
             variance = (max(xs) - min(xs)) + (max(ys) - min(ys))
-            if variance < self.MIN_MOVEMENT:
+            if variance <= self.MIN_MOVEMENT:
                 continue  # standing still — handled by restricted_zone
 
             last = zone["last_event"]
@@ -257,11 +257,13 @@ class DetectionAnalyzer:
         shelf_items = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "shelf_item"]
 
         # 1. Shoplifting: person near high-value item for >2s
+        # Key uses coarse spatial coords so it stays stable across frames
+        # (id(p) changes every frame since YOLO creates new objects each inference)
         if persons and items:
             for p in persons:
                 for item in items:
                     if self._boxes_overlap(p, item, threshold=0.3):
-                        key = f"sweep_{id(p)}"
+                        key = f"sweep_{int(p.x*10)}_{int(p.y*10)}"
                         self._person_with_items.setdefault(key, now)
                         if now - self._person_with_items[key] >= 2.0:
                             evt = self._emit("shoplifting", max(p.confidence, item.confidence), [p, item], frame)
