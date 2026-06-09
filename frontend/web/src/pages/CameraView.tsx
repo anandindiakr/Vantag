@@ -18,13 +18,15 @@ import { useVantagStore, EventType, VantagEvent } from '../store/useVantagStore'
 import { useCameras } from '../hooks/useApi';
 
 const EVENT_TYPE_OPTIONS: Array<{ value: EventType | 'all'; label: string }> = [
-  { value: 'all',             label: 'All Events' },
-  { value: 'sweep',           label: 'Sweep' },
-  { value: 'dwell',           label: 'Dwell' },
-  { value: 'watchlist_match', label: 'Watchlist' },
-  { value: 'theft_attempt',   label: 'Theft Attempt' },
-  { value: 'queue_alert',     label: 'Queue Alert' },
-  { value: 'door_event',      label: 'Door Event' },
+  { value: 'all',               label: 'All Events' },
+  { value: 'shoplifting',       label: 'Shoplifting' },
+  { value: 'inventory_movement',label: 'Inventory Move' },
+  { value: 'restricted_zone',   label: 'Restricted Zone' },
+  { value: 'queue_breach',      label: 'Queue Breach' },
+  { value: 'fall_detected',     label: 'Fall Detected' },
+  { value: 'loitering',         label: 'Loitering' },
+  { value: 'face_match',        label: 'Face Match' },
+  { value: 'tamper',            label: 'Camera Tamper' },
 ];
 
 interface ZonePoint { x: number; y: number }

@@ -67,23 +67,14 @@ const SEVERITY_ORDER: Record<Severity, number> = {
 };
 
 const EVENT_TYPE_LABELS: Record<EventType, string> = {
-  sweep:               'Sweep',
-  dwell:               'Dwell',
-  empty_shelf:         'Empty Shelf',
-  watchlist_match:     'Watchlist Match',
-  queue_alert:         'Queue Alert',
-  door_event:          'Door Event',
-  loitering:           'Loitering',
-  crowd:               'Crowd',
-  theft_attempt:       'Theft Attempt',
-  system:              'System',
-  // New AI analyzers
-  shoplifting:         'Shoplifting',
-  inventory_movement:  'Inventory Move',
-  restricted_zone:     'Restricted Zone',
-  queue_length:        'Queue Breach',
-  fall_detection:      'Fall Detected',
-  tamper:              'Camera Tamper',
+  shoplifting:        'Shoplifting',
+  inventory_movement: 'Inventory Move',
+  restricted_zone:    'Restricted Zone',
+  queue_breach:       'Queue Breach',
+  fall_detected:      'Fall Detected',
+  loitering:          'Loitering',
+  face_match:         'Face Match',
+  tamper:             'Camera Tamper',
 };
 
 function SeverityBadge({ s }: { s: Severity }) {

@@ -31,8 +31,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from ..middleware.tenant_middleware import require_active_tenant
 
 from .models import HealthResponse
 from .pipeline import VantagPipeline
@@ -261,15 +262,20 @@ _SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 # Routers
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Subscription gate — applied to all tenant-data routers
+# ---------------------------------------------------------------------------
+_sub_gate = [Depends(require_active_tenant)]
+
 app.include_router(ws_router)
-app.include_router(stores_router)
-app.include_router(queue_router)
-app.include_router(cameras_router)
-app.include_router(reports_router)
-app.include_router(watchlist_router)
-app.include_router(audio_router)
-app.include_router(door_router)
-app.include_router(pos_router)
+app.include_router(stores_router,     dependencies=_sub_gate)
+app.include_router(queue_router,      dependencies=_sub_gate)
+app.include_router(cameras_router,    dependencies=_sub_gate)
+app.include_router(reports_router,    dependencies=_sub_gate)
+app.include_router(watchlist_router,  dependencies=_sub_gate)
+app.include_router(audio_router,      dependencies=_sub_gate)
+app.include_router(door_router,       dependencies=_sub_gate)
+app.include_router(pos_router,        dependencies=_sub_gate)
 app.include_router(auth_router)
 app.include_router(onboarding_router)
 app.include_router(tenants_router)
@@ -277,8 +283,8 @@ app.include_router(edge_router)
 app.include_router(agent_download_router)
 app.include_router(billing_router)
 app.include_router(camera_probe_router)
-app.include_router(demo_router)
-app.include_router(zone_router)
+app.include_router(demo_router,       dependencies=_sub_gate)
+app.include_router(zone_router,       dependencies=_sub_gate)
 app.include_router(support_router)
 app.include_router(system_router)
 app.include_router(snapshots_router)

@@ -29,12 +29,6 @@ interface NamePopup {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CAMERAS = [
-  { id: 'cam-01', label: 'cam-01 — Zone A' },
-  { id: 'cam-03', label: 'cam-03 — Zone C' },
-  { id: 'cam-04', label: 'cam-04 — Zone D' },
-];
-
 const ZONE_META: Record<ZoneType, {
   label: string; emoji: string; color: string; hex: string;
   tagline: string; desc: string; guide: string;
@@ -87,7 +81,9 @@ function toCanvasCoords(
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ZoneEditorPage() {
-  const [camId,       setCamId]       = useState('cam-03');
+  const [camId,       setCamId]       = useState('');
+  const [cameras,     setCameras]     = useState<{ id: string; label: string }[]>([]);
+  const [camsLoading, setCamsLoading] = useState(true);
   const [snapUrl,     setSnapUrl]     = useState('');
   const [snapLoading, setSnapLoading] = useState(false);
   const [mode,        setMode]        = useState<ZoneType | null>(null);
@@ -119,6 +115,34 @@ export default function ZoneEditorPage() {
   useEffect(() => {
     const id = setInterval(() => setGuideTick((t) => t + 1), 200);
     return () => clearInterval(id);
+  }, []);
+
+  // ── Fetch tenant cameras ───────────────────────────────────────────────────
+
+  useEffect(() => {
+    setCamsLoading(true);
+    api.get('/cameras')
+      .then(({ data }) => {
+        const list: { id: string; label: string }[] = (
+          Array.isArray(data) ? data : (data.cameras ?? [])
+        ).map((c: { camera_id: string; name?: string; location?: string }) => ({
+          id:    c.camera_id,
+          label: c.name ? `${c.camera_id} — ${c.name}` : c.camera_id,
+        }));
+        setCameras(list);
+        if (list.length > 0 && !camId) setCamId(list[0].id);
+      })
+      .catch(() => {
+        // Fallback to sensible defaults when API is unreachable
+        const fallback = [
+          { id: 'cam-01', label: 'cam-01' },
+          { id: 'cam-02', label: 'cam-02' },
+        ];
+        setCameras(fallback);
+        if (!camId) setCamId(fallback[0].id);
+      })
+      .finally(() => setCamsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Snapshot ──────────────────────────────────────────────────────────────
@@ -508,9 +532,15 @@ export default function ZoneEditorPage() {
           <select
             value={camId}
             onChange={(e) => setCamId(e.target.value)}
-            className="bg-vantag-card border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm"
+            disabled={camsLoading}
+            className="bg-vantag-card border border-slate-600 rounded-lg px-3 py-2 text-slate-200 text-sm disabled:opacity-50"
           >
-            {CAMERAS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            {camsLoading
+              ? <option>Loading cameras…</option>
+              : cameras.length === 0
+                ? <option value="">No cameras configured</option>
+                : cameras.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)
+            }
           </select>
           <button
             onClick={refreshSnapshot}

@@ -5,6 +5,8 @@ Billing endpoints: create order, webhook handler, invoice listing.
 """
 from __future__ import annotations
 
+import json
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -21,6 +23,7 @@ from ..middleware.tenant_middleware import get_current_user_id
 from ..services.razorpay_service import create_order, verify_payment_signature, verify_webhook_signature
 
 billing_router = APIRouter(prefix="/api/billing", tags=["billing"])
+logger = logging.getLogger("vantag.billing")
 
 
 class CreateOrderRequest(BaseModel):
@@ -47,7 +50,6 @@ async def create_payment_order(
 
     order = create_order(tenant.country, body.plan_id, tenant.id)
 
-    # Record pending invoice
     inv = Invoice(
         id=str(uuid.uuid4()),
         tenant_id=tenant.id,
@@ -84,7 +86,6 @@ async def verify_payment(
     if not valid:
         raise HTTPException(status_code=400, detail="Payment verification failed")
 
-    # Activate tenant
     await session.execute(
         update(Tenant).where(Tenant.id == tenant.id).values(status="active")
     )
@@ -96,6 +97,100 @@ async def verify_payment(
     await session.commit()
 
     return {"success": True, "status": "active"}
+
+
+async def _process_webhook_event(
+    event_type: str,
+    payload: dict,
+    pe_id: str,
+    session: AsyncSession,
+) -> None:
+    """Process a Razorpay webhook event and update tenant/invoice state."""
+    data = payload.get("payload", {})
+
+    try:
+        # ── Payment captured / authorized → activate tenant + mark invoice paid ──
+        if event_type in ("payment.captured", "payment.authorized"):
+            payment = data.get("payment", {}).get("entity", {})
+            order_id = payment.get("order_id")
+            payment_id = payment.get("id")
+            if order_id:
+                inv_result = await session.execute(
+                    select(Invoice).where(Invoice.razorpay_order_id == order_id)
+                )
+                inv = inv_result.scalar_one_or_none()
+                if inv:
+                    await session.execute(
+                        update(Invoice)
+                        .where(Invoice.id == inv.id)
+                        .values(status="paid", razorpay_payment_id=payment_id)
+                    )
+                    await session.execute(
+                        update(Tenant)
+                        .where(Tenant.id == inv.tenant_id)
+                        .values(status="active")
+                    )
+                    logger.info(
+                        "Webhook payment.captured: activated tenant=%s order=%s",
+                        inv.tenant_id, order_id,
+                    )
+
+        # ── Subscription renewed ──────────────────────────────────────────────
+        elif event_type == "subscription.charged":
+            sub_data = data.get("subscription", {}).get("entity", {})
+            sub_id = sub_data.get("id")
+            if sub_id:
+                sub_result = await session.execute(
+                    select(Subscription).where(Subscription.id == sub_id)
+                )
+                sub = sub_result.scalar_one_or_none()
+                if sub:
+                    await session.execute(
+                        update(Tenant)
+                        .where(Tenant.id == sub.tenant_id)
+                        .values(status="active")
+                    )
+
+        # ── Subscription cancelled → suspend tenant ───────────────────────────
+        elif event_type in ("subscription.cancelled", "subscription.completed"):
+            sub_data = data.get("subscription", {}).get("entity", {})
+            sub_id = sub_data.get("id")
+            if sub_id:
+                sub_result = await session.execute(
+                    select(Subscription).where(Subscription.id == sub_id)
+                )
+                sub = sub_result.scalar_one_or_none()
+                if sub:
+                    await session.execute(
+                        update(Tenant)
+                        .where(Tenant.id == sub.tenant_id)
+                        .values(status="suspended")
+                    )
+                    logger.info(
+                        "Webhook %s: suspended tenant=%s", event_type, sub.tenant_id
+                    )
+
+        # ── Payment failed → mark invoice, log (don't immediately suspend) ────
+        elif event_type == "payment.failed":
+            payment = data.get("payment", {}).get("entity", {})
+            order_id = payment.get("order_id")
+            if order_id:
+                await session.execute(
+                    update(Invoice)
+                    .where(Invoice.razorpay_order_id == order_id)
+                    .values(status="failed")
+                )
+                logger.warning("Webhook payment.failed: order=%s", order_id)
+
+        # Mark event as processed
+        await session.execute(
+            update(PaymentEvent).where(PaymentEvent.id == pe_id).values(processed=True)
+        )
+        await session.commit()
+
+    except Exception as exc:
+        logger.error("Webhook processing error for %s: %s", event_type, exc, exc_info=True)
+        await session.rollback()
 
 
 @billing_router.post("/webhook/{country}")
@@ -111,14 +206,10 @@ async def razorpay_webhook(
     if not verify_webhook_signature(body, x_razorpay_signature or "", country.upper()):
         raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
-    import json
     payload = json.loads(body)
     event_type = payload.get("event", "unknown")
-
-    # Extract idempotency key from Razorpay payload
     event_id = payload.get("id") or payload.get("payload", {}).get("id")
 
-    # Check for duplicate event before inserting
     if event_id:
         existing = await session.execute(
             select(PaymentEvent).where(PaymentEvent.razorpay_event_id == event_id)
@@ -137,9 +228,11 @@ async def razorpay_webhook(
     try:
         await session.commit()
     except IntegrityError:
-        # Race condition: another worker inserted the same event_id simultaneously
         await session.rollback()
         return {"status": "duplicate_ignored", "event": event_type}
+
+    # Process the event — update tenant/invoice state
+    await _process_webhook_event(event_type, payload, pe.id, session)
 
     return {"received": True, "event": event_type}
 

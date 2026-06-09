@@ -52,21 +52,13 @@ export interface RiskFactor {
 }
 
 export type EventType =
-  | 'sweep'
-  | 'dwell'
-  | 'empty_shelf'
-  | 'watchlist_match'
-  | 'queue_alert'
-  | 'door_event'
-  | 'loitering'
-  | 'crowd'
-  | 'theft_attempt'
-  | 'system'
   | 'shoplifting'
   | 'inventory_movement'
   | 'restricted_zone'
-  | 'queue_length'
-  | 'fall_detection'
+  | 'queue_breach'
+  | 'fall_detected'
+  | 'loitering'
+  | 'face_match'
   | 'tamper';
 
 export interface VantagEvent {

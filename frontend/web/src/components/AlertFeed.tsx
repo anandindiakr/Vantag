@@ -1,15 +1,13 @@
 import { useEffect, useRef } from 'react';
 import {
   Shield,
-  Clock,
   Package,
   User,
   AlertCircle,
-  DoorOpen,
   Users,
   Crosshair,
   ShoppingCart,
-  Cpu,
+  AlertOctagon,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useVantagStore, VantagEvent, EventType, Severity } from '../store/useVantagStore';
@@ -17,31 +15,29 @@ import { useVantagStore, VantagEvent, EventType, Severity } from '../store/useVa
 function eventIcon(type: EventType) {
   const cls = 'shrink-0';
   switch (type) {
-    case 'sweep':           return <Shield size={14} className={cls} />;
-    case 'dwell':           return <Clock size={14} className={cls} />;
-    case 'empty_shelf':     return <Package size={14} className={cls} />;
-    case 'watchlist_match': return <User size={14} className={cls} />;
-    case 'queue_alert':     return <ShoppingCart size={14} className={cls} />;
-    case 'door_event':      return <DoorOpen size={14} className={cls} />;
-    case 'loitering':       return <Users size={14} className={cls} />;
-    case 'crowd':           return <Users size={14} className={cls} />;
-    case 'theft_attempt':   return <Crosshair size={14} className={cls} />;
-    default:                return <Cpu size={14} className={cls} />;
+    case 'shoplifting':        return <Crosshair size={14} className={cls} />;
+    case 'inventory_movement': return <Package size={14} className={cls} />;
+    case 'restricted_zone':    return <Shield size={14} className={cls} />;
+    case 'queue_breach':       return <ShoppingCart size={14} className={cls} />;
+    case 'fall_detected':      return <AlertCircle size={14} className={cls} />;
+    case 'loitering':          return <Users size={14} className={cls} />;
+    case 'face_match':         return <User size={14} className={cls} />;
+    case 'tamper':             return <AlertOctagon size={14} className={cls} />;
+    default:                   return <AlertCircle size={14} className={cls} />;
   }
 }
 
 function eventIconColor(type: EventType): string {
   switch (type) {
-    case 'sweep':
-    case 'theft_attempt':   return 'text-vantag-red';
-    case 'dwell':
+    case 'shoplifting':
+    case 'restricted_zone':
+    case 'face_match':
+    case 'tamper':             return 'text-vantag-red';
+    case 'fall_detected':
     case 'loitering':
-    case 'crowd':           return 'text-vantag-amber';
-    case 'empty_shelf':     return 'text-slate-400';
-    case 'watchlist_match': return 'text-vantag-red';
-    case 'queue_alert':     return 'text-vantag-amber';
-    case 'door_event':      return 'text-blue-400';
-    default:                return 'text-slate-500';
+    case 'queue_breach':       return 'text-vantag-amber';
+    case 'inventory_movement': return 'text-slate-400';
+    default:                   return 'text-slate-500';
   }
 }
 

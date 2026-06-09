@@ -4,10 +4,13 @@ Tenant middleware — extracts tenant_id from JWT and injects into request.state
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
     from jose import JWTError, jwt
@@ -81,3 +84,71 @@ async def get_optional_tenant_id(
         return payload.get("tenant_id")
     except Exception:
         return None
+
+
+def _get_session_dep():
+    """Lazy import to avoid circular dependency at module load time."""
+    from ..db.database import get_session
+    return get_session
+
+
+async def require_active_tenant(
+    user: dict = Depends(get_current_user_id),
+) -> dict:
+    """
+    Blocks API access when the tenant's subscription is inactive or expired.
+
+    Raises HTTP 402 with detail="subscription_required" when:
+    - tenant.status == "suspended" (or any non-trial, non-active status)
+    - tenant.status == "trial" AND trial_ends_at is in the past
+
+    Super-admins bypass this check entirely.
+    """
+    from ..db.database import get_session
+    from ..db.models.tenant import Tenant
+
+    # Super-admins always pass
+    if user.get("is_super_admin"):
+        return user
+
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    # We need a DB session — use a one-shot async session here
+    async for session in get_session():
+        result = await session.execute(
+            select(Tenant).where(Tenant.id == tenant_id)
+        )
+        tenant = result.scalar_one_or_none()
+        break
+
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    now = datetime.now(timezone.utc)
+
+    if tenant.status == "active":
+        return user
+
+    if tenant.status == "trial":
+        if tenant.trial_ends_at is None:
+            # No expiry set — treat as unlimited trial
+            return user
+        trial_end = tenant.trial_ends_at
+        if trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=timezone.utc)
+        if trial_end > now:
+            return user
+        raise HTTPException(
+            status_code=402,
+            detail="subscription_required",
+            headers={"X-Subscription-Status": "trial_expired"},
+        )
+
+    # Suspended, cancelled, or any other non-active status
+    raise HTTPException(
+        status_code=402,
+        detail="subscription_required",
+        headers={"X-Subscription-Status": tenant.status or "suspended"},
+    )
