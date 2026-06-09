@@ -11,6 +11,7 @@ POST /api/edge/register/bootstrap    – one-time bootstrap (registration_token 
 POST /api/edge/heartbeat             – authenticated heartbeat (X-API-Key)
 POST /api/edge/events                – ingest detection event (X-API-Key)
 GET  /api/edge/config                – poll latest camera config (X-API-Key)
+GET  /api/edge/agents                – list tenant's agents + live status (JWT)
 """
 from __future__ import annotations
 
@@ -523,6 +524,59 @@ async def get_config(
             for c in cameras
         ]
     }
+
+
+@edge_router.get("/agents")
+async def list_agents(
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Return all EdgeAgent rows for the calling tenant with derived live status.
+
+    ``effective_status`` is ``"online"`` only when ``last_heartbeat`` is within
+    the last 5 minutes; otherwise ``"offline"``.  This avoids a background
+    cron job to flip the DB column and is always accurate at read time.
+    """
+    from datetime import timedelta
+
+    tenant_id = user["tenant_id"]
+    result = await session.execute(
+        select(EdgeAgent).where(EdgeAgent.tenant_id == tenant_id)
+    )
+    agents = result.scalars().all()
+    now = datetime.now(timezone.utc)
+    stale_threshold = timedelta(minutes=5)
+
+    items = []
+    for a in agents:
+        if a.last_heartbeat is not None:
+            hb = a.last_heartbeat
+            # Ensure tz-aware comparison
+            if hb.tzinfo is None:
+                from datetime import timezone as _tz
+                hb = hb.replace(tzinfo=_tz.utc)
+            age = now - hb
+            effective_status = "online" if age <= stale_threshold else "offline"
+            last_heartbeat_iso = hb.isoformat()
+            last_heartbeat_age_seconds = int(age.total_seconds())
+        else:
+            effective_status = "offline"
+            last_heartbeat_iso = None
+            last_heartbeat_age_seconds = None
+
+        items.append({
+            "agent_id": a.id,
+            "device_type": a.device_type,
+            "device_name": a.device_name or a.device_type,
+            "status": effective_status,
+            "last_heartbeat": last_heartbeat_iso,
+            "last_heartbeat_age_seconds": last_heartbeat_age_seconds,
+            "camera_count": a.camera_count,
+            "capabilities": a.capabilities,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        })
+
+    return {"agents": items, "total": len(items)}
 
 
 # ─── Simple edge agent endpoints (registration_token-based, no API key) ──────

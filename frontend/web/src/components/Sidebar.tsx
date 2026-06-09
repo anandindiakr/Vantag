@@ -16,6 +16,7 @@ import {
   Settings2,
   HeartPulse,
   ShieldAlert,
+  MonitorCheck,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useVantagStore } from '../store/useVantagStore';
@@ -40,6 +41,7 @@ const navItems: NavItem[] = [
   { label: 'Demo Center',  to: '/demo',         icon: <Zap size={20} /> },
   { label: 'Health Check', to: '/health-check', icon: <HeartPulse size={20} />, dividerBefore: true },
   { label: 'Install Edge Agent', to: '/download', icon: <Download size={20} />, dividerBefore: true },
+  { label: 'Agent Status',       to: '/agent-status', icon: <MonitorCheck size={20} /> },
   { label: 'Help & Support', to: '/help', icon: <HelpCircle size={20} /> },
 ];
 

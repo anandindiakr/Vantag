@@ -37,6 +37,7 @@ const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
 const StoreDetail  = lazy(() => import('./pages/StoreDetail'));
 const DownloadPage = lazy(() => import('./pages/DownloadPage'));
+const AgentStatusPage = lazy(() => import('./pages/AgentStatusPage'));
 const HowItWorks   = lazy(() => import('./pages/HowItWorks'));
 const FAQ          = lazy(() => import('./pages/FAQ'));
 const HelpCenter   = lazy(() => import('./pages/HelpCenter'));
@@ -135,6 +136,7 @@ export default function App() {
               <Route path="/watchlist"  element={<WatchlistPage />} />
               <Route path="/stores/:id" element={<StoreDetail />} />
               <Route path="/download"   element={<DownloadPage />} />
+              <Route path="/agent-status" element={<AgentStatusPage />} />
               <Route path="/help"       element={<HelpCenter />} />
               <Route path="/health-check" element={<HealthCheck />} />
             </Route>
