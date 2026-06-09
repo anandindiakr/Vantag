@@ -801,12 +801,16 @@ async def download_agent(
         "mqtt_host": mqtt_host,
         "mqtt_port": int(os.getenv("MQTT_PORT", "1883")),
         "tenant_id": tenant_id,
+        # NOTE: keys here MUST match windows_agent/agent/config.py::CameraConfig
+        # fields (id, name, rtsp_url, location, ...). Any extra/renamed key makes
+        # CameraConfig(**c) raise TypeError, which AgentConfig.load() swallows and
+        # then falls back to an EMPTY config (no api_key) -> dead agent.
         "cameras": [
             {
-                "camera_id": c.camera_id,
+                "id": c.camera_id,
                 "name": c.name,
-                "rtsp_url": c.get_rtsp_url() if hasattr(c, "get_rtsp_url") else None,
-                "fps_target": getattr(c, "fps_target", 10),
+                "rtsp_url": (c.get_rtsp_url() if hasattr(c, "get_rtsp_url") else None) or "",
+                "location": getattr(c, "location", "") or "",
             }
             for c in cams
         ],
