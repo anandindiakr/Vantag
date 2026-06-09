@@ -28,8 +28,8 @@ class CameraConfig:
 class AgentConfig:
     api_key: str = ""
     agent_id: str = ""
-    backend_url: str = "https://app.vantag.io"
-    mqtt_host: str = "localhost"
+    backend_url: str = "https://retail-vantag.com"
+    mqtt_host: str = "retail-vantag.com"
     mqtt_port: int = 1883
     tenant_id: str = ""
     cameras: List[CameraConfig] = field(default_factory=list)
@@ -65,4 +65,6 @@ class AgentConfig:
         print(f"[Config] Saved to {CONFIG_FILE}")
 
     def is_configured(self) -> bool:
-        return bool(self.api_key and self.agent_id)
+        # Only api_key is required for first-run.
+        # agent_id is assigned by the backend after registration.
+        return bool(self.api_key)

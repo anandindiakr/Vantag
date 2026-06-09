@@ -250,6 +250,7 @@ def main():
         on_stop=stop_monitoring,
         on_settings=open_settings,
         on_quit=lambda: sys.exit(0),
+        dashboard_url=_config.backend_url,
     )
     log.info("Vantag tray icon running. Right-click tray icon to control.")
     tray.run()   # blocks until tray icon quits

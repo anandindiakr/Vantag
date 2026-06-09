@@ -35,11 +35,13 @@ class VantagTrayIcon:
         on_stop: Callable,
         on_settings: Callable,
         on_quit: Callable,
+        dashboard_url: str = "https://retail-vantag.com",
     ):
         self._on_start = on_start
         self._on_stop = on_stop
         self._on_settings = on_settings
         self._on_quit = on_quit
+        self._dashboard_url = dashboard_url
         self._icon: pystray.Icon | None = None
         self._running = False
 
@@ -77,7 +79,7 @@ class VantagTrayIcon:
 
     def _open_dashboard(self):
         import webbrowser
-        webbrowser.open("http://localhost:3000")
+        webbrowser.open(self._dashboard_url)
 
     def _quit(self):
         self._on_quit()
