@@ -4,11 +4,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useRegion } from '../hooks/useRegion';
 
 interface Faq { q: string; a: string; }
 
 export default function FAQ() {
   const { t } = useTranslation();
+  const region = useRegion();
+  const supportEmail = region.region === 'IN' ? 'support@retailnazar.com' : 'support@retail-vantag.com';
   const [faqs, setFaqs] = useState<Faq[]>([]);
 
   useEffect(() => {
@@ -35,7 +38,7 @@ export default function FAQ() {
           {t('faq.title', 'Frequently asked questions')}
         </h1>
         <p className="text-white/60 text-center mb-12">
-          {t('faq.subtitle', "Can't find what you need? Use the chat in the bottom-right or email support@retail-vantag.com")}
+          {t('faq.subtitle', "Can't find what you need? Use the chat in the bottom-right or email ") + supportEmail}
         </p>
 
         <div className="space-y-3">
@@ -58,9 +61,9 @@ export default function FAQ() {
           <p className="text-white/70 mb-4">
             {t('faq.more_body', 'Our Vantag Assistant (bottom-right) answers instantly. For complex cases, email our team.')}
           </p>
-          <a href="mailto:support@retail-vantag.com"
+          <a href={`mailto:${supportEmail}`}
             className="inline-block bg-violet-600 hover:bg-violet-500 px-6 py-3 rounded-xl font-bold">
-            support@retail-vantag.com
+            {supportEmail}
           </a>
         </div>
       </div>

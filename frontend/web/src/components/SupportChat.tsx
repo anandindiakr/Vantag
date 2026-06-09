@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, X, Send, Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useRegion } from '../hooks/useRegion';
 
 interface Msg {
   role: 'user' | 'assistant';
@@ -26,6 +27,8 @@ const WELCOME: Msg = {
 
 export default function SupportChat() {
   const { i18n } = useTranslation();
+  const region = useRegion();
+  const supportEmail = region.region === 'IN' ? 'support@retailnazar.com' : 'support@retail-vantag.com';
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([WELCOME]);
   const [input, setInput] = useState('');
@@ -79,7 +82,7 @@ export default function SupportChat() {
         {
           role: 'assistant',
           content:
-            "I'm unable to reach the AI right now. Please email support@retail-vantag.com and we'll respond within 24 hours.",
+            `I'm unable to reach the AI right now. Please email ${supportEmail} and we'll respond within 24 hours.`,
         },
       ]);
       setEscalate(true);
@@ -145,10 +148,10 @@ export default function SupportChat() {
           {/* Escalation banner */}
           {escalate && (
             <a
-              href="mailto:support@retail-vantag.com"
+              href={`mailto:${supportEmail}`}
               className="bg-amber-500/20 text-amber-200 text-xs px-4 py-2 border-t border-amber-500/30 flex items-center gap-2 hover:bg-amber-500/30"
             >
-              <Mail size={14} /> Need a human? Email support@retail-vantag.com
+              <Mail size={14} /> Need a human? Email {supportEmail}
             </a>
           )}
 

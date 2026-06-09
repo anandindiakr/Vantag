@@ -5,11 +5,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, Download, MessageCircle, Mail, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useRegion } from '../hooks/useRegion';
 
 interface Faq { q: string; a: string; }
 
 export default function HelpCenter() {
   const { t } = useTranslation();
+  const region = useRegion();
+  const supportEmail = region.region === 'IN' ? 'support@retailnazar.com' : 'support@retail-vantag.com';
   const [faqs, setFaqs] = useState<Faq[]>([]);
 
   useEffect(() => {
@@ -78,9 +81,9 @@ export default function HelpCenter() {
           <h3 className="text-xl font-bold mb-1">{t('help.contact_title', 'Need a human?')}</h3>
           <p className="text-white/70 text-sm">{t('help.contact_body', "Email us and we'll reply within 24 hours.")}</p>
         </div>
-        <a href="mailto:support@retail-vantag.com"
+        <a href={`mailto:${supportEmail}`}
           className="bg-violet-600 hover:bg-violet-500 px-5 py-3 rounded-xl font-bold flex items-center gap-2">
-          <Mail size={16} /> support@retail-vantag.com
+          <Mail size={16} /> {supportEmail}
         </a>
       </div>
     </div>

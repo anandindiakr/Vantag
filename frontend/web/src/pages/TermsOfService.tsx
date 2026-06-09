@@ -1,9 +1,12 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useRegion } from '../hooks/useRegion';
 
 const LAST_UPDATED = '1 May 2026';
 
 export default function TermsOfService() {
+  const region = useRegion();
+  const supportEmail = region.region === 'IN' ? 'support@retailnazar.com' : 'support@retail-vantag.com';
   useEffect(() => {
     document.title = 'Terms of Service | Vantag';
     let m = document.querySelector('meta[name="description"]');
@@ -91,7 +94,7 @@ export default function TermsOfService() {
         <p>Material changes are notified 30 days in advance. Continued use constitutes acceptance.</p>
 
         <h2 className="text-2xl font-semibold text-white mt-10">15. Contact</h2>
-        <p>Legal: <strong>legal@retail-vantag.com</strong> &nbsp;|&nbsp; Support: <strong>support@retail-vantag.com</strong></p>
+        <p>Legal: <strong>legal@retail-vantag.com</strong> &nbsp;|&nbsp; Support: <strong>{supportEmail}</strong></p>
       </main>
     </div>
   );

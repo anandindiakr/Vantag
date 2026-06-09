@@ -885,7 +885,7 @@ export default function Landing() {
                 <Link to="/privacy" className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">Privacy Policy</Link>
                 <Link to="/terms" className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">Terms of Service</Link>
                 <Link to="/faq" className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">FAQ</Link>
-                <a href="mailto:support@retail-vantag.com" className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">Contact Us</a>
+                <a href={`mailto:${region.region === 'IN' ? 'support@retailnazar.com' : 'support@retail-vantag.com'}`} className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">Contact Us</a>
               </div>
               {/* ── Cross-region links ── */}
               <div className="space-y-3">
@@ -926,7 +926,7 @@ export default function Landing() {
           </div>
 
           <div className="flex items-center justify-between mt-12 pt-8 border-t border-white/5">
-            <span className="font-mono-alt text-[11px] text-white/20">© 2026 Vantag Technologies · IN · SG · MY</span>
+            <span className="font-mono-alt text-[11px] text-white/20">© {new Date().getFullYear()} A product of AI Algo (S) Pte Ltd. · IN · SG · MY</span>
             <span className="font-mono-alt text-[11px] text-white/20">11 AI Models · Edge-First · Hardware-Agnostic</span>
           </div>
         </div>
