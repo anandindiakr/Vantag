@@ -266,8 +266,8 @@ def test_analyzer_shoplifting():
     da = DetectionAnalyzer("cam1", cooldown_sec=1, fps=5.0)
     person = _person(x=0.30, y=0.30, w=0.10, h=0.15)
     bag    = BoundingBox(x=0.32, y=0.32, w=0.08, h=0.12, label="backpack", confidence=0.85)
-    # Spatial key is "sweep_3_3" (int(0.30*10)=3 for both x and y).
-    # Seed it as already having started 3 seconds ago to satisfy the 2s timer.
+    # Item key: "sweep_{int(0.32*10)}_{int(0.32*10)}" = "sweep_3_3"
+    # Seed it 3s ago so the 2s threshold is already met.
     da._person_with_items["sweep_3_3"] = time.time() - 3.0
     events = da.analyse([person, bag], BLANK_FRAME)
     types_seen = {e["event_type"] for e in events}
@@ -324,9 +324,135 @@ test_analyzer_fall_integration()
 test_analyzer_loitering_integration()
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
+# 4. Shoplifting timer — YOLO realism
+#    Each "frame" creates NEW BoundingBox instances (just like real YOLO).
+#    Item position is fixed; person position jitters or drifts.
+# =============================================================================
+print("\n--- Shoplifting timer: YOLO realism ---")
+
+import random as _random
+_random.seed(42)
+
+def _yolo_frame(person_cx, person_cy, item_cx, item_cy,
+                person_jitter=0.003, item_jitter=0.001):
+    """
+    Simulate one YOLO inference output:
+      - New BoundingBox objects created from scratch (like real postprocess())
+      - Small Gaussian noise added (1-2px at 640p ≈ 0.002-0.003 normalised)
+    """
+    pw, ph = 0.10, 0.20
+    iw, ih = 0.08, 0.12
+    px = person_cx - pw/2 + _random.gauss(0, person_jitter)
+    py = person_cy - ph/2 + _random.gauss(0, person_jitter)
+    ix = item_cx   - iw/2 + _random.gauss(0, item_jitter)
+    iy = item_cy   - ih/2 + _random.gauss(0, item_jitter)
+    return (
+        BoundingBox(max(0,px), max(0,py), pw, ph, "person",  0.88),
+        BoundingBox(max(0,ix), max(0,iy), iw, ih, "backpack", 0.91),
+    )
+
+def test_shoplifting_jitter_safe():
+    """
+    Stationary person near item with realistic ±3px YOLO jitter.
+    New BoundingBox objects each frame. Timer must accumulate and fire.
+    """
+    da = DetectionAnalyzer("cam1", cooldown_sec=1, fps=5.0)
+    # Back-date the item's slot 3s (key is item-anchored, so jitter on person is irrelevant)
+    item_cx, item_cy = 0.55, 0.45
+    iw, ih = 0.08, 0.12
+    item_key = f"sweep_{int((item_cx - iw/2)*10)}_{int((item_cy - ih/2)*10)}"
+    da._person_with_items[item_key] = time.time() - 3.0
+
+    all_events = []
+    for _ in range(10):
+        p, item = _yolo_frame(0.52, 0.47, item_cx, item_cy)
+        all_events += da.analyse([p, item], BLANK_FRAME)
+
+    types_seen = {e["event_type"] for e in all_events}
+    check("shoplifting fires despite per-frame YOLO jitter (new objects each frame)",
+          "shoplifting" in types_seen,
+          f"events={types_seen}")
+
+def test_shoplifting_slow_walk_fires():
+    """
+    Person drifts 5px/frame (slow browse) — crosses 64px cell in ~13 frames.
+    With item-anchored key the timer must still fire at 2s (5 frames @ 2.5 AI fps).
+    """
+    da = DetectionAnalyzer("cam1", cooldown_sec=1, fps=5.0)
+    item_cx, item_cy = 0.55, 0.45
+    iw, ih = 0.08, 0.12
+    item_key = f"sweep_{int((item_cx - iw/2)*10)}_{int((item_cy - ih/2)*10)}"
+    da._person_with_items[item_key] = time.time() - 3.0
+
+    all_events = []
+    for i in range(15):
+        # Person drifts +5px per frame (0.0078 normalised/frame)
+        drift = i * (5 / 640)
+        p, item = _yolo_frame(0.52 + drift, 0.47, item_cx, item_cy)
+        all_events += da.analyse([p, item], BLANK_FRAME)
+
+    types_seen = {e["event_type"] for e in all_events}
+    check("shoplifting fires for slow-walking person (item-anchored key stable)",
+          "shoplifting" in types_seen,
+          f"events={types_seen}")
+
+def test_shoplifting_brisk_walk_fires():
+    """
+    Person drifts 15px/frame (brisk walk — would break old person-anchored key
+    in ~1.7s, before the 2s timer). Item-anchored key must fire correctly.
+    """
+    da = DetectionAnalyzer("cam1", cooldown_sec=1, fps=5.0)
+    item_cx, item_cy = 0.55, 0.45
+    iw, ih = 0.08, 0.12
+    item_key = f"sweep_{int((item_cx - iw/2)*10)}_{int((item_cy - ih/2)*10)}"
+    da._person_with_items[item_key] = time.time() - 3.0
+
+    all_events = []
+    for i in range(10):
+        drift = i * (15 / 640)
+        p, item = _yolo_frame(0.52 + drift, 0.47, item_cx, item_cy)
+        all_events += da.analyse([p, item], BLANK_FRAME)
+
+    types_seen = {e["event_type"] for e in all_events}
+    check("shoplifting fires for brisk-walking person (would fail with old person key)",
+          "shoplifting" in types_seen,
+          f"events={types_seen}")
+
+def test_shoplifting_different_items_independent():
+    """
+    Two backpacks in different shelf positions. Timer on bag-A fires without
+    contaminating bag-B's slot, and vice-versa.
+    """
+    da = DetectionAnalyzer("cam1", cooldown_sec=60, fps=5.0)  # long cooldown
+    # Item A at left shelf, Item B at right shelf (different int(x*10) cells)
+    item_a = BoundingBox(0.20, 0.40, 0.08, 0.12, "backpack", 0.90)
+    item_b = BoundingBox(0.70, 0.40, 0.08, 0.12, "backpack", 0.90)
+    person = BoundingBox(0.18, 0.38, 0.10, 0.20, "person", 0.88)
+
+    key_a = f"sweep_{int(0.20*10)}_{int(0.40*10)}"
+    key_b = f"sweep_{int(0.70*10)}_{int(0.40*10)}"
+
+    # Only seed item-A's timer
+    da._person_with_items[key_a] = time.time() - 3.0
+
+    # Person overlaps item-A only
+    events = da.analyse([person, item_a, item_b], BLANK_FRAME)
+    types_seen = {e["event_type"] for e in events}
+
+    check("shoplifting fires for item-A only; item-B slot not contaminated",
+          "shoplifting" in types_seen and key_b not in da._person_with_items,
+          f"events={types_seen}, keys={list(da._person_with_items.keys())}")
+
+test_shoplifting_jitter_safe()
+test_shoplifting_slow_walk_fires()
+test_shoplifting_brisk_walk_fires()
+test_shoplifting_different_items_independent()
+
+
+# =============================================================================
 # Summary
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 total = len(_PASS) + len(_FAIL)
 print(f"\n{'='*60}")
 print(f"Results: {len(_PASS)}/{total} passed")

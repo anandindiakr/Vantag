@@ -257,18 +257,23 @@ class DetectionAnalyzer:
         shelf_items = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "shelf_item"]
 
         # 1. Shoplifting: person near high-value item for >2s
-        # Key uses coarse spatial coords so it stays stable across frames
-        # (id(p) changes every frame since YOLO creates new objects each inference)
+        # Key on the ITEM's position (items are stationary — backpack/bag on shelf).
+        # Keying on the person would reset the timer whenever they walk a grid cell
+        # width (~64px at 640p) before the 2s window closes.
         if persons and items:
             for p in persons:
                 for item in items:
                     if self._boxes_overlap(p, item, threshold=0.3):
-                        key = f"sweep_{int(p.x*10)}_{int(p.y*10)}"
+                        key = f"sweep_{int(item.x*10)}_{int(item.y*10)}"
                         self._person_with_items.setdefault(key, now)
                         if now - self._person_with_items[key] >= 2.0:
                             evt = self._emit("shoplifting", max(p.confidence, item.confidence), [p, item], frame)
                             if evt:
                                 events.append(evt)
+            # Prune item slots where no person has been nearby for >30s
+            stale = [k for k, t in self._person_with_items.items() if now - t > 30]
+            for k in stale:
+                del self._person_with_items[k]
         else:
             self._person_with_items.clear()
 
