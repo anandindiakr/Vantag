@@ -21,9 +21,9 @@ const IS_LOCALHOST = typeof window !== 'undefined' &&
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 const REGION_SWITCHER = [
-  { code: 'IN' as const, name: 'India',     app: 'Retail Nazar', flag: '🇮🇳', lang: 'en' },
-  { code: 'SG' as const, name: 'Singapore', app: 'Vantag',       flag: '🇸🇬', lang: 'en' },
-  { code: 'MY' as const, name: 'Malaysia',  app: 'JagaJaga',     flag: '🇲🇾', lang: 'ms' },
+  { code: 'IN' as const, name: 'India',     app: 'Retail Nazar', flag: '🇮🇳', lang: 'en', url: 'https://retailnazar.com' },
+  { code: 'SG' as const, name: 'Singapore', app: 'Vantag',       flag: '🇸🇬', lang: 'en', url: 'https://retail-vantag.com' },
+  { code: 'MY' as const, name: 'Malaysia',  app: 'JagaJaga',     flag: '🇲🇾', lang: 'ms', url: 'https://jagajaga.my' },
 ];
 
 /* ── 11 AI Feature detectors ── */
@@ -846,9 +846,22 @@ export default function Landing() {
               <p className="text-sm text-white/35 font-body-alt leading-relaxed mb-4">
                 AI-powered retail security platform for shops across India, Singapore and Malaysia.
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {REGION_SWITCHER.map(r => (
-                  <span key={r.code} className="text-[11px] font-mono-alt px-2 py-1 rounded border border-white/8 text-white/30">{r.flag} {r.app}</span>
+                  <a
+                    key={r.code}
+                    href={r.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`text-[11px] font-mono-alt px-2.5 py-1 rounded border transition-all cursor-pointer select-none
+                      ${r.code === region.code
+                        ? 'border-cyan-500/40 text-cyan-400 bg-cyan-500/10 font-semibold pointer-events-none'
+                        : 'border-white/10 text-white/40 hover:border-white/30 hover:text-white/70 hover:bg-white/5'
+                      }`}
+                    title={`Go to ${r.app} — ${r.name}`}
+                  >
+                    {r.flag} {r.code} {r.app}
+                  </a>
                 ))}
               </div>
             </div>
