@@ -17,6 +17,10 @@ try:
 except ImportError:
     from jwt import decode as jwt_decode, exceptions as JWTError
 
+# DB imports are safe here — database.py does NOT import from middleware
+from ..db.database import AsyncSessionLocal, get_session
+from ..db.models.tenant import Tenant
+
 JWT_SECRET = os.getenv("VANTAG_JWT_SECRET", "change-me")
 JWT_ALGORITHM = "HS256"
 
@@ -86,12 +90,6 @@ async def get_optional_tenant_id(
         return None
 
 
-def _get_session_dep():
-    """Lazy import to avoid circular dependency at module load time."""
-    from ..db.database import get_session
-    return get_session
-
-
 async def require_active_tenant(
     user: dict = Depends(get_current_user_id),
 ) -> dict:
@@ -99,14 +97,11 @@ async def require_active_tenant(
     Blocks API access when the tenant's subscription is inactive or expired.
 
     Raises HTTP 402 with detail="subscription_required" when:
-    - tenant.status == "suspended" (or any non-trial, non-active status)
+    - tenant.status is not "active" or "trial"
     - tenant.status == "trial" AND trial_ends_at is in the past
 
     Super-admins bypass this check entirely.
     """
-    from ..db.database import get_session
-    from ..db.models.tenant import Tenant
-
     # Super-admins always pass
     if user.get("is_super_admin"):
         return user
@@ -115,13 +110,11 @@ async def require_active_tenant(
     if not tenant_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
-    # We need a DB session — use a one-shot async session here
-    async for session in get_session():
+    async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(Tenant).where(Tenant.id == tenant_id)
         )
         tenant = result.scalar_one_or_none()
-        break
 
     if tenant is None:
         raise HTTPException(status_code=404, detail="Tenant not found")
