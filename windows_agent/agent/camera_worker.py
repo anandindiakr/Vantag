@@ -186,6 +186,150 @@ class LoiteringDetector:
 
 
 # ---------------------------------------------------------------------------
+# Crowd Detector
+# ---------------------------------------------------------------------------
+
+class CrowdDetector:
+    """
+    Detects crowding: person count stays at/above a threshold for a sustained
+    window. Uses a rolling count history so a single noisy frame doesn't fire.
+
+    Emits 'crowding' (canonical backend type).
+    """
+
+    MIN_PERSONS   = 5     # >= this many people = potential crowd
+    SUSTAIN_SEC   = 5.0   # must hold for this long before firing
+
+    def __init__(self, camera_id: str, cooldown_sec: int = 60, min_persons: int = MIN_PERSONS):
+        self.camera_id = camera_id
+        self._cooldown = max(cooldown_sec, 60)
+        self._min_persons = min_persons
+        self._crowd_since: Optional[float] = None
+        self._last_event: float = 0.0
+
+    def analyse(self, persons: list, frame: np.ndarray) -> Optional[dict]:
+        now = time.time()
+        count = len(persons)
+
+        if count >= self._min_persons:
+            if self._crowd_since is None:
+                self._crowd_since = now
+            elif now - self._crowd_since >= self.SUSTAIN_SEC:
+                if now - self._last_event >= self._cooldown:
+                    self._last_event = now
+                    small = cv2.resize(frame, (320, 180))
+                    _, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 60])
+                    snap = base64.b64encode(buf.tobytes()).decode()
+                    # Confidence scales with how far over the threshold we are
+                    conf = min(0.5 + 0.1 * (count - self._min_persons), 0.95)
+                    return {
+                        "camera_id": self.camera_id,
+                        "event_type": "crowding",
+                        "severity": "high" if count >= self._min_persons * 2 else "medium",
+                        "confidence": round(conf, 3),
+                        "snapshot_b64": snap,
+                        "metadata": {
+                            "timestamp": int(now * 1000),
+                            "person_count": count,
+                            "threshold": self._min_persons,
+                            "bounding_boxes": [p.to_dict() for p in persons],
+                        },
+                    }
+        else:
+            self._crowd_since = None
+
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Suspicious Behavior Detector
+# ---------------------------------------------------------------------------
+
+class SuspiciousBehaviorDetector:
+    """
+    Detects suspicious behavior via erratic movement: a person who repeatedly
+    reverses horizontal direction (pacing / casing an area) within a coarse
+    grid cell. Distinct from loitering (slow drift) and dwell (stationary).
+
+    Emits 'suspicious_behavior' (canonical backend type).
+    """
+
+    HISTORY_LEN      = 20    # rolling window of centre-x positions per cell
+    MIN_REVERSALS    = 4     # direction changes within the window to flag
+    MIN_AMPLITUDE    = 0.04  # each swing must span at least this (normalised)
+
+    def __init__(self, camera_id: str, cooldown_sec: int = 60):
+        self.camera_id = camera_id
+        self._cooldown = max(cooldown_sec, 60)
+        self._tracks: dict[str, collections.deque] = {}
+        self._last_event: dict[str, float] = {}
+
+    def _cell(self, p) -> str:
+        cx = int(min(p.x + p.w / 2, 0.999) * 4)
+        cy = int(min(p.y + p.h / 2, 0.999) * 4)
+        return f"{cx}_{cy}"
+
+    def analyse(self, persons: list, frame: np.ndarray) -> Optional[dict]:
+        now = time.time()
+        seen: set[str] = set()
+
+        for p in persons:
+            cell = self._cell(p)
+            seen.add(cell)
+            cx = p.x + p.w / 2
+            dq = self._tracks.setdefault(cell, collections.deque(maxlen=self.HISTORY_LEN))
+            dq.append(cx)
+
+            if len(dq) < self.HISTORY_LEN:
+                continue
+
+            reversals = self._count_reversals(list(dq))
+            if reversals >= self.MIN_REVERSALS:
+                last = self._last_event.get(cell, 0)
+                if now - last >= self._cooldown:
+                    self._last_event[cell] = now
+                    small = cv2.resize(frame, (320, 180))
+                    _, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 60])
+                    snap = base64.b64encode(buf.tobytes()).decode()
+                    return {
+                        "camera_id": self.camera_id,
+                        "event_type": "suspicious_behavior",
+                        "severity": "medium",
+                        "confidence": round(min(0.5 + 0.1 * reversals, 0.95), 3),
+                        "snapshot_b64": snap,
+                        "metadata": {
+                            "timestamp": int(now * 1000),
+                            "direction_reversals": reversals,
+                            "bounding_boxes": [p.to_dict()],
+                        },
+                    }
+
+        # Drop tracks for cells with no person this frame
+        for cell in list(self._tracks.keys()):
+            if cell not in seen:
+                del self._tracks[cell]
+                self._last_event.pop(cell, None)
+
+        return None
+
+    def _count_reversals(self, xs: list) -> int:
+        """Count significant horizontal direction changes in a position series."""
+        reversals = 0
+        direction = 0          # -1 left, +1 right, 0 unknown
+        anchor = xs[0]
+        for x in xs[1:]:
+            delta = x - anchor
+            if abs(delta) < self.MIN_AMPLITUDE:
+                continue
+            new_dir = 1 if delta > 0 else -1
+            if direction != 0 and new_dir != direction:
+                reversals += 1
+            direction = new_dir
+            anchor = x
+        return reversals
+
+
+# ---------------------------------------------------------------------------
 # Detection Analyzer (orchestrates all sub-detectors)
 # ---------------------------------------------------------------------------
 
@@ -194,19 +338,23 @@ class DetectionAnalyzer:
     Orchestrates per-frame detection results and decides when to emit events.
 
     Events emitted (canonical backend types):
-      shoplifting        – person near high-value item for >2s
-      restricted_zone    – person stationary in sensitive zone for >30s
-      inventory_movement – no shelf item for >60s
-      fall_detected      – aspect-ratio transition standing→fallen
-      loitering          – person in zone >90s while still moving
+      shoplifting         – person near high-value item for >2s
+      restricted_zone     – person stationary in sensitive zone for >30s
+      inventory_movement  – no shelf item for >60s
+      fall_detected       – aspect-ratio transition standing→fallen
+      loitering           – person in zone >90s while still moving
+      crowding            – person count >= threshold sustained for >5s
+      suspicious_behavior – person pacing / reversing direction in a zone
     """
 
     _SEVERITY_MAP = {
-        "shoplifting":        "high",
-        "restricted_zone":    "medium",
-        "inventory_movement": "medium",
-        "fall_detected":      "high",
-        "loitering":          "low",
+        "shoplifting":         "high",
+        "restricted_zone":     "medium",
+        "inventory_movement":  "medium",
+        "fall_detected":       "high",
+        "loitering":           "low",
+        "crowding":            "medium",
+        "suspicious_behavior": "medium",
     }
 
     def __init__(self, camera_id: str, cooldown_sec: int = 30, fps: float = 5.0):
@@ -220,6 +368,8 @@ class DetectionAnalyzer:
 
         self._fall_detector = FallDetector(camera_id, cooldown_sec)
         self._loiter_detector = LoiteringDetector(camera_id, cooldown_sec)
+        self._crowd_detector = CrowdDetector(camera_id, cooldown_sec)
+        self._suspicious_detector = SuspiciousBehaviorDetector(camera_id, cooldown_sec)
 
     def _can_emit(self, event_type: str) -> bool:
         last = self._last_event.get(event_type, 0)
@@ -314,6 +464,16 @@ class DetectionAnalyzer:
         loiter_evt = self._loiter_detector.analyse(persons, frame)
         if loiter_evt:
             events.append(loiter_evt)
+
+        # 6. Crowding
+        crowd_evt = self._crowd_detector.analyse(persons, frame)
+        if crowd_evt:
+            events.append(crowd_evt)
+
+        # 7. Suspicious behavior (pacing / direction reversals)
+        suspicious_evt = self._suspicious_detector.analyse(persons, frame)
+        if suspicious_evt:
+            events.append(suspicious_evt)
 
         return events
 

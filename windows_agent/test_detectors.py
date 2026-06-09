@@ -76,7 +76,14 @@ _api_stub.VantagApiClient = _FakeApi
 sys.modules["agent.api_client"] = _api_stub
 
 # Now import the real detectors
-from agent.camera_worker import FallDetector, LoiteringDetector, DetectionAnalyzer
+from agent.camera_worker import (
+    FallDetector,
+    LoiteringDetector,
+    CrowdDetector,
+    SuspiciousBehaviorDetector,
+    DetectionAnalyzer,
+)
+import collections
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 BLANK_FRAME = np.zeros((180, 320, 3), dtype=np.uint8)
@@ -448,6 +455,196 @@ test_shoplifting_jitter_safe()
 test_shoplifting_slow_walk_fires()
 test_shoplifting_brisk_walk_fires()
 test_shoplifting_different_items_independent()
+
+
+# =============================================================================
+# 5. Restricted Zone (via DetectionAnalyzer dwell-frame counter)
+#    Fires when a person stays in the same coarse cell for >30s worth of frames.
+# =============================================================================
+print("\n--- Restricted Zone (DetectionAnalyzer) ---")
+
+def _dwell_key(da):
+    """Return the single 'dwell_' key the analyzer created (float-rounding safe)."""
+    return next((k for k in da._person_frame_counts if k.startswith("dwell_")), None)
+
+def test_restricted_zone_fires_after_frame_threshold():
+    da = DetectionAnalyzer("cam1", cooldown_sec=1, fps=5.0)
+    p = _person(x=0.30, y=0.30, w=0.10, h=0.15, confidence=0.70)
+    da.analyse([p], BLANK_FRAME)             # creates the dwell key (count=1)
+    key = _dwell_key(da)
+    da._person_frame_counts[key] = int(30 * da.fps) - 1   # one short of threshold
+    events = da.analyse([p], BLANK_FRAME)    # count hits threshold → fires
+    types_seen = {e["event_type"] for e in events}
+    check("restricted_zone fires after >30s stationary presence",
+          "restricted_zone" in types_seen,
+          f"events={types_seen}")
+
+def test_restricted_zone_no_fire_below_threshold():
+    da = DetectionAnalyzer("cam1", cooldown_sec=1, fps=5.0)
+    p = _person(x=0.30, y=0.30, w=0.10, h=0.15, confidence=0.70)
+    da.analyse([p], BLANK_FRAME)
+    key = _dwell_key(da)
+    da._person_frame_counts[key] = 5         # well below 150
+    events = da.analyse([p], BLANK_FRAME)
+    types_seen = {e["event_type"] for e in events}
+    check("no restricted_zone below frame threshold",
+          "restricted_zone" not in types_seen,
+          f"events={types_seen}")
+
+def test_restricted_zone_counter_resets_after_fire():
+    da = DetectionAnalyzer("cam1", cooldown_sec=1, fps=5.0)
+    p = _person(x=0.30, y=0.30, w=0.10, h=0.15, confidence=0.70)
+    da.analyse([p], BLANK_FRAME)
+    key = _dwell_key(da)
+    da._person_frame_counts[key] = int(30 * da.fps) - 1
+    da.analyse([p], BLANK_FRAME)             # fires, then resets counter
+    check("restricted_zone frame counter resets to 0 after firing",
+          da._person_frame_counts.get(key) == 0,
+          f"count={da._person_frame_counts.get(key)}")
+
+def test_restricted_zone_severity_medium():
+    da = DetectionAnalyzer("cam1", cooldown_sec=1, fps=5.0)
+    # confidence 0.70 < 0.85 → severity stays 'medium' (not auto-promoted)
+    p = _person(x=0.30, y=0.30, w=0.10, h=0.15, confidence=0.70)
+    da.analyse([p], BLANK_FRAME)
+    key = _dwell_key(da)
+    da._person_frame_counts[key] = int(30 * da.fps) - 1
+    events = da.analyse([p], BLANK_FRAME)
+    evt = next((e for e in events if e["event_type"] == "restricted_zone"), None)
+    check("restricted_zone severity=medium",
+          evt is not None and evt.get("severity") == "medium",
+          f"severity={evt.get('severity') if evt else 'None'}")
+
+test_restricted_zone_fires_after_frame_threshold()
+test_restricted_zone_no_fire_below_threshold()
+test_restricted_zone_counter_resets_after_fire()
+test_restricted_zone_severity_medium()
+
+
+# =============================================================================
+# 6. CrowdDetector
+#    Fires when person count >= threshold sustained for SUSTAIN_SEC.
+# =============================================================================
+print("\n--- CrowdDetector ---")
+
+def _persons(n):
+    # Spread persons across the frame; only the count matters to CrowdDetector.
+    return [_person(x=min(0.05 * i, 0.9), y=0.4, w=0.05, h=0.15) for i in range(n)]
+
+def test_crowd_no_fire_below_count():
+    cd = CrowdDetector("cam1", cooldown_sec=1)   # cooldown forced to >=60
+    evt = None
+    for _ in range(20):
+        evt = cd.analyse(_persons(4), BLANK_FRAME)   # 4 < MIN_PERSONS(5)
+    check("no crowding when count below threshold", evt is None, f"got {evt}")
+
+def test_crowd_no_fire_before_sustain():
+    cd = CrowdDetector("cam1", cooldown_sec=1)
+    evt1 = cd.analyse(_persons(6), BLANK_FRAME)   # sets crowd_since=now
+    evt2 = cd.analyse(_persons(6), BLANK_FRAME)   # now-crowd_since ~0 < 5s
+    check("no crowding before sustain window elapses",
+          evt1 is None and evt2 is None,
+          f"evt1={evt1}, evt2={evt2}")
+
+def test_crowd_fires_after_sustain():
+    cd = CrowdDetector("cam1", cooldown_sec=1)
+    cd._crowd_since = time.time() - 6.0           # backdate past SUSTAIN_SEC(5)
+    evt = cd.analyse(_persons(6), BLANK_FRAME)
+    check("crowding fires after sustained over-threshold count",
+          evt is not None and evt["event_type"] == "crowding",
+          f"got {evt}")
+
+def test_crowd_severity_scales_with_count():
+    cd = CrowdDetector("cam1", cooldown_sec=1)
+    cd._crowd_since = time.time() - 6.0
+    evt = cd.analyse(_persons(10), BLANK_FRAME)    # 10 >= MIN_PERSONS*2 → high
+    check("crowding severity=high when count >= 2x threshold",
+          evt is not None and evt.get("severity") == "high",
+          f"severity={evt.get('severity') if evt else 'None'}")
+
+def test_crowd_resets_when_count_drops():
+    cd = CrowdDetector("cam1", cooldown_sec=1)
+    cd._crowd_since = time.time() - 3.0
+    cd.analyse(_persons(3), BLANK_FRAME)           # below threshold → reset
+    check("crowd timer resets when count drops below threshold",
+          cd._crowd_since is None,
+          f"crowd_since={cd._crowd_since}")
+
+test_crowd_no_fire_below_count()
+test_crowd_no_fire_before_sustain()
+test_crowd_fires_after_sustain()
+test_crowd_severity_scales_with_count()
+test_crowd_resets_when_count_drops()
+
+
+# =============================================================================
+# 7. SuspiciousBehaviorDetector
+#    Fires on repeated horizontal direction reversals (pacing / casing) within
+#    a single grid cell, once the per-cell history window is full.
+# =============================================================================
+print("\n--- SuspiciousBehaviorDetector ---")
+
+def _pacing_person(high: bool):
+    # Oscillate centre-x between 0.55 and 0.70 (swing 0.15 >> MIN_AMPLITUDE 0.04).
+    # Both centres map to grid cell x=int(cx*4)=2; cy fixed at cell 2 → "2_2".
+    cx = 0.70 if high else 0.55
+    return _person(x=cx - 0.05, y=0.50, w=0.10, h=0.20)
+
+def test_suspicious_no_fire_straight_walk():
+    sd = SuspiciousBehaviorDetector("cam1", cooldown_sec=1)
+    evt = None
+    # Monotonic drift within one cell (0.55→0.70): direction never reverses.
+    for i in range(25):
+        cx = 0.55 + i * (0.006)              # stays < 0.70 → cell "2_2"
+        p = _person(x=cx - 0.05, y=0.50, w=0.10, h=0.20)
+        evt = sd.analyse([p], BLANK_FRAME)
+    check("no suspicious_behavior for straight/monotonic movement",
+          evt is None, f"got {evt}")
+
+def test_suspicious_fires_on_pacing():
+    sd = SuspiciousBehaviorDetector("cam1", cooldown_sec=1)
+    events = []
+    for i in range(22):
+        events.append(sd.analyse([_pacing_person(i % 2 == 0)], BLANK_FRAME))
+    evt = next((e for e in events if e is not None), None)
+    check("suspicious_behavior fires on repeated direction reversals (pacing)",
+          evt is not None and evt["event_type"] == "suspicious_behavior",
+          f"got {evt}")
+
+def test_suspicious_severity_medium():
+    sd = SuspiciousBehaviorDetector("cam1", cooldown_sec=1)
+    events = []
+    for i in range(22):
+        events.append(sd.analyse([_pacing_person(i % 2 == 0)], BLANK_FRAME))
+    evt = next((e for e in events if e is not None), None)
+    check("suspicious_behavior severity=medium",
+          evt is not None and evt.get("severity") == "medium",
+          f"severity={evt.get('severity') if evt else 'None'}")
+
+def test_suspicious_track_cleared_on_exit():
+    sd = SuspiciousBehaviorDetector("cam1", cooldown_sec=1)
+    sd._tracks["2_2"] = collections.deque([0.5] * 20, maxlen=20)
+    sd._last_event["2_2"] = time.time()
+    sd.analyse([], BLANK_FRAME)              # nobody in frame → drop the track
+    check("suspicious track cleared when person leaves frame",
+          "2_2" not in sd._tracks and "2_2" not in sd._last_event,
+          f"tracks={list(sd._tracks.keys())}")
+
+def test_analyzer_suspicious_integration():
+    da = DetectionAnalyzer("cam1", cooldown_sec=1, fps=5.0)
+    events = []
+    for i in range(22):
+        events += da.analyse([_pacing_person(i % 2 == 0)], BLANK_FRAME)
+    types_seen = {e["event_type"] for e in events}
+    check("suspicious_behavior emitted through DetectionAnalyzer",
+          "suspicious_behavior" in types_seen,
+          f"events={types_seen}")
+
+test_suspicious_no_fire_straight_walk()
+test_suspicious_fires_on_pacing()
+test_suspicious_severity_medium()
+test_suspicious_track_cleared_on_exit()
+test_analyzer_suspicious_integration()
 
 
 # =============================================================================
