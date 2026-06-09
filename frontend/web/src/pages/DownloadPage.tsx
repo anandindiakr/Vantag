@@ -17,7 +17,14 @@ const CodeBlock: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 export default function DownloadPage() {
-  const apiKey = localStorage.getItem('vantag_tenant_id') || 'YOUR_TENANT_ID';
+  // Tenant is persisted by Login/Register as a JSON object under 'vantag_tenant'.
+  const apiKey = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('vantag_tenant') || '{}').id || 'YOUR_TENANT_ID';
+    } catch {
+      return 'YOUR_TENANT_ID';
+    }
+  })();
   const apiUrl = window.location.origin;
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
