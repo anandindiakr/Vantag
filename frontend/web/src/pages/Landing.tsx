@@ -854,7 +854,7 @@ export default function Landing() {
             </div>
 
             {/* Links */}
-            <div className="flex gap-16 text-sm">
+            <div className="flex flex-wrap gap-12 text-sm">
               <div className="space-y-3">
                 <div className="font-mono-alt text-[10px] tracking-widest text-white/25 uppercase mb-4">Product</div>
                 {['Features', 'Pricing', 'Download App', 'API Docs'].map(l => (
@@ -869,9 +869,45 @@ export default function Landing() {
               </div>
               <div className="space-y-3">
                 <div className="font-mono-alt text-[10px] tracking-widest text-white/25 uppercase mb-4">Company</div>
-                {['About', 'Privacy', 'Terms', 'Contact'].map(l => (
-                  <div key={l} className="text-white/40 hover:text-white/80 cursor-pointer transition-colors font-body-alt">{l}</div>
-                ))}
+                <Link to="/privacy" className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">Privacy Policy</Link>
+                <Link to="/terms" className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">Terms of Service</Link>
+                <Link to="/faq" className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">FAQ</Link>
+                <a href="mailto:support@retail-vantag.com" className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">Contact Us</a>
+              </div>
+              {/* ── Cross-region links ── */}
+              <div className="space-y-3">
+                <div className="font-mono-alt text-[10px] tracking-widest text-white/25 uppercase mb-4">Our Platforms</div>
+                <a
+                  href="https://retail-vantag.com"
+                  target="_blank" rel="noopener noreferrer"
+                  className={`flex items-center gap-2 font-body-alt transition-colors ${region.code === 'SG' ? 'text-cyan-400 font-semibold' : 'text-white/40 hover:text-white/80'}`}
+                >
+                  🇸🇬 <span>Vantag</span>
+                  <span className="font-mono-alt text-[10px] text-white/20">Singapore</span>
+                </a>
+                <a
+                  href="https://retailnazar.com"
+                  target="_blank" rel="noopener noreferrer"
+                  className={`flex items-center gap-2 font-body-alt transition-colors ${region.code === 'IN' ? 'text-cyan-400 font-semibold' : 'text-white/40 hover:text-white/80'}`}
+                >
+                  🇮🇳 <span>Retail Nazar</span>
+                  <span className="font-mono-alt text-[10px] text-white/20">India</span>
+                </a>
+                <a
+                  href="https://jagajaga.my"
+                  target="_blank" rel="noopener noreferrer"
+                  className={`flex items-center gap-2 font-body-alt transition-colors ${region.code === 'MY' ? 'text-cyan-400 font-semibold' : 'text-white/40 hover:text-white/80'}`}
+                >
+                  🇲🇾 <span>JagaJaga</span>
+                  <span className="font-mono-alt text-[10px] text-white/20">Malaysia</span>
+                </a>
+                <a
+                  href="https://retailnazar.in"
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-2 font-body-alt text-white/25 hover:text-white/60 transition-colors"
+                >
+                  🇮🇳 <span className="text-[11px]">retailnazar.in</span>
+                </a>
               </div>
             </div>
           </div>
