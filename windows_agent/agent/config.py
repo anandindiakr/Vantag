@@ -22,6 +22,9 @@ class CameraConfig:
     enabled: bool = True
     width: int = 1280
     height: int = 720
+    # Per-camera detection confidence threshold (0.25–0.85). When None the
+    # agent falls back to the global AgentConfig.confidence_threshold.
+    confidence: Optional[float] = None
 
 
 @dataclass

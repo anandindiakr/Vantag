@@ -26,6 +26,7 @@ export interface Camera {
   fps: number;
   resolution: string;
   zones: Zone[];
+  confidenceThreshold: number;
 }
 
 export interface Zone {

@@ -37,7 +37,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import CameraResponse, CameraStatus, ZonePolygon, ZoneUpdateRequest
+from .models import CameraResponse, CameraStatus, ZonePolygon, ZoneUpdateRequest, SensitivityUpdateRequest
 from ..middleware.tenant_middleware import get_current_user_id
 from ..db.database import get_session
 from ..db.models.camera import CameraConfig
@@ -198,6 +198,13 @@ def _db_camera_to_response(row) -> CameraResponse:  # noqa: ANN001
     except Exception:  # noqa: BLE001
         rtsp = None
 
+    try:
+        _cfg = dict(getattr(row, "analyzer_config", None) or {})
+        _conf = float(_cfg.get("confidence_threshold", 0.5))
+    except (TypeError, ValueError):
+        _conf = 0.5
+    _conf = max(0.1, min(0.95, _conf))
+
     return CameraResponse(
         camera_id=row.camera_id,
         name=row.name or row.camera_id,
@@ -213,6 +220,7 @@ def _db_camera_to_response(row) -> CameraResponse:  # noqa: ANN001
         consecutive_failures=0,
         last_checked_at=getattr(row, "last_connected_at", None),
         zones=[],
+        confidence_threshold=_conf,
     )
 
 
@@ -432,6 +440,60 @@ async def update_zones(
     resp = _db_camera_to_response(row)
     resp.zones = [ZonePolygon(name=z["name"], points=z["points"]) for z in zones_payload]
     return resp
+
+
+# ---------------------------------------------------------------------------
+# PATCH /api/cameras/{camera_id}/sensitivity
+# ---------------------------------------------------------------------------
+
+
+@router.patch(
+    "/{camera_id}/sensitivity",
+    response_model=CameraResponse,
+    summary="Update detection sensitivity (confidence threshold)",
+)
+async def update_sensitivity(
+    camera_id: str,
+    body: SensitivityUpdateRequest,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> CameraResponse:
+    """
+    Set the per-camera detection confidence threshold.
+
+    Persisted to the camera's ``analyzer_config`` JSON so the Edge Agent
+    receives it on its next config sync (~5 s) and restarts that camera's
+    worker with the new threshold. Lower threshold = more sensitive (more
+    detections/alerts); higher = fewer false alarms.
+    """
+    row = await _get_db_camera(session, user.get("tenant_id"), camera_id)
+
+    try:
+        cfg = dict(getattr(row, "analyzer_config", None) or {})
+        cfg["confidence_threshold"] = round(float(body.confidence_threshold), 3)
+        row.analyzer_config = cfg
+        await session.commit()
+    except Exception as exc:  # noqa: BLE001
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save sensitivity: {exc}",
+        ) from exc
+
+    # Best-effort in-memory apply for on-box deployments.
+    if _pipeline is not None:
+        try:
+            cam = _pipeline.registry.get_camera(camera_id)
+            cam.analyzer_config = dict(getattr(cam, "analyzer_config", None) or {})
+            cam.analyzer_config["confidence_threshold"] = cfg["confidence_threshold"]
+        except Exception:  # noqa: BLE001
+            pass
+
+    logger.info(
+        "Sensitivity updated | camera_id=%s confidence=%.3f",
+        camera_id, cfg["confidence_threshold"],
+    )
+    return _db_camera_to_response(row)
 
 
 # ---------------------------------------------------------------------------

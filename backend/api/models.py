@@ -193,6 +193,23 @@ class CameraResponse(BaseModel):
     consecutive_failures: int = Field(0, description="Number of consecutive health-check failures.")
     last_checked_at: Optional[datetime] = None
     zones: List[ZonePolygon] = Field(default_factory=list)
+    confidence_threshold: float = Field(
+        0.5,
+        ge=0.1,
+        le=0.95,
+        description="Per-camera detection confidence threshold. Lower = more sensitive (more alerts).",
+    )
+
+
+class SensitivityUpdateRequest(BaseModel):
+    """Payload for updating a camera's detection confidence threshold."""
+
+    confidence_threshold: float = Field(
+        ...,
+        ge=0.1,
+        le=0.95,
+        description="Detection confidence threshold. Lower = more sensitive / more alerts; higher = fewer false alarms.",
+    )
 
 
 class ZoneUpdateRequest(BaseModel):

@@ -520,6 +520,7 @@ async def get_config(
                 "name": c.name,
                 "location": c.location,
                 "fps_target": c.fps_target,
+                "confidence_threshold": (c.analyzer_config or {}).get("confidence_threshold"),
             }
             for c in cameras
         ]
@@ -860,6 +861,7 @@ async def download_agent(
                 "name": c.name,
                 "rtsp_url": (c.get_rtsp_url() if hasattr(c, "get_rtsp_url") else None) or "",
                 "location": getattr(c, "location", "") or "",
+                "confidence": (getattr(c, "analyzer_config", None) or {}).get("confidence_threshold"),
             }
             for c in cams
         ],

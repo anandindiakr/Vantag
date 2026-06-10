@@ -8,11 +8,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, Wifi, WifiOff, Plus, Trash2, TestTube2,
   Loader2, CheckCircle2, XCircle, ArrowLeft, Network, Sparkles,
-  MessageCircle,
+  MessageCircle, SlidersHorizontal,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useQueryClient } from '@tanstack/react-query';
-import { api, useCameras, queryKeys } from '../hooks/useApi';
+import { api, useCameras, queryKeys, useUpdateCameraSensitivity } from '../hooks/useApi';
+import type { Camera as CameraModel } from '../store/useVantagStore';
 import toast from 'react-hot-toast';
 import InfoTooltip from '../components/InfoTooltip';
 
@@ -894,52 +895,125 @@ function CameraListSection() {
       ) : (
         <div className="space-y-2">
           {cameras.map((cam) => (
-            <motion.div
+            <CameraRow
               key={cam.id}
-              layout
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 8 }}
-              className="flex items-center justify-between gap-4 px-4 py-3 bg-white/3 border border-white/8 rounded-xl hover:border-white/15 transition-colors"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                {cam.online ? (
-                  <Wifi className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                ) : (
-                  <WifiOff className="w-4 h-4 text-white/20 flex-shrink-0" />
-                )}
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">{cam.name}</p>
-                  <p className="text-xs text-white/40 truncate">{cam.location} · {cam.resolution}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <span
-                  className={clsx(
-                    'text-xs font-bold px-2 py-0.5 rounded-full',
-                    cam.online
-                      ? 'bg-emerald-500/15 text-emerald-400'
-                      : 'bg-white/5 text-white/30',
-                  )}
-                >
-                  {cam.online ? 'ONLINE' : 'OFFLINE'}
-                </span>
-                <button
-                  onClick={() => handleDelete(cam.id, cam.name)}
-                  disabled={deletingId === cam.id}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 disabled:opacity-40 rounded-lg text-xs font-medium text-red-400 transition-all"
-                >
-                  {deletingId === cam.id
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <Trash2 className="w-3.5 h-3.5" />}
-                  Delete
-                </button>
-              </div>
-            </motion.div>
+              cam={cam}
+              deleting={deletingId === cam.id}
+              onDelete={() => handleDelete(cam.id, cam.name)}
+            />
           ))}
         </div>
       )}
     </SectionCard>
+  );
+}
+
+// ─── Single camera row with per-camera sensitivity slider ─────────────────────
+
+function sensitivityLabel(t: number): string {
+  if (t <= 0.4) return 'High catch-rate (more alerts)';
+  if (t >= 0.7) return 'Low false-alarms (fewer alerts)';
+  return 'Balanced';
+}
+
+function CameraRow({
+  cam,
+  deleting,
+  onDelete,
+}: {
+  cam: CameraModel;
+  deleting: boolean;
+  onDelete: () => void;
+}) {
+  const updateSensitivity = useUpdateCameraSensitivity();
+  const [threshold, setThreshold] = useState<number>(cam.confidenceThreshold ?? 0.5);
+
+  // Keep local slider in sync if the server value changes (e.g. refetch).
+  useEffect(() => {
+    setThreshold(cam.confidenceThreshold ?? 0.5);
+  }, [cam.confidenceThreshold]);
+
+  // Debounced PATCH so we don't fire on every pixel of slider drag.
+  const commit = (value: number) => {
+    updateSensitivity.mutate(
+      { cameraId: cam.id, threshold: value },
+      {
+        onSuccess: () => toast.success(`Sensitivity saved for "${cam.name}".`),
+        onError: (err) => toast.error((err as Error).message ?? 'Failed to save sensitivity.'),
+      },
+    );
+  };
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 8 }}
+      className="flex flex-col gap-3 px-4 py-3 bg-white/3 border border-white/8 rounded-xl hover:border-white/15 transition-colors"
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          {cam.online ? (
+            <Wifi className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          ) : (
+            <WifiOff className="w-4 h-4 text-white/20 flex-shrink-0" />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-white truncate">{cam.name}</p>
+            <p className="text-xs text-white/40 truncate">{cam.location} · {cam.resolution}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span
+            className={clsx(
+              'text-xs font-bold px-2 py-0.5 rounded-full',
+              cam.online
+                ? 'bg-emerald-500/15 text-emerald-400'
+                : 'bg-white/5 text-white/30',
+            )}
+          >
+            {cam.online ? 'ONLINE' : 'OFFLINE'}
+          </span>
+          <button
+            onClick={onDelete}
+            disabled={deleting}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 disabled:opacity-40 rounded-lg text-xs font-medium text-red-400 transition-all"
+          >
+            {deleting
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <Trash2 className="w-3.5 h-3.5" />}
+            Delete
+          </button>
+        </div>
+      </div>
+
+      {/* Per-camera detection sensitivity */}
+      <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+        <SlidersHorizontal className="w-3.5 h-3.5 text-white/30 flex-shrink-0" />
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <span className="text-xs font-medium text-white/50">Sensitivity</span>
+          <InfoTooltip text="Detection confidence threshold. Lower = catches more events but more false alarms. Higher = fewer false alarms but may miss subtle events. Applied to this camera's AI on the next sync." />
+        </div>
+        <input
+          type="range"
+          min={0.25}
+          max={0.85}
+          step={0.05}
+          value={threshold}
+          onChange={(e) => setThreshold(Number(e.target.value))}
+          onPointerUp={() => commit(threshold)}
+          onKeyUp={() => commit(threshold)}
+          className="flex-1 accent-emerald-400 cursor-pointer"
+        />
+        <span className="text-xs font-mono text-white/60 w-10 text-right">
+          {Math.round(threshold * 100)}%
+        </span>
+        <span className="text-[10px] text-white/30 w-40 text-right hidden sm:inline">
+          {updateSensitivity.isPending ? 'Saving…' : sensitivityLabel(threshold)}
+        </span>
+      </div>
+    </motion.div>
   );
 }
 

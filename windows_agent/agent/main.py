@@ -87,6 +87,14 @@ def _on_event(event: dict):
 
 def _map_remote_camera(c: dict) -> CameraConfig:
     """Map a backend camera dict (camera_id/resolution_width/...) to the agent's CameraConfig."""
+    analyzer = c.get("analyzer_config") or {}
+    conf = c.get("confidence_threshold")
+    if conf is None:
+        conf = analyzer.get("confidence_threshold")
+    try:
+        conf = float(conf) if conf is not None else None
+    except (TypeError, ValueError):
+        conf = None
     return CameraConfig(
         id=c.get("camera_id") or c.get("id") or "",
         name=c.get("name") or c.get("camera_id") or "Camera",
@@ -95,7 +103,17 @@ def _map_remote_camera(c: dict) -> CameraConfig:
         enabled=c.get("enabled", True),
         width=c.get("resolution_width") or c.get("width") or 1280,
         height=c.get("resolution_height") or c.get("height") or 720,
+        confidence=conf,
     )
+
+
+def _cam_conf(cam) -> float:
+    """Resolve the effective confidence threshold for a camera."""
+    val = getattr(cam, "confidence", None)
+    if val is None:
+        return _config.confidence_threshold
+    # Clamp to a sane operating range.
+    return max(0.1, min(0.95, float(val)))
 
 
 def _build_worker(cam):
@@ -103,7 +121,7 @@ def _build_worker(cam):
         config=cam,
         inference=_inference,
         api_client=_api,
-        conf_threshold=_config.confidence_threshold,
+        conf_threshold=_cam_conf(cam),
         target_fps=_config.inference_fps,
         event_cooldown_sec=_config.event_cooldown_sec,
         on_event=_on_event,
@@ -138,9 +156,14 @@ def reconcile_cameras():
     }
     running = {w.config.id: w for w in _workers}
 
-    # Stop workers whose camera was removed/disabled or whose stream changed.
+    # Stop workers whose camera was removed/disabled or whose stream/sensitivity changed.
     for cam_id, w in list(running.items()):
-        if cam_id not in desired or desired[cam_id].rtsp_url != w.config.rtsp_url:
+        changed = (
+            cam_id not in desired
+            or desired[cam_id].rtsp_url != w.config.rtsp_url
+            or _cam_conf(desired[cam_id]) != getattr(w, "_conf", None)
+        )
+        if changed:
             log.info(f"Stopping worker for camera {cam_id} (removed/changed)")
             try:
                 w.stop()
@@ -198,7 +221,7 @@ def start_monitoring():
             config=cam,
             inference=_inference,
             api_client=_api,
-            conf_threshold=_config.confidence_threshold,
+            conf_threshold=_cam_conf(cam),
             target_fps=_config.inference_fps,
             event_cooldown_sec=_config.event_cooldown_sec,
             on_event=_on_event,

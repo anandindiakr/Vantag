@@ -74,6 +74,7 @@ const normCamera = (r: any): Camera => ({
                 ? `${r.resolution_width}x${r.resolution_height}`
                 : (r.resolution ?? '1920x1080'),
   zones:      r.zones      ?? [],
+  confidenceThreshold: r.confidence_threshold ?? 0.5,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -370,6 +371,24 @@ export function useCameras(storeId?: string): UseQueryResult<Camera[]> {
 }
 
 // ─── Mutation Hooks ───────────────────────────────────────────────────────────
+
+export function useUpdateCameraSensitivity(): UseMutationResult<
+  void,
+  Error,
+  { cameraId: string; threshold: number }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ cameraId, threshold }) => {
+      await api.patch(`/cameras/${cameraId}/sensitivity`, {
+        confidence_threshold: threshold,
+      });
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.cameras });
+    },
+  });
+}
 
 interface AddWatchlistPayload {
   name: string;
