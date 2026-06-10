@@ -195,19 +195,39 @@ async def list_stores(
     response_model=StoreResponse,
     summary="Get store detail",
 )
-async def get_store(store_id: str) -> StoreResponse:
-    """Return detail for a single store."""
-    pipeline = _get_pipeline()
-    risk_data = pipeline.risk_scores.get(store_id)
+async def get_store(
+    store_id: str,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> StoreResponse:
+    """Return detail for a single store, derived from the tenant camera table."""
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
 
     try:
-        cameras = [
-            cam
-            for cam in pipeline.registry.all_cameras()
-            if _camera_store_id(cam) == store_id
-        ]
+        rows = (
+            await session.execute(
+                select(CameraConfig).where(CameraConfig.tenant_id == tenant_id)
+            )
+        ).scalars().all()
     except Exception:  # noqa: BLE001
-        cameras = []
+        rows = []
+
+    cameras = []
+    for cam in rows:
+        location = cam.location or ""
+        prefix = location.split("\u2013")[0].split("-")[0].strip() if location else ""
+        cam_store_id = (prefix or "auto-detected").lower().replace(" ", "_")
+        if cam_store_id == store_id:
+            cameras.append(cam)
+
+    # Live risk/events only exist when an on-box pipeline is running.
+    risk_data = None
+    recent_events: dict = {}
+    if _pipeline is not None:
+        risk_data = getattr(_pipeline, "risk_scores", {}).get(store_id)
+        recent_events = getattr(_pipeline, "recent_events", {}) or {}
 
     if risk_data is None and not cameras:
         raise HTTPException(
@@ -216,17 +236,23 @@ async def get_store(store_id: str) -> StoreResponse:
         )
 
     score = float((risk_data or {}).get("score", 0.0))
-    health_status = pipeline.health_monitor.get_status() if pipeline.health_monitor else {}
     active = sum(
-        1 for cam in cameras if health_status.get(cam.id, {}).get("healthy", False)
+        1 for cam in cameras if (getattr(cam, "conn_status", "") or "").lower() == "online"
     )
-    last_events = pipeline.recent_events.get(store_id, [])
-    last_event_at = last_events[-1].get("timestamp") if last_events else None
+    location_label = next(
+        (c.location for c in cameras if getattr(c, "location", None)),
+        store_id.replace("_", " ").title(),
+    )
+    last_events = recent_events.get(store_id, [])
+    last_event_at = (
+        (last_events[-1].get("timestamp") or last_events[-1].get("occurred_at"))
+        if last_events else None
+    )
 
     return StoreResponse(
         store_id=store_id,
         name=_store_display_name(store_id),
-        location=_store_location(cameras),
+        location=location_label,
         camera_count=len(cameras),
         active_cameras=active,
         risk_score=round(score, 2),
@@ -247,7 +273,20 @@ async def get_store(store_id: str) -> StoreResponse:
 )
 async def get_risk(store_id: str) -> RiskScoreResponse:
     """Return the current risk score and event counts for a store."""
-    pipeline = _get_pipeline()
+    # Analytics (risk scoring) only exist when an on-box pipeline is running.
+    # On the multi-tenant SaaS backend there is no pipeline, so return a clean
+    # zero score rather than a 503.
+    if _pipeline is None:
+        return RiskScoreResponse(
+            store_id=store_id,
+            score=0.0,
+            severity=SeverityLevel.LOW,
+            event_counts={},
+            window_seconds=300,
+            computed_at=datetime.now(tz=timezone.utc),
+        )
+
+    pipeline = _pipeline
 
     # Validate store exists
     all_stores = _get_store_ids(pipeline)
@@ -300,7 +339,19 @@ async def get_heatmap(
     window: str = Query("hourly", description="Aggregation window: 'hourly' or 'daily'."),
 ) -> HeatmapResponse:
     """Return normalised heatmap grid data for a store."""
-    pipeline = _get_pipeline()
+    # Heatmaps are produced by the on-box pipeline. Return an empty grid on the
+    # SaaS backend instead of raising 503.
+    if _pipeline is None:
+        return HeatmapResponse(
+            store_id=store_id,
+            window=window,
+            grid_rows=10,
+            grid_cols=10,
+            cells=[],
+            generated_at=datetime.now(tz=timezone.utc),
+        )
+
+    pipeline = _pipeline
     heatmap_store = pipeline.heatmaps.get(store_id, {})
     raw_grid = heatmap_store.get(window, {})
 
@@ -353,7 +404,15 @@ async def list_incidents(
     event_type: Optional[str] = Query(None, description="Filter by event type (e.g. inventory_movement)."),
 ) -> IncidentListResponse:
     """Return a paginated list of incidents for a store, newest first."""
-    pipeline = _get_pipeline()
+    # Incident history is held in the on-box pipeline's in-memory buffer. On the
+    # SaaS backend there is none yet — return an empty page rather than 503.
+    if _pipeline is None:
+        return IncidentListResponse(
+            incidents=[],
+            pagination=PaginationMeta(page=page, limit=limit, total=0, pages=1),
+        )
+
+    pipeline = _pipeline
     all_incidents: List[dict] = list(
         reversed(pipeline.recent_events.get(store_id, []))
     )
@@ -411,7 +470,14 @@ async def list_incidents(
 )
 async def get_queue_status() -> QueueStatusResponse:
     """Return live queue depths for all checkout lanes in all stores."""
-    pipeline = _get_pipeline()
+    # Queue analytics come from the on-box pipeline. Empty list on SaaS.
+    if _pipeline is None:
+        return QueueStatusResponse(
+            lanes=[],
+            retrieved_at=datetime.now(tz=timezone.utc),
+        )
+
+    pipeline = _pipeline
     raw_queues: dict = getattr(pipeline, "queue_status", {})
 
     lanes: List[LaneQueueStatus] = []

@@ -293,22 +293,34 @@ async def list_discovered_cameras(
     response_model=CameraResponse,
     summary="Get camera detail and configuration",
 )
-async def get_camera(camera_id: str, user: dict = Depends(get_current_user_id)) -> CameraResponse:
+async def get_camera(
+    camera_id: str,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> CameraResponse:
     """Return full configuration and current health state for a single camera."""
-    pipeline = _get_pipeline()
-    try:
-        cam = pipeline.registry.get_camera(camera_id)
-    except KeyError:
+    row = await _get_db_camera(session, user.get("tenant_id"), camera_id)
+    return _db_camera_to_response(row)
+
+
+async def _get_db_camera(session: AsyncSession, tenant_id, camera_id: str):  # noqa: ANN001
+    """Fetch a tenant-scoped camera row or raise 404."""
+    if not tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found.")
+    row = (
+        await session.execute(
+            select(CameraConfig).where(
+                CameraConfig.tenant_id == tenant_id,
+                CameraConfig.camera_id == camera_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Camera '{camera_id}' not found.",
         )
-
-    health_status: dict = {}
-    if pipeline.health_monitor:
-        health_status = pipeline.health_monitor.get_status()
-
-    return _build_camera_response(cam, health_status.get(camera_id))
+    return row
 
 
 # ---------------------------------------------------------------------------
@@ -321,23 +333,29 @@ async def get_camera(camera_id: str, user: dict = Depends(get_current_user_id)) 
     summary="Get latest frame as JPEG",
     responses={200: {"content": {"image/jpeg": {}}}},
 )
-async def get_snapshot(camera_id: str, user: dict = Depends(get_current_user_id)) -> Response:
+async def get_snapshot(
+    camera_id: str,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
     """
     Return the most recent captured frame for a camera as a JPEG image.
 
     Responds with ``404`` if the camera does not exist and ``503`` if no
     frame is currently available (stream is offline or buffer is empty).
     """
-    pipeline = _get_pipeline()
+    # Verify camera exists for this tenant.
+    await _get_db_camera(session, user.get("tenant_id"), camera_id)
 
-    # Verify camera exists.
-    try:
-        pipeline.registry.get_camera(camera_id)
-    except KeyError:
+    # Live frames are only available when an on-box inference pipeline is
+    # running. For SaaS/edge deployments the camera streams on the agent, so
+    # there is no local frame -> report 503 (the UI shows an "offline" tile).
+    if _pipeline is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Camera '{camera_id}' not found.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"No frame available for camera '{camera_id}'. Stream may be offline.",
         )
+    pipeline = _pipeline
 
     # Prefer a cached annotated snapshot over a raw frame.
     cached: Optional[bytes] = pipeline.latest_snapshots.get(camera_id)
@@ -373,41 +391,47 @@ async def get_snapshot(camera_id: str, user: dict = Depends(get_current_user_id)
     response_model=CameraResponse,
     summary="Update zone polygon configuration",
 )
-async def update_zones(camera_id: str, body: ZoneUpdateRequest, user: dict = Depends(get_current_user_id)) -> CameraResponse:
+async def update_zones(
+    camera_id: str,
+    body: ZoneUpdateRequest,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> CameraResponse:
     """
     Replace the zone polygon configuration for a camera.
 
-    The updated zones are applied in-memory immediately and will be used by
-    all analyzers on the next processed frame.  To persist changes across
-    restarts, update ``cameras.yaml`` separately.
+    Persisted to the camera's ``analyzer_config`` JSON in the tenant DB so the
+    edge agent receives the zones on its next config sync. If an on-box
+    pipeline is running, the change is also applied in-memory immediately.
     """
-    pipeline = _get_pipeline()
+    row = await _get_db_camera(session, user.get("tenant_id"), camera_id)
+
+    zones_payload = [{"name": z.name, "points": z.points} for z in body.zones]
     try:
-        cam = pipeline.registry.get_camera(camera_id)
-    except KeyError:
+        cfg = dict(getattr(row, "analyzer_config", None) or {})
+        cfg["zones"] = zones_payload
+        row.analyzer_config = cfg
+        await session.commit()
+    except Exception as exc:  # noqa: BLE001
+        await session.rollback()
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Camera '{camera_id}' not found.",
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save zones: {exc}",
+        ) from exc
 
-    from ..ingestion.camera_registry import ZoneConfig
+    # Best-effort in-memory apply for on-box deployments.
+    if _pipeline is not None:
+        try:
+            from ..ingestion.camera_registry import ZoneConfig
+            cam = _pipeline.registry.get_camera(camera_id)
+            cam.zones = [ZoneConfig(name=z.name, points=z.points) for z in body.zones]
+        except Exception:  # noqa: BLE001
+            pass
 
-    new_zones = [
-        ZoneConfig(name=z.name, points=z.points)
-        for z in body.zones
-    ]
-    cam.zones = new_zones
-    logger.info(
-        "Zone config updated | camera_id=%s zones=%d",
-        camera_id,
-        len(new_zones),
-    )
-
-    health_status: dict = {}
-    if pipeline.health_monitor:
-        health_status = pipeline.health_monitor.get_status()
-
-    return _build_camera_response(cam, health_status.get(camera_id))
+    logger.info("Zone config updated | camera_id=%s zones=%d", camera_id, len(zones_payload))
+    resp = _db_camera_to_response(row)
+    resp.zones = [ZonePolygon(name=z["name"], points=z["points"]) for z in zones_payload]
+    return resp
 
 
 # ---------------------------------------------------------------------------
@@ -1125,41 +1149,54 @@ async def confirm_discovered_camera(
 
     cam_name = body.name or row.name or (row.brand or f"Camera {row.ip_address}")
 
-    # Register in the live pipeline (mirrors create_camera).
-    pipeline = _get_pipeline()
-    from ..ingestion.camera_registry import CameraConfig as RegCameraConfig, Resolution, ConfigError
-
-    reg_id = f"cam-{uuid.uuid4().hex[:8]}"
-    new_cam = RegCameraConfig(
-        id=reg_id,
-        name=cam_name,
-        rtsp_url=rtsp_url,
-        location=body.location,
-        resolution=Resolution(width=width, height=height),
-        fps_target=body.fps,
-        enabled=True,
-        low_light_mode=body.low_light_mode,
-        zones=[],
-        staff_zone_colors=[],
-        analyzer_config={},
-    )
-    try:
-        pipeline.registry.add_camera(new_cam)
-    except ConfigError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"Failed to register camera: {exc}") from exc
-
-    # Flip the DB row to confirmed/enabled and persist final details.
+    # Persist the confirmed camera to the tenant DB (single source of truth).
+    # The edge agent picks this up on its next config sync. Status stays
+    # "offline" until that agent heartbeats — the VPS cannot reach LAN cameras
+    # directly, so it must not claim "online" here.
     row.enabled = True
     row.name = cam_name
     row.location = body.location
-    row.conn_status = "online"
+    row.resolution_width = width
+    row.resolution_height = height
+    row.fps_target = body.fps
+    row.low_light_mode = body.low_light_mode
     row.set_rtsp_url(rtsp_url)
-    await session.commit()
+    try:
+        await session.commit()
+    except Exception as exc:  # noqa: BLE001
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to confirm camera: {exc}") from exc
+
+    # Best-effort register in the live pipeline for on-box deployments only.
+    if _pipeline is not None:
+        try:
+            from ..ingestion.camera_registry import (
+                CameraConfig as RegCameraConfig,
+                Resolution,
+            )
+
+            reg_id = f"cam-{uuid.uuid4().hex[:8]}"
+            new_cam = RegCameraConfig(
+                id=reg_id,
+                name=cam_name,
+                rtsp_url=rtsp_url,
+                location=body.location,
+                resolution=Resolution(width=width, height=height),
+                fps_target=body.fps,
+                enabled=True,
+                low_light_mode=body.low_light_mode,
+                zones=[],
+                staff_zone_colors=[],
+                analyzer_config={},
+            )
+            _pipeline.registry.add_camera(new_cam)
+            row.conn_status = "online"
+            await session.commit()
+        except Exception:  # noqa: BLE001
+            pass
 
     logger.info("Discovered camera confirmed | camera_id=%s name=%s", camera_id, cam_name)
-    return _build_camera_response(new_cam, None)
+    return _db_camera_to_response(row)
 
 
 # ---------------------------------------------------------------------------
