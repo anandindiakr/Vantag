@@ -671,6 +671,23 @@ _AGENT_PKG_DIR = _REPO_ROOT / "windows_agent"
 _RUN_BAT = """@echo off
 REM Vantag Edge Agent launcher (Windows)
 cd /d "%~dp0"
+if not exist "requirements.txt" (
+  echo.
+  echo ============================================================
+  echo   STOP - the files are still inside the ZIP.
+  echo.
+  echo   You double-clicked run.bat from inside the zip preview.
+  echo   Please do this instead:
+  echo     1^) Close this window
+  echo     2^) Find vantag-edge-agent-windows.zip in your Downloads
+  echo     3^) Right-click it and choose "Extract All..."
+  echo     4^) Open the EXTRACTED folder
+  echo     5^) Double-click run.bat there
+  echo ============================================================
+  echo.
+  pause
+  exit /b 1
+)
 where python >nul 2>nul || (echo Python 3.10+ is required. Install from python.org && pause && exit /b 1)
 if not exist .venv (python -m venv .venv)
 call .venv\\Scripts\\activate.bat
@@ -684,6 +701,11 @@ _RUN_SH = """#!/usr/bin/env bash
 # Vantag Edge Agent launcher (Linux/macOS)
 set -e
 cd "$(dirname "$0")"
+if [ ! -f requirements.txt ]; then
+  echo "ERROR: requirements.txt not found. Did you extract the zip first?"
+  echo "Run:  unzip vantag-edge-agent-linux.zip -d vantag-agent && cd vantag-agent && ./run.sh"
+  exit 1
+fi
 command -v python3 >/dev/null 2>&1 || { echo "Python 3.10+ is required."; exit 1; }
 [ -d .venv ] || python3 -m venv .venv
 source .venv/bin/activate
@@ -692,24 +714,51 @@ pip install -r requirements.txt
 python -m agent.main
 """
 
-_README = """# Vantag Edge Agent
+_README = """# Vantag Edge Agent - SETUP INSTRUCTIONS
 
-This package is pre-configured for your account. To run:
+############################################################
+#  STEP 1 (IMPORTANT): EXTRACT THIS ZIP FIRST              #
+#  Do NOT run run.bat from inside the zip preview window.  #
+#  Right-click the downloaded .zip -> "Extract All..."     #
+#  then open the extracted folder before continuing.       #
+############################################################
 
-## Windows
-Double-click `run.bat` (or run it from a terminal). It creates a virtual
-environment, installs dependencies, and starts the agent.
+This package is pre-configured for YOUR account (your keys are already inside
+config.json - keep it private).
 
-## Linux / macOS
+## What this does
+It runs on a PC that is on the SAME local network (LAN) as your cameras. It
+connects OUT to the Vantag cloud, so your cameras never need to be exposed to
+the internet. This is why cameras on your LAN cannot be tested directly from
+the website - the Edge Agent is what reaches them.
+
+## Requirements
+- A Windows or Linux PC kept switched on, on the same network as the cameras
+- Python 3.10 or newer (Windows: install from https://python.org and tick
+  "Add Python to PATH" during install)
+
+## Windows - how to run
+1. Extract the zip (see STEP 1 above).
+2. Open the extracted folder.
+3. Double-click `run.bat`.
+   The first run downloads dependencies (a few minutes) and then starts.
+4. Leave the window open. Your cameras turn ONLINE in the dashboard in ~30s.
+
+## Linux / Raspberry Pi - how to run
+    unzip vantag-edge-agent-linux.zip -d vantag-agent
+    cd vantag-agent
     chmod +x run.sh
     ./run.sh
 
-The bundled `config.json` already contains your `api_key`, `agent_id`, the
-backend URL, and your detected cameras. Add or edit cameras there if needed,
-then restart the agent.
+## After it starts
+- Cameras appear ONLINE in your dashboard within ~30 seconds.
+- Use "Auto-Scan with Edge Agent" on the Manage Cameras page to discover
+  cameras on your LAN automatically.
+- Real AI detections show on the Incidents page with snapshot evidence.
 
-Cameras will turn ONLINE in your dashboard within ~30 seconds, and real AI
-detections will appear on the Incidents page with snapshot evidence.
+## Need help?
+Email support@retailnazar.com (India) / support@retail-vantag.com, or use the
+"Need help setting up?" chat in the app.
 """
 
 

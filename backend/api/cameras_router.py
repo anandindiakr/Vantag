@@ -581,6 +581,29 @@ async def test_camera_connection(
     else:
         rtsp_url = f"rtsp://{body.ip}:{body.port}{path}"
 
+    # The backend runs in the cloud and cannot route to a private LAN address
+    # (e.g. 192.168.x.x / 10.x / 172.16-31.x). A camera on the user's local
+    # network must be reached by the Edge Agent, not from the cloud. Detect
+    # this and return an actionable message instead of a confusing timeout.
+    try:
+        import ipaddress
+        ip_obj = ipaddress.ip_address(body.ip)
+        if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local:
+            return TestConnectionResponse(
+                success=False,
+                error=(
+                    "This camera is on your local network ("
+                    f"{body.ip}), which our cloud cannot reach directly. "
+                    "Install and run the Vantag Edge Agent on a PC on the same "
+                    "network as the camera, then use \"Auto-Scan with Edge Agent\" "
+                    "to detect and validate it. The agent tests cameras locally and "
+                    "streams results securely to your dashboard."
+                ),
+            )
+    except ValueError:
+        # Not a literal IP (could be a hostname/DDNS) - allow the probe to run.
+        pass
+
     def _capture() -> TestConnectionResponse:
         cap = None
         try:
