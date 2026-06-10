@@ -23,7 +23,13 @@ import math
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..middleware.tenant_middleware import get_current_user_id
+from ..db.database import get_session
+from ..db.models.camera import CameraConfig
 
 from .models import (
     HeatmapCell,
@@ -102,42 +108,72 @@ def _get_store_ids(pipeline) -> List[str]:  # noqa: ANN001
     response_model=List[StoreResponse],
     summary="List all stores",
 )
-async def list_stores() -> List[StoreResponse]:
-    """Return a list of all stores with their current risk scores."""
-    pipeline = _get_pipeline()
+async def list_stores(
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> List[StoreResponse]:
+    """Return a list of all stores for the current tenant, derived from the
+    tenant-scoped camera table (the same source the edge agent uses).
+
+    Stores are inferred by grouping cameras on their ``location`` prefix, so a
+    store appears as soon as the user adds (or the agent discovers) a camera —
+    no separate "create store" step required.
+    """
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        return []
 
     try:
-        cameras = pipeline.registry.all_cameras()
-    except Exception:  # noqa: BLE001
-        cameras = []
+        rows = (
+            await session.execute(
+                select(CameraConfig).where(CameraConfig.tenant_id == tenant_id)
+            )
+        ).scalars().all()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to load stores from DB | tenant=%s err=%s", tenant_id, exc)
+        return []
 
-    # Group cameras by store (inferred from location prefix).
+    # Group cameras by inferred store id.
     store_camera_map: dict = {}
-    for cam in cameras:
-        store_id = _camera_store_id(cam)
+    for cam in rows:
+        location = cam.location or ""
+        prefix = location.split("\u2013")[0].split("-")[0].strip() if location else ""
+        store_id = (prefix or "auto-detected").lower().replace(" ", "_")
         store_camera_map.setdefault(store_id, []).append(cam)
 
-    # Also include stores that have risk scores but no loaded cameras.
-    for store_id in pipeline.risk_scores:
-        store_camera_map.setdefault(store_id, [])
+    # Pull live risk/events from the in-memory pipeline when it is available
+    # (single-tenant / on-box deployments). Safe no-op for SaaS tenants.
+    risk_scores: dict = {}
+    recent_events: dict = {}
+    if _pipeline is not None:
+        risk_scores = getattr(_pipeline, "risk_scores", {}) or {}
+        recent_events = getattr(_pipeline, "recent_events", {}) or {}
+        for store_id in risk_scores:
+            store_camera_map.setdefault(store_id, [])
 
     stores: List[StoreResponse] = []
     for store_id, cams in store_camera_map.items():
-        risk_data = pipeline.risk_scores.get(store_id, {})
-        score = float(risk_data.get("score", 0.0))
-        health_status = pipeline.health_monitor.get_status() if pipeline.health_monitor else {}
+        risk_data = risk_scores.get(store_id, {})
+        score = float(risk_data.get("score", 0.0)) if isinstance(risk_data, dict) else 0.0
 
         active = sum(
-            1 for cam in cams if health_status.get(cam.id, {}).get("healthy", False)
+            1 for cam in cams if (getattr(cam, "conn_status", "") or "").lower() == "online"
         )
-        last_events = pipeline.recent_events.get(store_id, [])
-        last_event_at = (last_events[-1].get("timestamp") or last_events[-1].get("occurred_at")) if last_events else None
+        last_events = recent_events.get(store_id, [])
+        last_event_at = (
+            (last_events[-1].get("timestamp") or last_events[-1].get("occurred_at"))
+            if last_events else None
+        )
+        location_label = next(
+            (c.location for c in cams if getattr(c, "location", None)),
+            store_id.replace("_", " ").title(),
+        )
 
         stores.append(
             StoreResponse(
                 store_id=store_id,
-                name=_store_display_name(store_id),
-                location=_store_location(cams),
+                name=store_id.replace("_", " ").title(),
+                location=location_label,
                 camera_count=len(cams),
                 active_cameras=active,
                 risk_score=round(score, 2),

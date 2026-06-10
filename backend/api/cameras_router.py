@@ -150,25 +150,70 @@ def _encode_jpeg(frame: np.ndarray, quality: int = 85) -> bytes:
     response_model=List[CameraResponse],
     summary="List all cameras with health status",
 )
-async def list_cameras(user: dict = Depends(get_current_user_id)) -> List[CameraResponse]:
-    """Return all cameras registered in the system along with their health state."""
-    pipeline = _get_pipeline()
+async def list_cameras(
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> List[CameraResponse]:
+    """Return all cameras registered for the current tenant (DB-backed).
+
+    This is the single source of truth shared with the edge agent. Cameras the
+    user adds manually or that the edge agent auto-discovers both land in the
+    tenant-scoped ``CameraConfig`` table, so the dashboard and the agent always
+    agree on the camera list.
+    """
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        return []
+
     try:
-        cameras = pipeline.registry.all_cameras()
+        rows = (
+            await session.execute(
+                select(CameraConfig)
+                .where(CameraConfig.tenant_id == tenant_id)
+                .order_by(CameraConfig.created_at)
+            )
+        ).scalars().all()
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to load camera registry: {exc}",
-        ) from exc
+        logger.warning("Failed to load cameras from DB | tenant=%s err=%s", tenant_id, exc)
+        return []
 
-    health_status: dict = {}
-    if pipeline.health_monitor:
-        health_status = pipeline.health_monitor.get_status()
+    return [_db_camera_to_response(row) for row in rows]
 
-    return [
-        _build_camera_response(cam, health_status.get(cam.id))
-        for cam in cameras
-    ]
+
+def _db_camera_to_response(row) -> CameraResponse:  # noqa: ANN001
+    """Convert a ``CameraConfig`` DB row into the API ``CameraResponse``."""
+    conn = (getattr(row, "conn_status", "") or "").lower()
+    if conn == "online":
+        cam_status = CameraStatus.ONLINE
+    else:
+        # pending / offline / unknown -> offline until the agent confirms a frame
+        cam_status = CameraStatus.OFFLINE
+
+    location = row.location or ""
+    prefix = location.split("\u2013")[0].split("-")[0].strip() if location else ""
+    store_id = (prefix or "auto-detected").lower().replace(" ", "_")
+
+    try:
+        rtsp = row.get_rtsp_url() if hasattr(row, "get_rtsp_url") else None
+    except Exception:  # noqa: BLE001
+        rtsp = None
+
+    return CameraResponse(
+        camera_id=row.camera_id,
+        name=row.name or row.camera_id,
+        location=location,
+        store_id=store_id,
+        rtsp_url=_mask_rtsp(rtsp) if rtsp else "",
+        resolution_width=getattr(row, "resolution_width", None) or 1920,
+        resolution_height=getattr(row, "resolution_height", None) or 1080,
+        fps_target=getattr(row, "fps_target", None) or 15,
+        enabled=bool(getattr(row, "enabled", False)),
+        low_light_mode=bool(getattr(row, "low_light_mode", False)),
+        status=cam_status,
+        consecutive_failures=0,
+        last_checked_at=getattr(row, "last_connected_at", None),
+        zones=[],
+    )
 
 
 # ---------------------------------------------------------------------------
