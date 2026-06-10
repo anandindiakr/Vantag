@@ -491,6 +491,10 @@ class DetectionAnalyzer:
 # ---------------------------------------------------------------------------
 
 class CameraWorker:
+    # Give up after this many consecutive connection failures so cameras with
+    # no real RTSP stream (e.g. demo placeholders) don't flood the log forever.
+    MAX_FAILURES = 3
+
     def __init__(
         self,
         config: CameraConfig,
@@ -596,6 +600,12 @@ class CameraWorker:
                 self.consecutive_failures += 1
                 self.error_msg = str(e)
                 log.warning(f"[{self.config.name}] Error: {e} (failures={self.consecutive_failures})")
+                if self.consecutive_failures >= self.MAX_FAILURES:
+                    log.error(
+                        f"[{self.config.name}] Giving up after {self.MAX_FAILURES} "
+                        f"consecutive failures — no valid RTSP stream. Worker stopping."
+                    )
+                    break
                 backoff = min(2 ** self.consecutive_failures, 60)
                 log.info(f"[{self.config.name}] Reconnecting in {backoff}s...")
                 self._stop_event.wait(timeout=backoff)

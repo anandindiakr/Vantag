@@ -26,6 +26,7 @@ const VerifyEmail  = lazy(() => import('./pages/auth/VerifyEmail'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const ResetPassword  = lazy(() => import('./pages/auth/ResetPassword'));
 const SalesDemo      = lazy(() => import('./pages/auth/SalesDemo'));
+const Pair           = lazy(() => import('./pages/Pair'));
 const Onboarding   = lazy(() => import('./pages/onboarding/Onboarding'));
 const Dashboard    = lazy(() => import('./pages/Dashboard'));
 const CamerasPage   = lazy(() => import('./pages/CamerasPage'));
@@ -114,6 +115,7 @@ export default function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/sales-demo" element={<SalesDemo />} />
+            <Route path="/pair" element={<Pair />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
 

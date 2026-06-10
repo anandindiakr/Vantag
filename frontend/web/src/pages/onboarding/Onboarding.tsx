@@ -508,13 +508,16 @@ export default function Onboarding() {
                 <CheckCircle className="w-8 h-8 text-emerald-400" />
               </div>
               <h2 className="text-2xl font-bold mb-2">You're almost live!</h2>
-              <p className="text-white/40 text-sm mb-8">Download the Edge Agent below and run it on a PC on the same network as your cameras. The QR / key below is your pairing credential.</p>
+              <p className="text-white/40 text-sm mb-8">Download the Edge Agent below and run it on a PC on the same network as your cameras. Scan the QR with your phone for step-by-step pairing instructions.</p>
 
-              {/* QR code — uses public QR service so no npm dep needed */}
+              {/* QR code — encodes a deep link to /pair so scanning with any phone
+                  opens a help page with the pairing key + setup steps (not a raw string). */}
               <div className="w-48 h-48 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 p-3">
                 {agentData.api_key ? (
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(agentData.api_key)}`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(
+                      `${window.location.origin}/pair#${encodeURIComponent(agentData.qr_data || btoa(JSON.stringify({ api_key: agentData.api_key })))}`
+                    )}`}
                     alt="Edge Agent pairing QR code"
                     className="w-full h-full object-contain"
                   />

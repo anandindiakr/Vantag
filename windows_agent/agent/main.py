@@ -122,6 +122,12 @@ def start_monitoring():
     for cam in _config.cameras:
         if not cam.enabled:
             continue
+        if not (cam.rtsp_url or "").strip():
+            log.info(
+                f"Skipping camera '{cam.name}' ({cam.id}) — no RTSP URL configured. "
+                f"Add a stream URL via the dashboard to start monitoring it."
+            )
+            continue
         worker = CameraWorker(
             config=cam,
             inference=_inference,
