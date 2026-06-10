@@ -670,11 +670,15 @@ class CreateCameraRequest(BaseModel):
 async def create_camera(
     body: CreateCameraRequest,
     user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
 ) -> CameraResponse:
     """
-    Register a new camera, persist it to cameras.yaml, and return its config.
+    Register a new camera in the tenant's database so the store's edge agent
+    picks it up on its next config sync, and return the saved config.
     """
-    pipeline = _get_pipeline()
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
 
     # Build RTSP URL
     path = body.rtsp_path if body.rtsp_path.startswith("/") else f"/{body.rtsp_path}"
@@ -693,31 +697,50 @@ async def create_camera(
     # Generate a unique camera ID
     cam_id = f"cam-{uuid.uuid4().hex[:8]}"
 
-    from ..ingestion.camera_registry import CameraConfig, Resolution, ConfigError
-
-    new_cam = CameraConfig(
-        id=cam_id,
+    row = CameraConfig(
+        tenant_id=tenant_id,
+        camera_id=cam_id,
         name=body.name,
-        rtsp_url=rtsp_url,
+        ip_address=body.ip,
         location=body.location,
-        resolution=Resolution(width=width, height=height),
+        resolution_width=width,
+        resolution_height=height,
         fps_target=body.fps,
         enabled=body.enabled,
         low_light_mode=body.low_light_mode,
-        zones=[],
-        staff_zone_colors=[],
-        analyzer_config={},
+        conn_status="pending",
     )
+    row.set_rtsp_url(rtsp_url)
 
     try:
-        pipeline.registry.add_camera(new_cam)
-    except ConfigError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        session.add(row)
+        await session.commit()
     except Exception as exc:  # noqa: BLE001
+        await session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to register camera: {exc}") from exc
 
-    logger.info("Camera created via API | camera_id=%s name=%s", cam_id, body.name)
-    return _build_camera_response(new_cam, None)
+    logger.info(
+        "Camera created via API | camera_id=%s name=%s tenant=%s",
+        cam_id, body.name, tenant_id,
+    )
+
+    store_id = (body.location or "auto-detected").split("–")[0].strip().lower().replace(" ", "_")
+    return CameraResponse(
+        camera_id=cam_id,
+        name=body.name,
+        location=body.location,
+        store_id=store_id,
+        rtsp_url=_mask_rtsp(rtsp_url),
+        resolution_width=width,
+        resolution_height=height,
+        fps_target=body.fps,
+        enabled=body.enabled,
+        low_light_mode=body.low_light_mode,
+        status=CameraStatus.OFFLINE,
+        consecutive_failures=0,
+        last_checked_at=None,
+        zones=[],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -732,26 +755,41 @@ async def create_camera(
 async def delete_camera(
     camera_id: str,
     user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
 ) -> None:
     """
-    Remove a camera from the registry and persist the change to cameras.yaml.
+    Remove a camera from the tenant's database so the edge agent stops
+    monitoring it on its next config sync.
     """
-    pipeline = _get_pipeline()
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
 
-    try:
-        pipeline.registry.remove_camera(camera_id)
-    except KeyError:
+    row = (
+        await session.execute(
+            select(CameraConfig).where(
+                CameraConfig.tenant_id == tenant_id,
+                CameraConfig.camera_id == camera_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Camera '{camera_id}' not found.",
         )
+
+    try:
+        await session.delete(row)
+        await session.commit()
     except Exception as exc:  # noqa: BLE001
+        await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to remove camera: {exc}",
         ) from exc
 
-    logger.info("Camera deleted via API | camera_id=%s", camera_id)
+    logger.info("Camera deleted via API | camera_id=%s tenant=%s", camera_id, tenant_id)
 
 
 # ---------------------------------------------------------------------------
