@@ -323,20 +323,33 @@ export default function ZoneEditorPage() {
 
   // ── Canvas event handlers ─────────────────────────────────────────────────
 
-  const getPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const r = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  // Convert a pointer event to canvas-internal coordinates. The canvas is
+  // internally 960×540 but rendered stretched (w-full), so we must scale the
+  // display-pixel cursor position back into the canvas coordinate system — this
+  // is what makes the drawn box track the cursor exactly.
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current!;
+    const r = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / r.width;
+    const scaleY = canvas.height / r.height;
+    const x = Math.max(0, Math.min(canvas.width, (e.clientX - r.left) * scaleX));
+    const y = Math.max(0, Math.min(canvas.height, (e.clientY - r.top) * scaleY));
+    return { x, y };
   };
 
-  const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!mode || namePopup) return;
+    e.preventDefault();
+    // Capture the pointer so dragging keeps working even if the cursor briefly
+    // leaves the canvas, and the release is always delivered here.
+    try { canvasRef.current?.setPointerCapture(e.pointerId); } catch { /* noop */ }
     const pos = getPos(e);
     setIsDrawing(true);
     setDragStart(pos);
     setCurrentRect({ x: pos.x, y: pos.y, w: 0, h: 0 });
   };
 
-  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !dragStart) return;
     const pos = getPos(e);
     setCurrentRect({
@@ -347,7 +360,8 @@ export default function ZoneEditorPage() {
     });
   };
 
-  const onMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    try { canvasRef.current?.releasePointerCapture(e.pointerId); } catch { /* noop */ }
     if (!isDrawing || !currentRect || !mode) return;
     setIsDrawing(false);
     const { x, y, w, h } = currentRect;
@@ -585,12 +599,13 @@ export default function ZoneEditorPage() {
                 width={960}
                 height={540}
                 className={clsx(
-                  'w-full block',
+                  'w-full block touch-none select-none',
                   mode && !namePopup ? 'cursor-crosshair' : 'cursor-default'
                 )}
-                onMouseDown={onMouseDown}
-                onMouseMove={onMouseMove}
-                onMouseUp={onMouseUp}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
               />
 
               {/* Inline name popup */}
