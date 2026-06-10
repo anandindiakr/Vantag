@@ -73,6 +73,33 @@ export default function Onboarding() {
   const [agentData, setAgentData] = useState<any>(null);
   const [cameras, setCameras] = useState<CameraEntry[]>([{ ip: '', name: '', location: '', rtsp_url: '', brand: '', probeStatus: 'idle' }]);
   const [shopForm, setShopForm] = useState({ shop_name: '', address: '', city: '', language: 'en', phone: '' });
+  const [dlBusy, setDlBusy] = useState<string | null>(null);
+
+  // Authenticated edge-agent download. A plain <a href> can't send the
+  // Authorization header, so the browser would just open a 401 JSON page in a
+  // new tab. Fetch the zip with the bearer token and save it as a blob.
+  const downloadAgent = async (platform: 'windows' | 'linux') => {
+    setDlBusy(platform);
+    try {
+      const res = await fetch(`/api/agent/download?platform=${platform}`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      if (!res.ok) throw new Error(`Download failed (${res.status}). Please log in again.`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vantag-edge-agent-${platform}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(e?.message || 'Download failed.');
+    } finally {
+      setDlBusy(null);
+    }
+  };
 
   useEffect(() => {
     // Load saved step from server
@@ -481,7 +508,7 @@ export default function Onboarding() {
                 <CheckCircle className="w-8 h-8 text-emerald-400" />
               </div>
               <h2 className="text-2xl font-bold mb-2">You're almost live!</h2>
-              <p className="text-white/40 text-sm mb-8">Scan this QR code with your Android phone to connect it to Vantag.</p>
+              <p className="text-white/40 text-sm mb-8">Download the Edge Agent below and run it on a PC on the same network as your cameras. The QR / key below is your pairing credential.</p>
 
               {/* QR code — uses public QR service so no npm dep needed */}
               <div className="w-48 h-48 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 p-3">
@@ -498,15 +525,18 @@ export default function Onboarding() {
 
               <div className="text-xs text-white/30 font-mono mb-8 bg-white/5 rounded-lg px-4 py-2 break-all">{agentData.api_key}</div>
 
-              <div className="flex gap-3 mb-6">
-                <a href={agentData.download_links?.android} target="_blank" rel="noreferrer"
-                  className="flex-1 py-3 bg-emerald-600/80 hover:bg-emerald-600 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all">
-                  📱 Download Android App
-                </a>
-                <a href={agentData.download_links?.windows} target="_blank" rel="noreferrer"
-                  className="flex-1 py-3 bg-white/8 hover:bg-white/12 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all">
-                  💻 Windows Agent
-                </a>
+              <div className="flex gap-3 mb-3">
+                <button onClick={() => downloadAgent('windows')} disabled={dlBusy !== null}
+                  className="flex-1 py-3 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all">
+                  💻 {dlBusy === 'windows' ? 'Preparing…' : 'Windows Agent'}
+                </button>
+                <button onClick={() => downloadAgent('linux')} disabled={dlBusy !== null}
+                  className="flex-1 py-3 bg-white/8 hover:bg-white/12 disabled:opacity-50 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all">
+                  🐧 {dlBusy === 'linux' ? 'Preparing…' : 'Linux / Raspberry Pi'}
+                </button>
+              </div>
+              <div className="text-xs text-white/30 mb-6 flex items-center justify-center gap-2">
+                📱 Android app — <span className="text-white/50">coming soon</span>
               </div>
 
               <button onClick={() => nav('/dashboard')}

@@ -260,8 +260,8 @@ async def step5_install_agent(
     tenant_result = await session.execute(select(Tenant).where(Tenant.id == user["tenant_id"]))
     tenant = tenant_result.scalar_one_or_none()
 
-    region_url_map = {"india": "https://api.vantag.in", "singapore": "https://api.vantag.sg", "malaysia": "https://api.jagajaga.my"}
-    api_url = region_url_map.get(tenant.region if tenant else "india", "http://localhost:8800")
+    region_url_map = {"india": "https://retailnazar.com", "singapore": "https://retail-vantag.com", "malaysia": "https://jagajaga.my"}
+    api_url = region_url_map.get(tenant.region if tenant else "india", "https://retail-vantag.com")
 
     qr_payload = {
         "api_key": agent.api_key,
@@ -287,8 +287,8 @@ async def step5_install_agent(
         "qr_data": qr_data,
         "registration_token": reg_token,
         "download_links": {
-            "android": "https://play.google.com/store/apps/details?id=com.vantag.edgeagent",
-            "windows": "https://download.vantag.in/edge-agent-setup.exe",
+            "windows": "/api/agent/download?platform=windows",
+            "linux": "/api/agent/download?platform=linux",
         },
     }
 
