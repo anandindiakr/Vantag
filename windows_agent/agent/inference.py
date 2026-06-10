@@ -53,7 +53,13 @@ class BoundingBox:
 
 
 class YoloInference:
-    MODEL_URL = "https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.onnx"
+    # Ultralytics does NOT ship a prebuilt .onnx in its release assets (that URL
+    # 404s). The reliable path is to let the bundled `ultralytics` package fetch
+    # the .pt weights and export ONNX locally. These mirrors are only a fallback
+    # for environments where ultralytics export is unavailable.
+    MODEL_URLS = [
+        "https://huggingface.co/Xenova/yolov8n/resolve/main/onnx/model.onnx",
+    ]
 
     def __init__(self, model_path: Optional[str] = None, device: str = "cpu"):
         self._session = None
@@ -73,10 +79,7 @@ class YoloInference:
                 model_path = str(cache_dir / "yolov8n.onnx")
 
                 if not Path(model_path).exists():
-                    log.info(f"Downloading YOLOv8n model to {model_path}...")
-                    import urllib.request
-                    urllib.request.urlretrieve(self.MODEL_URL, model_path)
-                    log.info("Model downloaded successfully")
+                    self._acquire_model(model_path)
 
             providers = ["CPUExecutionProvider"]
             if self.device == "cuda":
@@ -95,6 +98,39 @@ class YoloInference:
             log.warning("onnxruntime not installed — inference disabled (install: pip install onnxruntime)")
         except Exception as e:
             log.error(f"Failed to load ONNX model: {e}")
+
+    def _acquire_model(self, model_path: str):
+        """Obtain a YOLOv8n ONNX model at ``model_path``.
+
+        Primary path: use the bundled ``ultralytics`` package to download the
+        official .pt weights and export them to ONNX (always available, never
+        404s). Fallback: download a prebuilt ONNX from a mirror.
+        """
+        # 1) Preferred — export via ultralytics (handles weight download too).
+        try:
+            from ultralytics import YOLO
+            import shutil
+            log.info("Preparing YOLOv8n ONNX via ultralytics (first run only, ~30s)…")
+            m = YOLO("yolov8n.pt")
+            exported = m.export(format="onnx", imgsz=self._img_size, opset=12)
+            shutil.copyfile(str(exported), model_path)
+            log.info(f"Model ready at {model_path}")
+            return
+        except Exception as e:  # noqa: BLE001
+            log.warning(f"ultralytics export unavailable ({e}); trying mirror download…")
+
+        # 2) Fallback — direct download from a known-good mirror.
+        import urllib.request
+        for url in self.MODEL_URLS:
+            try:
+                log.info(f"Downloading YOLOv8n model from {url}…")
+                urllib.request.urlretrieve(url, model_path)
+                log.info("Model downloaded successfully")
+                return
+            except Exception as e:  # noqa: BLE001
+                log.warning(f"Download failed from {url}: {e}")
+
+        raise RuntimeError("Could not obtain YOLOv8n model from ultralytics or mirrors")
 
     def detect(self, frame_bgr: np.ndarray, conf_threshold: float = 0.5) -> List[BoundingBox]:
         """Run inference on a BGR OpenCV frame. Returns list of BoundingBox."""

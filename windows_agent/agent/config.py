@@ -30,7 +30,9 @@ class AgentConfig:
     agent_id: str = ""
     backend_url: str = "https://retail-vantag.com"
     mqtt_host: str = "retail-vantag.com"
-    mqtt_port: int = 1883
+    mqtt_port: int = 8883               # public MQTTS (TLS) port on the broker
+    mqtt_username: str = "vantag_edge"  # shared edge broker user
+    mqtt_password: str = ""             # shared edge broker password (falls back to api_key)
     tenant_id: str = ""
     cameras: List[CameraConfig] = field(default_factory=list)
     inference_device: str = "cpu"       # "cpu" | "cuda" | "dml"

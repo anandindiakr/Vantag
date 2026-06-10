@@ -9,12 +9,21 @@ log = logging.getLogger("vantag.mqtt")
 
 
 class VantagMqttClient:
-    def __init__(self, host: str, port: int, tenant_id: str, api_key: str):
+    def __init__(self, host: str, port: int, tenant_id: str, api_key: str,
+                 username: str = "vantag_edge", password: str = "", tls: bool = None):
         self.host = host
         self.port = port
         self.tenant_id = tenant_id
+        # TLS is required on the public broker port (8883). Auto-enable when the
+        # caller doesn't specify and the port is the standard MQTTS port.
+        self.tls = (port == 8883) if tls is None else tls
         self._client = mqtt.Client(client_id=f"vantag-win-{tenant_id[:8]}", clean_session=True)
-        self._client.username_pw_set(username="vantag", password=api_key)
+        self._client.username_pw_set(username=username, password=(password or api_key))
+        if self.tls:
+            try:
+                self._client.tls_set()  # use system CA bundle (broker has a valid LE cert)
+            except Exception as e:  # noqa: BLE001
+                log.warning(f"MQTT TLS setup failed: {e}")
         self._client.on_connect = self._on_connect
         self._client.on_message = self._on_message
         self._client.on_disconnect = self._on_disconnect
@@ -24,9 +33,9 @@ class VantagMqttClient:
         try:
             self._client.connect(self.host, self.port, keepalive=60)
             self._client.loop_start()
-            log.info(f"MQTT connecting to {self.host}:{self.port}")
+            log.info(f"MQTT connecting to {self.host}:{self.port} (tls={self.tls})")
         except Exception as e:
-            log.error(f"MQTT connect failed: {e}")
+            log.warning(f"MQTT connect failed ({e}) — door control disabled, monitoring continues")
 
     def disconnect(self):
         self._client.loop_stop()

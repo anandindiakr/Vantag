@@ -148,6 +148,8 @@ def start_monitoring():
         port=_config.mqtt_port,
         tenant_id=_config.tenant_id,
         api_key=_config.api_key,
+        username=getattr(_config, "mqtt_username", "vantag_edge"),
+        password=getattr(_config, "mqtt_password", ""),
     )
     _mqtt.connect()
 
