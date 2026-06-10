@@ -559,6 +559,10 @@ class TestConnectionResponse(BaseModel):
     success: bool
     thumbnail_base64: Optional[str] = None
     error: Optional[str] = None
+    # True when the test could not run because the camera is on a private LAN
+    # the cloud cannot reach. The Edge Agent validates these locally, so the UI
+    # should still allow the camera to be saved.
+    lan_unreachable: bool = False
 
 
 @router.post(
@@ -591,13 +595,13 @@ async def test_camera_connection(
         if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local:
             return TestConnectionResponse(
                 success=False,
+                lan_unreachable=True,
                 error=(
                     "This camera is on your local network ("
                     f"{body.ip}), which our cloud cannot reach directly. "
-                    "Install and run the Vantag Edge Agent on a PC on the same "
-                    "network as the camera, then use \"Auto-Scan with Edge Agent\" "
-                    "to detect and validate it. The agent tests cameras locally and "
-                    "streams results securely to your dashboard."
+                    "That's expected — just click \"Save Camera\" and your "
+                    "on-site Edge Agent will connect to it locally and start "
+                    "monitoring. (No cloud test is needed for LAN cameras.)"
                 ),
             )
     except ValueError:

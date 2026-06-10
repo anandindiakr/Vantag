@@ -98,6 +98,72 @@ def _map_remote_camera(c: dict) -> CameraConfig:
     )
 
 
+def _build_worker(cam):
+    return CameraWorker(
+        config=cam,
+        inference=_inference,
+        api_client=_api,
+        conf_threshold=_config.confidence_threshold,
+        target_fps=_config.inference_fps,
+        event_cooldown_sec=_config.event_cooldown_sec,
+        on_event=_on_event,
+    )
+
+
+def reconcile_cameras():
+    """Pull the latest camera list from the backend and start/stop workers so
+    that cameras added, removed, enabled or disabled in the web dashboard take
+    effect on a running agent WITHOUT requiring a restart."""
+    global _workers, _inference
+    if _api is None:
+        return
+    try:
+        remote = _api.get_config()
+    except Exception as e:  # noqa: BLE001
+        log.debug(f"reconcile_cameras: get_config failed: {e}")
+        return
+    if not remote:
+        return
+
+    cams = [_map_remote_camera(c) for c in remote.get("cameras", [])]
+    _config.cameras = cams
+    try:
+        _config.save()
+    except Exception:  # noqa: BLE001
+        pass
+
+    desired = {
+        c.id: c for c in cams
+        if c.enabled and (c.rtsp_url or "").strip()
+    }
+    running = {w.config.id: w for w in _workers}
+
+    # Stop workers whose camera was removed/disabled or whose stream changed.
+    for cam_id, w in list(running.items()):
+        if cam_id not in desired or desired[cam_id].rtsp_url != w.config.rtsp_url:
+            log.info(f"Stopping worker for camera {cam_id} (removed/changed)")
+            try:
+                w.stop()
+            except Exception:  # noqa: BLE001
+                pass
+            if w in _workers:
+                _workers.remove(w)
+            running.pop(cam_id, None)
+
+    # Start workers for newly added/confirmed cameras.
+    new_ids = [cid for cid in desired if cid not in running]
+    if new_ids and _inference is None:
+        _inference = YoloInference(device=_config.inference_device)
+    for cid in new_ids:
+        cam = desired[cid]
+        log.info(f"Starting worker for newly added camera '{cam.name}' ({cid})")
+        w = _build_worker(cam)
+        w.start()
+        _workers.append(w)
+    if new_ids:
+        log.info(f"Camera sync: {len(_workers)} worker(s) now active")
+
+
 def start_monitoring():
     global _workers, _inference, _mqtt
 
@@ -180,6 +246,9 @@ def start_monitoring():
             ).start()
 
     schedule.every(30).seconds.do(send_heartbeat)
+    # Periodically reconcile the camera list with the dashboard so cameras the
+    # user adds/removes online start/stop monitoring without an agent restart.
+    schedule.every(20).seconds.do(reconcile_cameras)
     threading.Thread(
         target=lambda: [time.sleep(1) or schedule.run_pending() for _ in iter(int, 1)],
         daemon=True,

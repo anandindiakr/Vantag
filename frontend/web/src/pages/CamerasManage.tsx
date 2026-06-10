@@ -2,7 +2,7 @@
 // Camera Management page: auto-scan, manual add (brand-aware), and camera list with delete.
 // Features: brand presets, auto-detect RTSP path, contextual help, floating support button.
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -60,6 +60,7 @@ interface TestResult {
   success: boolean;
   thumbnail_base64?: string;
   error?: string;
+  lan_unreachable?: boolean;
 }
 
 interface AutoDetectResult {
@@ -357,6 +358,18 @@ function EdgeDiscoverySection() {
     }
   };
 
+  // Show whatever the Edge Agent has already reported, without making the user
+  // click "Auto-Scan" first, and keep refreshing so newly-discovered cameras
+  // appear on their own (the agent scans the LAN on startup and on request).
+  useEffect(() => {
+    void fetchDiscovered();
+    const timer = setInterval(() => {
+      void fetchDiscovered();
+    }, 6000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleAutoScan = async () => {
     setRequesting(true);
     try {
@@ -380,6 +393,8 @@ function EdgeDiscoverySection() {
         setPolling(false);
         if (found.length > before) {
           toast.success(`Found ${found.length} camera(s) on your network.`);
+        } else if (found.length > 0) {
+          toast.success(`Showing ${found.length} camera(s) your Edge Agent has found.`);
         } else if (attempts >= 15) {
           toast('No new cameras yet. Make sure the edge agent is running.', { icon: '🔍' });
         }
@@ -487,6 +502,8 @@ function ManualAddSectionWrapper({
       });
       setTestResult(res.data);
       if (res.data.success) toast.success('Connection successful!');
+      else if (res.data.lan_unreachable)
+        toast.success('LAN camera detected — click "Save Camera" and your Edge Agent will validate it locally.');
       else toast.error(res.data.error ?? 'Connection failed.');
     } catch (err: unknown) {
       setTestResult({ success: false, error: (err as Error).message });
@@ -581,7 +598,10 @@ function ManualAddSectionWrapper({
     }
   };
 
-  const canSave = testResult?.success === true;
+  // A camera can be saved when the cloud test succeeded, OR when the test
+  // reported the camera is on a private LAN the cloud cannot reach — those are
+  // validated locally by the on-site Edge Agent, so we must not block Save.
+  const canSave = testResult?.success === true || testResult?.lan_unreachable === true;
 
   const brandLabel = BRAND_OPTIONS.find((b) => b.value === selectedBrand)?.label ?? 'Generic';
 
@@ -781,6 +801,14 @@ function ManualAddSectionWrapper({
               <div className="flex items-center gap-2 text-emerald-400 text-sm">
                 <CheckCircle2 className="w-4 h-4" /> Connected (no frame captured)
               </div>
+            ) : testResult.lan_unreachable ? (
+              <div className="flex items-start gap-2 text-amber-300 text-sm bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2.5">
+                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>
+                  This camera is on your local network, so the cloud can't test it directly — that's normal.
+                  Click <strong>Save Camera</strong> and your on-site Edge Agent will connect to it locally and start monitoring.
+                </span>
+              </div>
             ) : (
               <div className="flex items-center gap-2 text-red-400 text-sm">
                 <XCircle className="w-4 h-4" /> {testResult.error ?? 'Connection failed'}
@@ -809,7 +837,7 @@ function ManualAddSectionWrapper({
           Save Camera
         </button>
         {!canSave && !testing && (
-          <p className="text-xs text-white/30">Run &quot;Test Connection&quot; first to enable Save</p>
+          <p className="text-xs text-white/30">Run &quot;Test Connection&quot; first — for LAN cameras it will let you Save right away.</p>
         )}
       </div>
 
