@@ -31,6 +31,7 @@ const Onboarding   = lazy(() => import('./pages/onboarding/Onboarding'));
 const Dashboard    = lazy(() => import('./pages/Dashboard'));
 const CamerasPage   = lazy(() => import('./pages/CamerasPage'));
 const CamerasManage = lazy(() => import('./pages/CamerasManage'));
+const SetupWizard   = lazy(() => import('./pages/SetupWizard'));
 const DemoCenter    = lazy(() => import('./pages/DemoCenter'));
 const ZoneEditor    = lazy(() => import('./pages/ZoneEditorPage'));
 const CameraView   = lazy(() => import('./pages/CameraView'));
@@ -141,6 +142,7 @@ export default function App() {
               <Route path="/download"   element={<DownloadPage />} />
               <Route path="/agent-status" element={<AgentStatusPage />} />
               <Route path="/account"     element={<AccountPage />} />
+              <Route path="/setup"       element={<SetupWizard />} />
               <Route path="/help"       element={<HelpCenter />} />
               <Route path="/help/how-it-works" element={<HowItWorks embedded />} />
               <Route path="/help/faq"   element={<FAQ embedded />} />
