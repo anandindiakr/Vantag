@@ -91,6 +91,60 @@ def run_discovery_and_report(reason: str = "startup"):
 
 
 
+def _run_rtsp_probe_job(job: dict):
+    """Run a cloud-delegated RTSP path probe on this LAN and report back.
+
+    The cloud cannot reach private camera IPs, so the dashboard's
+    "Auto-Detect RTSP path" queues a job that we execute here.
+    """
+    if _api is None:
+        return
+    job_id = job.get("job_id")
+    ip = job.get("ip")
+    port = int(job.get("port") or 554)
+    username = job.get("username") or None
+    password = job.get("password") or None
+    brand = job.get("brand") or None
+    log.info("RTSP probe job %s: %s:%s (brand=%s)", job_id, ip, port, brand)
+
+    tried: list[str] = []
+    result: dict | None = None
+    try:
+        creds = [(username, password)] if (username or password) else None
+        paths = discovery._candidate_paths(brand)
+        for path in paths:
+            tried.append(path)
+            for u, p in (creds or discovery._DEFAULT_CREDS):
+                res = discovery._try_rtsp(ip, port, path, u, p)
+                if res:
+                    result = res
+                    break
+            if result:
+                break
+    except Exception as e:  # noqa: BLE001
+        log.warning("RTSP probe job %s failed: %s", job_id, e)
+
+    payload = {
+        "job_id": job_id,
+        "success": result is not None,
+        "rtsp_path": result["path"] if result else None,
+        "rtsp_url": result["rtsp_url"] if result else None,
+        "brand": brand,
+        "tried_paths": tried[:50],
+        "error": None if result else "No candidate RTSP path produced a video frame. Check IP, port and credentials.",
+    }
+    try:
+        resp = _api._session.post(
+            f"{_api.base_url}/api/edge/rtsp-probe-result",
+            json=payload,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        log.info("RTSP probe job %s reported (success=%s)", job_id, payload["success"])
+    except Exception as e:  # noqa: BLE001
+        log.warning("Failed to report RTSP probe result %s: %s", job_id, e)
+
+
 def _on_event(event: dict):
     _recent_events.append(event)
     if len(_recent_events) > 100:
@@ -280,6 +334,15 @@ def start_monitoring():
                 daemon=True,
                 name="discovery-ondemand",
             ).start()
+        # Backend may delegate RTSP path probes (cloud can't reach LAN IPs)
+        if isinstance(resp, dict):
+            for _job in resp.get("rtsp_probe_jobs") or []:
+                threading.Thread(
+                    target=_run_rtsp_probe_job,
+                    args=(_job,),
+                    daemon=True,
+                    name=f"rtsp-probe-{_job.get('job_id', '?')[:8]}",
+                ).start()
 
     schedule.every(30).seconds.do(send_heartbeat)
     # Periodically reconcile the camera list with the dashboard so cameras the

@@ -1025,6 +1025,9 @@ class AutoDetectPathResponse(BaseModel):
     thumbnail_base64: Optional[str] = None
     tried: Optional[int] = None
     message: Optional[str] = None
+    # When the probe is delegated to the tenant's Edge Agent:
+    queued: bool = False
+    job_id: Optional[str] = None
 
 
 def _try_rtsp_path(ip: str, port: int, path: str, username: Optional[str], password: Optional[str]) -> Optional[dict]:
@@ -1066,16 +1069,58 @@ def _try_rtsp_path(ip: str, port: int, path: str, username: Optional[str], passw
 async def auto_detect_rtsp_path(
     body: AutoDetectPathRequest,
     user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
 ) -> AutoDetectPathResponse:
     """
     Concurrently probe all known RTSP paths for a camera IP.
 
     Strategy:
+    0. If the IP is private (LAN), the cloud cannot reach it — delegate the
+       probe to the tenant's online Edge Agent and return a job_id to poll.
     1. Try ONVIF discovery first (graceful skip if ``onvif-zeep`` not installed).
     2. If ONVIF fails, run all candidate paths in ``asyncio.wait(..., FIRST_COMPLETED)``.
        Each path is tried with a 3-second timeout.  Total cap: 30 seconds.
     3. Return the first URL that yields a valid video frame.
     """
+    # 0. Private LAN IP → delegate to the Edge Agent (the cloud can't reach it)
+    try:
+        _ip_private = ipaddress.ip_address(body.ip).is_private
+    except ValueError:
+        _ip_private = False
+    if _ip_private:
+        from datetime import datetime, timedelta, timezone as _tz
+        from ..db.models.tenant import EdgeAgent
+        from .edge_router import queue_rtsp_probe
+
+        tenant_id = user.get("tenant_id")
+        cutoff = datetime.now(_tz.utc) - timedelta(minutes=2)
+        res = await session.execute(
+            select(EdgeAgent).where(
+                EdgeAgent.tenant_id == tenant_id,
+                EdgeAgent.last_heartbeat >= cutoff,
+            )
+        )
+        agent = res.scalars().first()
+        if agent is None:
+            return AutoDetectPathResponse(
+                success=False,
+                message=(
+                    f"{body.ip} is a private LAN address — it can only be reached "
+                    "from inside your store network. Start the Edge Agent on a PC "
+                    "in the same network as the camera, wait ~30 seconds, then try "
+                    "Auto-Detect again. The probe will then run through your agent."
+                ),
+            )
+        job_id = queue_rtsp_probe(
+            tenant_id, body.ip, body.port, body.username, body.password,
+        )
+        return AutoDetectPathResponse(
+            success=False,
+            queued=True,
+            job_id=job_id,
+            message="Probe delegated to your Edge Agent — checking camera paths on your LAN…",
+        )
+
     # 1. ONVIF attempt (best-effort)
     try:
         from onvif import ONVIFCamera  # type: ignore[import]
@@ -1174,6 +1219,32 @@ async def auto_detect_rtsp_path(
         tried=total,
         message="Could not auto-detect. Contact support chat for help.",
     )
+
+
+@router.get(
+    "/auto-detect-path/result/{job_id}",
+    summary="Poll the result of an Edge-Agent-delegated RTSP path probe",
+)
+async def auto_detect_path_result(
+    job_id: str,
+    user: dict = Depends(get_current_user_id),
+) -> dict:
+    from .edge_router import get_rtsp_probe_result
+
+    rec = get_rtsp_probe_result(job_id)
+    if rec is None:
+        return {"status": "expired", "message": "Probe job expired — please run Auto-Detect again."}
+    if rec.get("status") != "done":
+        return {"status": "pending"}
+    return {
+        "status": "done",
+        "success": rec.get("success", False),
+        "rtsp_path": rec.get("rtsp_path"),
+        "rtsp_url": rec.get("rtsp_url"),
+        "brand": rec.get("brand"),
+        "tried_paths": rec.get("tried_paths", []),
+        "error": rec.get("error"),
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -17,10 +17,11 @@ const Step = ({ num, title, body, icon }: { num: number; title: string; body: st
   </div>
 );
 
-export default function HowItWorks() {
+export default function HowItWorks({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className={embedded ? 'text-white' : 'min-h-screen bg-[#0a0a0f] text-white'}>
+      {!embedded && (
       <nav className="px-8 py-4 flex items-center justify-between border-b border-white/10">
         <Link to="/" className="text-xl font-bold">Vantag</Link>
         <div className="flex gap-6 text-sm">
@@ -30,8 +31,14 @@ export default function HowItWorks() {
           <Link to="/login" className="hover:text-violet-400">{t('nav.login', 'Login')}</Link>
         </div>
       </nav>
+      )}
 
-      <div className="max-w-6xl mx-auto px-8 py-16">
+      <div className={embedded ? 'max-w-6xl mx-auto px-8 py-8' : 'max-w-6xl mx-auto px-8 py-16'}>
+        {embedded && (
+          <Link to="/help" className="inline-block mb-6 text-sm text-violet-400 hover:text-violet-300">
+            ← {t('help.back', 'Back to Help Center')}
+          </Link>
+        )}
         <h1 className="text-5xl font-bold mb-4 text-center">
           {t('how.title', 'How Vantag works')}
         </h1>
@@ -67,12 +74,14 @@ export default function HowItWorks() {
           />
         </div>
 
+        {!embedded && (
         <div className="text-center">
           <Link to="/register"
             className="inline-block bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-500 hover:to-purple-600 px-8 py-4 rounded-xl font-bold text-lg transition-all">
             {t('how.cta', 'Start free trial')}
           </Link>
         </div>
+        )}
       </div>
     </div>
   );

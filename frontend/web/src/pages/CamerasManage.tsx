@@ -555,6 +555,39 @@ function ManualAddSectionWrapper({
         if (res.data.thumbnail_base64) {
           setTestResult({ success: true, thumbnail_base64: res.data.thumbnail_base64 });
         }
+      } else if ((res.data as { queued?: boolean; job_id?: string }).queued) {
+        // LAN camera — the probe runs on the user's Edge Agent. Poll for the result.
+        const jobId = (res.data as { job_id?: string }).job_id!;
+        toast('Camera is on your LAN — probing through your Edge Agent (up to ~90s)…', { icon: '📡' });
+        const deadline = Date.now() + 95_000;
+        let finished = false;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 4000));
+          try {
+            const poll = await api.get<{
+              status: string; success?: boolean; rtsp_path?: string;
+              rtsp_url?: string; error?: string;
+            }>(`/cameras/auto-detect-path/result/${jobId}`);
+            if (poll.data.status === 'done') {
+              finished = true;
+              if (poll.data.success && poll.data.rtsp_path) {
+                setForm((f) => ({ ...f, rtsp_path: poll.data.rtsp_path! }));
+                toast.success(`Edge Agent found a working path: ${poll.data.rtsp_path}`);
+              } else {
+                toast.error(poll.data.error ?? 'Edge Agent could not find a working RTSP path. Check the IP, port and camera credentials.');
+              }
+              break;
+            }
+            if (poll.data.status === 'expired') {
+              finished = true;
+              toast.error('Probe expired — please try Auto-Detect again.');
+              break;
+            }
+          } catch { /* transient — keep polling */ }
+        }
+        if (!finished) {
+          toast.error('Edge Agent did not respond in time. Make sure the agent is running on a PC in the same network as the camera, then retry.');
+        }
       } else {
         toast.error(res.data.message ?? 'Could not auto-detect RTSP path.');
       }

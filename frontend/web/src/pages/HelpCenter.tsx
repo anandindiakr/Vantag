@@ -24,8 +24,8 @@ export default function HelpCenter() {
 
   const quicklinks = [
     { icon: <Download size={20} />, title: t('help.ql.install', 'Install Edge Agent'), to: '/download' },
-    { icon: <BookOpen size={20} />, title: t('help.ql.how', 'How Vantag works'), to: '/how-it-works' },
-    { icon: <ShieldCheck size={20} />, title: t('help.ql.security', 'Security & Privacy'), to: '/faq' },
+    { icon: <BookOpen size={20} />, title: t('help.ql.how', 'How Vantag works'), to: '/help/how-it-works' },
+    { icon: <ShieldCheck size={20} />, title: t('help.ql.security', 'Security & Privacy'), to: '/help/faq' },
     { icon: <MessageCircle size={20} />, title: t('help.ql.chat', 'Chat with AI Assistant'), action: 'chat' },
   ];
 

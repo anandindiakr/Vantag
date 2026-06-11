@@ -162,6 +162,49 @@ _bootstrap_tokens: dict[str, str] = {}  # token → tenant_id
 # consumes the flag on its next heartbeat.
 _scan_requests: dict[str, bool] = {}  # tenant_id → scan_requested
 
+# ---------------------------------------------------------------------------
+# RTSP probe jobs — the cloud cannot reach private LAN IPs, so path probing
+# (e.g. "auto-detect RTSP path" for Hikvision/Dahua/...) is delegated to the
+# tenant's online Edge Agent. Jobs are queued here, delivered in the heartbeat
+# response, and the agent POSTs the result back to /edge/rtsp-probe-result.
+# ---------------------------------------------------------------------------
+_rtsp_probe_jobs: dict[str, list[dict]] = {}    # tenant_id → queued jobs
+_rtsp_probe_results: dict[str, dict] = {}       # job_id → result record
+_PROBE_RESULT_TTL = 600  # seconds
+
+
+def _prune_probe_results() -> None:
+    cutoff = datetime.now(timezone.utc).timestamp() - _PROBE_RESULT_TTL
+    stale = [k for k, v in _rtsp_probe_results.items() if v.get("_ts", 0) < cutoff]
+    for k in stale:
+        _rtsp_probe_results.pop(k, None)
+
+
+def queue_rtsp_probe(tenant_id: str, ip: str, port: int = 554,
+                     username: str | None = None, password: str | None = None,
+                     brand: str | None = None) -> str:
+    """Queue an agent-side RTSP path probe. Returns the job_id to poll."""
+    _prune_probe_results()
+    job_id = uuid.uuid4().hex
+    _rtsp_probe_jobs.setdefault(tenant_id, []).append({
+        "job_id": job_id, "ip": ip, "port": port,
+        "username": username, "password": password, "brand": brand,
+    })
+    _rtsp_probe_results[job_id] = {
+        "status": "pending",
+        "_ts": datetime.now(timezone.utc).timestamp(),
+    }
+    return job_id
+
+
+def consume_rtsp_probes(tenant_id: str) -> list[dict]:
+    """Return (and clear) queued probe jobs for this tenant's agent."""
+    return _rtsp_probe_jobs.pop(tenant_id, [])
+
+
+def get_rtsp_probe_result(job_id: str) -> dict | None:
+    return _rtsp_probe_results.get(job_id)
+
 
 def request_camera_scan(tenant_id: str) -> None:
     """Mark that the given tenant's agent should run a discovery scan."""
@@ -316,7 +359,41 @@ async def heartbeat(
         "ok": True,
         "server_time": now.isoformat(),
         "scan_requested": consume_camera_scan(agent.tenant_id),
+        "rtsp_probe_jobs": consume_rtsp_probes(agent.tenant_id),
     }
+
+
+class RtspProbeResultBody(BaseModel):
+    job_id: str
+    success: bool
+    rtsp_path: str | None = None
+    rtsp_url: str | None = None
+    brand: str | None = None
+    tried_paths: list[str] | None = None
+    error: str | None = None
+
+
+@edge_router.post("/rtsp-probe-result")
+async def rtsp_probe_result(
+    body: RtspProbeResultBody,
+    agent: EdgeAgent = Depends(_verify_agent),
+) -> dict:
+    """Edge Agent reports the outcome of an RTSP path probe job."""
+    rec = _rtsp_probe_results.get(body.job_id)
+    if rec is None:
+        # Unknown/expired job — accept silently so the agent doesn't retry.
+        return {"ok": True, "known": False}
+    rec.update({
+        "status": "done",
+        "success": body.success,
+        "rtsp_path": body.rtsp_path,
+        "rtsp_url": body.rtsp_url,
+        "brand": body.brand,
+        "tried_paths": body.tried_paths or [],
+        "error": body.error,
+        "_ts": datetime.now(timezone.utc).timestamp(),
+    })
+    return {"ok": True, "known": True}
 
 
 class DiscoveredCameraItem(BaseModel):

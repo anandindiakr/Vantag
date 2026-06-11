@@ -142,6 +142,8 @@ export default function App() {
               <Route path="/agent-status" element={<AgentStatusPage />} />
               <Route path="/account"     element={<AccountPage />} />
               <Route path="/help"       element={<HelpCenter />} />
+              <Route path="/help/how-it-works" element={<HowItWorks embedded />} />
+              <Route path="/help/faq"   element={<FAQ embedded />} />
               <Route path="/health-check" element={<HealthCheck />} />
             </Route>
 
