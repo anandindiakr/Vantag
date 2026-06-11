@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import {
   WifiOff,
   Camera,
@@ -12,6 +13,9 @@ import {
   CheckCircle,
   Info,
   HelpCircle,
+  ThumbsUp,
+  ThumbsDown,
+  Send,
 } from 'lucide-react';
 
 interface Section {
@@ -345,6 +349,9 @@ export default function Troubleshooting() {
         <Accordion sections={sections.map((s) => ({ ...s, id: `ts-${s.id}` }))} />
       </div>
 
+      {/* Feedback Form */}
+      <FeedbackForm />
+
       {/* Still stuck */}
       <div className="rounded-xl bg-vantag-card border border-slate-700/60 p-5 space-y-2">
         <p className="text-sm font-semibold text-slate-100">Still stuck?</p>
@@ -356,6 +363,148 @@ export default function Troubleshooting() {
           with a screenshot and we will respond within 24 hours.
         </p>
       </div>
+    </div>
+  );
+}
+
+// ── Feedback form ───────────────────────────────────────────────────────────
+const topicOptions = [
+  'Camera Offline',
+  'RTSP / NVR Setup',
+  'Remote Access',
+  'Edge Agent Install',
+  'AI Functions',
+  'Zone Editor',
+  'QR Pairing',
+  'Other',
+];
+
+function FeedbackForm() {
+  const [helpful, setHelpful] = useState<'yes' | 'no' | null>(null);
+  const [topic, setTopic] = useState('');
+  const [message, setMessage] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!helpful) {
+      toast.error('Please tell us if this page was helpful');
+      return;
+    }
+    setSending(true);
+    try {
+      await fetch('/api/support/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('vantag_token') ?? ''}`,
+        },
+        body: JSON.stringify({
+          page: 'troubleshooting',
+          helpful: helpful === 'yes',
+          topic: topic || 'Not specified',
+          message,
+        }),
+      });
+    } catch {
+      // silently ignore network errors — feedback is best-effort
+    } finally {
+      setSending(false);
+      setSubmitted(true);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div className="rounded-xl bg-vantag-card border border-green-600/40 p-6 flex flex-col items-center gap-3 text-center">
+        <CheckCircle size={28} className="text-green-400" />
+        <p className="text-sm font-semibold text-slate-100">Thanks for your feedback!</p>
+        <p className="text-xs text-slate-400">We read every submission and use it to improve the guides.</p>
+        <button
+          className="text-xs text-vantag-red hover:underline mt-1"
+          onClick={() => { setSubmitted(false); setHelpful(null); setTopic(''); setMessage(''); }}
+        >
+          Submit another
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl bg-vantag-card border border-slate-700/60 p-5 space-y-5">
+      <div className="flex items-center gap-2">
+        <Send size={16} className="text-vantag-red" />
+        <p className="text-sm font-semibold text-slate-100">Was this guide helpful?</p>
+      </div>
+
+      {/* Thumbs */}
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={() => setHelpful('yes')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+            helpful === 'yes'
+              ? 'bg-green-600/20 border-green-500/60 text-green-300'
+              : 'border-slate-700 text-slate-400 hover:border-green-500/40 hover:text-green-300'
+          }`}
+        >
+          <ThumbsUp size={15} /> Yes, it helped
+        </button>
+        <button
+          type="button"
+          onClick={() => setHelpful('no')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+            helpful === 'no'
+              ? 'bg-red-600/20 border-red-500/60 text-red-300'
+              : 'border-slate-700 text-slate-400 hover:border-red-500/40 hover:text-red-300'
+          }`}
+        >
+          <ThumbsDown size={15} /> No, I still need help
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Topic */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-400">Which topic were you looking for help with?</label>
+          <select
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-vantag-red/60"
+          >
+            <option value="">Select a topic…</option>
+            {topicOptions.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Message */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-400">
+            {helpful === 'no'
+              ? 'Tell us what you were trying to do and what went wrong:'
+              : 'Any other comments or suggestions? (optional)'}
+          </label>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={3}
+            placeholder={helpful === 'no' ? 'e.g. "Camera still shows offline after following step 3…"' : 'e.g. "Add a video walkthrough"'}
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:ring-1 focus:ring-vantag-red/60"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={sending}
+          className="flex items-center gap-2 px-5 py-2 bg-vantag-red hover:bg-red-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          <Send size={14} />
+          {sending ? 'Sending…' : 'Send feedback'}
+        </button>
+      </form>
     </div>
   );
 }
