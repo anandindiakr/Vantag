@@ -763,6 +763,19 @@ Email support@retailnazar.com (India) / support@retail-vantag.com, or use the
 """
 
 
+def _agent_version() -> str:
+    """Read __version__ from the bundled agent package (single source of truth)."""
+    try:
+        import re
+        text = (_AGENT_PKG_DIR / "agent" / "__init__.py").read_text(encoding="utf-8")
+        m = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', text)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    return "0.0.0"
+
+
 def _build_agent_zip(config: dict, platform: str) -> bytes:
     import io
     import json
@@ -787,6 +800,8 @@ def _build_agent_zip(config: dict, platform: str) -> bytes:
             )
         # Prefilled config.json (sits next to the package; loaded by config.load()).
         zf.writestr("config.json", json.dumps(config, indent=2))
+        # Version stamp so users can tell which build they have.
+        zf.writestr("VERSION.txt", f"Vantag Edge Agent v{_agent_version()}\n")
         # Launchers + readme.
         zf.writestr("run.bat", _RUN_BAT)
         zf.writestr("run.sh", _RUN_SH)
@@ -868,7 +883,7 @@ async def download_agent(
     }
 
     data = _build_agent_zip(config, platform)
-    fname = f"vantag-edge-agent-{platform}.zip"
+    fname = f"vantag-edge-agent-{platform}-v{_agent_version()}.zip"
     return Response(
         content=data,
         media_type="application/zip",

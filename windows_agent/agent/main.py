@@ -315,7 +315,11 @@ def main():
     _hide_console()
 
     log.info("=" * 60)
-    log.info("Vantag Windows Edge Agent v1.0.0 starting")
+    try:
+        from . import __version__ as _ver
+    except Exception:
+        _ver = "unknown"
+    log.info(f"Vantag Windows Edge Agent v{_ver} starting")
     log.info("=" * 60)
 
     _config = AgentConfig.load()

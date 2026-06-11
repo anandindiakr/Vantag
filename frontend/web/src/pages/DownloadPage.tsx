@@ -41,10 +41,14 @@ export default function DownloadPage() {
         throw new Error(`Download failed (${res.status}). Please log in again.`);
       }
       const blob = await res.blob();
+      // Server sends a versioned filename (e.g. vantag-edge-agent-windows-v1.2.0.zip)
+      const cd = res.headers.get('Content-Disposition') || '';
+      const m = cd.match(/filename="?([^";]+)"?/);
+      const fname = m ? m[1] : `vantag-edge-agent-${platform}.zip`;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `vantag-edge-agent-${platform}.zip`;
+      a.download = fname;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -68,6 +72,12 @@ export default function DownloadPage() {
       <p className="text-white/60 mb-8">
         The Edge Agent runs on your local PC/tablet/Raspberry Pi and connects
         your LAN cameras to Vantag cloud. Choose your platform below.
+        <br />
+        <span className="text-white/40 text-sm">
+          The downloaded filename includes the agent version (e.g.
+          vantag-edge-agent-windows-v1.2.0.zip) — if you already installed an
+          older version, re-download and re-extract to update.
+        </span>
       </p>
 
       {/* ── Download buttons ─────────────────────────────────────────────── */}
