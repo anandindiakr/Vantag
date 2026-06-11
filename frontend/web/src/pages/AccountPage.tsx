@@ -306,7 +306,10 @@ export default function AccountPage() {
         <p className="text-xs text-white/40 mb-4">
           Download a pre-filled <code className="text-emerald-400">config.json</code> for your
           Windows Edge Agent. It includes your API key, tenant ID, and the subnet you configured
-          above. Place this file next to <code className="text-white/60">RetailVantag_EdgeAgent.exe</code>.
+          above. <strong className="text-white/70">Note:</strong> the Edge Agent zip from{' '}
+          <code className="text-white/60">Install Edge Agent</code> already contains this file —
+          you only need this download if you changed settings above and want to update an
+          existing agent.
         </p>
 
         {agentKey ? (
@@ -330,10 +333,10 @@ export default function AccountPage() {
             </button>
 
             <div className="mt-3 p-4 bg-amber-500/5 border border-amber-500/15 rounded-xl text-xs text-amber-200/70 space-y-1.5">
-              <p className="font-semibold text-amber-300">After downloading:</p>
-              <p>1. Place <code>config.json</code> next to <code>RetailVantag_EdgeAgent.exe</code></p>
-              <p>2. Double-click <code>RetailVantag_EdgeAgent.vbs</code> to start the agent (no visible window)</p>
-              <p>3. Right-click the tray icon to check status or re-run camera discovery</p>
+              <p className="font-semibold text-amber-300">How to update an existing agent:</p>
+              <p>1. Copy this <code>config.json</code> into your extracted Edge Agent folder — the same folder that has <code>run.bat</code> (replace the old file)</p>
+              <p>2. Double-click <code>run.bat</code> to start (or restart) the agent — keep that window open or minimised</p>
+              <p>3. Within ~1 minute the Agent Status page shows ONLINE and cameras start connecting</p>
               <p>4. If cameras are not found automatically, go to <strong>Manage Cameras → Manual Add</strong></p>
             </div>
           </div>
