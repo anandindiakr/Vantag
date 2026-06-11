@@ -32,7 +32,7 @@ import cv2
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -493,6 +493,66 @@ async def update_sensitivity(
         "Sensitivity updated | camera_id=%s confidence=%.3f",
         camera_id, cfg["confidence_threshold"],
     )
+    return _db_camera_to_response(row)
+
+
+# ---------------------------------------------------------------------------
+# PATCH /api/cameras/{camera_id}  (edit name / location / RTSP URL)
+# ---------------------------------------------------------------------------
+
+
+class CameraUpdateRequest(BaseModel):
+    """Editable camera fields. Omitted fields are left unchanged."""
+
+    name: Optional[str] = Field(None, max_length=200)
+    location: Optional[str] = Field(None, max_length=200)
+    rtsp_url: Optional[str] = Field(None, description="Full RTSP URL incl. credentials")
+    enabled: Optional[bool] = None
+
+
+@router.patch(
+    "/{camera_id}",
+    response_model=CameraResponse,
+    summary="Edit camera details (name, location, RTSP URL, enabled)",
+)
+async def update_camera(
+    camera_id: str,
+    body: CameraUpdateRequest,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> CameraResponse:
+    """Update editable camera fields. The Edge Agent picks up changes on its
+    next config sync, so an RTSP URL fix takes effect within seconds without
+    re-adding the camera."""
+    row = await _get_db_camera(session, user.get("tenant_id"), camera_id)
+
+    try:
+        if body.name is not None:
+            row.name = body.name.strip() or row.name
+        if body.location is not None:
+            row.location = body.location.strip()
+        if body.rtsp_url is not None and body.rtsp_url.strip():
+            url = body.rtsp_url.strip()
+            if not url.startswith("rtsp://"):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="RTSP URL must start with rtsp://",
+                )
+            row.set_rtsp_url(url)
+        if body.enabled is not None:
+            row.enabled = body.enabled
+        await session.commit()
+    except HTTPException:
+        await session.rollback()
+        raise
+    except Exception as exc:  # noqa: BLE001
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update camera: {exc}",
+        ) from exc
+
+    logger.info("Camera updated | camera_id=%s tenant=%s", camera_id, user.get("tenant_id"))
     return _db_camera_to_response(row)
 
 

@@ -342,16 +342,22 @@ def main():
     # Register / validate with backend
     _api = VantagApiClient(base_url=_config.backend_url, api_key=_config.api_key)
 
-    if not _config.agent_id:
-        log.info("Registering agent with backend…")
-        try:
-            result = _api.register(device_type="windows")
-            _config.agent_id = result["agent_id"]
+    # Always (re-)register on startup so the backend has the correct
+    # platform, hostname and OS version — fixes agents provisioned via
+    # QR pairing showing up as "android".
+    log.info("Registering agent with backend…")
+    try:
+        result = _api.register(device_type="windows")
+        new_id = result.get("agent_id")
+        if new_id and new_id != _config.agent_id:
+            _config.agent_id = new_id
             _config.save()
-            log.info(f"Agent registered: {_config.agent_id}")
-        except Exception as e:
+        log.info(f"Agent registered: {_config.agent_id}")
+    except Exception as e:
+        if not _config.agent_id:
             log.error(f"Registration failed: {e}")
             sys.exit(1)
+        log.warning(f"Re-registration failed (continuing with saved agent_id): {e}")
 
     # Auto-start monitoring
     start_monitoring()

@@ -268,7 +268,9 @@ async def _probe_websocket() -> tuple[bool, str, Optional[float]]:
     t0 = time.monotonic()
     try:
         from .websocket_router import manager
-        conn_count = len(manager.active_connections)
+        conn_count = len(getattr(manager, "_global_connections", {})) + len(
+            getattr(manager, "_store_connections", {})
+        )
         lat = round((time.monotonic() - t0) * 1000, 1)
         return True, f"Active connections: {conn_count}", lat
     except Exception as exc:  # noqa: BLE001

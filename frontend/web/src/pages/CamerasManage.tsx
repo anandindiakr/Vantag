@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, Wifi, WifiOff, Plus, Trash2, TestTube2,
   Loader2, CheckCircle2, XCircle, ArrowLeft, Network, Sparkles,
-  MessageCircle, SlidersHorizontal,
+  MessageCircle, SlidersHorizontal, Pencil, Save,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useQueryClient } from '@tanstack/react-query';
@@ -925,8 +925,36 @@ function CameraRow({
   deleting: boolean;
   onDelete: () => void;
 }) {
+  const qc = useQueryClient();
   const updateSensitivity = useUpdateCameraSensitivity();
   const [threshold, setThreshold] = useState<number>(cam.confidenceThreshold ?? 0.5);
+
+  // ── Edit state ──
+  const [editing, setEditing] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editName, setEditName] = useState(cam.name);
+  const [editLocation, setEditLocation] = useState(cam.location ?? '');
+  const [editRtsp, setEditRtsp] = useState('');
+
+  const handleEditSave = async () => {
+    if (!editName.trim()) { toast.error('Camera name cannot be empty.'); return; }
+    setSavingEdit(true);
+    try {
+      await api.patch(`/cameras/${cam.id}`, {
+        name: editName.trim(),
+        location: editLocation.trim() || undefined,
+        rtsp_url: editRtsp.trim() || undefined,
+      });
+      toast.success(`Camera "${editName.trim()}" updated. The Edge Agent will pick it up on next sync.`);
+      setEditing(false);
+      setEditRtsp('');
+      void qc.invalidateQueries({ queryKey: queryKeys.cameras });
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Failed to update camera.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   // Keep local slider in sync if the server value changes (e.g. refetch).
   useEffect(() => {
@@ -976,6 +1004,23 @@ function CameraRow({
             {cam.online ? 'ONLINE' : 'OFFLINE'}
           </span>
           <button
+            onClick={() => {
+              setEditName(cam.name);
+              setEditLocation(cam.location ?? '');
+              setEditRtsp('');
+              setEditing((e) => !e);
+            }}
+            className={clsx(
+              'flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-medium transition-all',
+              editing
+                ? 'bg-violet-500/20 border-violet-500/40 text-violet-300'
+                : 'bg-white/5 hover:bg-white/10 border-white/10 hover:border-white/20 text-white/70',
+            )}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Edit
+          </button>
+          <button
             onClick={onDelete}
             disabled={deleting}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 disabled:opacity-40 rounded-lg text-xs font-medium text-red-400 transition-all"
@@ -987,6 +1032,57 @@ function CameraRow({
           </button>
         </div>
       </div>
+
+      {/* Inline edit form */}
+      <AnimatePresence>
+        {editing && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-white/5">
+              <div>
+                <FieldLabel>Camera Name</FieldLabel>
+                <TextInput value={editName} onChange={setEditName} placeholder="Entrance Cam" />
+              </div>
+              <div>
+                <FieldLabel>Location</FieldLabel>
+                <TextInput value={editLocation} onChange={setEditLocation} placeholder="Zone A – Front Door" />
+              </div>
+              <div className="sm:col-span-2">
+                <FieldLabel>
+                  New RTSP URL (leave blank to keep current)
+                  <InfoTooltip text="Full RTSP URL including credentials, e.g. rtsp://admin:pass@192.168.1.100:554/Streaming/Channels/101. The current URL is hidden for security — only fill this to replace it." />
+                </FieldLabel>
+                <TextInput
+                  value={editRtsp}
+                  onChange={setEditRtsp}
+                  placeholder="rtsp://admin:password@192.168.1.100:554/Streaming/Channels/101"
+                />
+              </div>
+              <div className="sm:col-span-2 flex gap-2">
+                <button
+                  onClick={handleEditSave}
+                  disabled={savingEdit}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-xl text-xs font-semibold text-white transition-all"
+                >
+                  {savingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  {savingEdit ? 'Saving…' : 'Save Changes'}
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  disabled={savingEdit}
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs text-white/60 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Per-camera detection sensitivity */}
       <div className="flex items-center gap-3 pt-2 border-t border-white/5">
