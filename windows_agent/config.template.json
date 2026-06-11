@@ -11,5 +11,7 @@
   "inference_fps": 5,
   "confidence_threshold": 0.6,
   "event_cooldown_sec": 30,
-  "log_level": "INFO"
+  "log_level": "INFO",
+  "_scan_subnet_comment": "Set scan_subnet to force discovery on a specific LAN (e.g. 192.168.254.0/24). Leave blank to auto-detect all private subnets.",
+  "scan_subnet": ""
 }

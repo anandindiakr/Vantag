@@ -60,6 +60,7 @@ class CameraConfig(Base):
     fps_target: Mapped[int] = mapped_column(Integer, default=15)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     low_light_mode: Mapped[bool] = mapped_column(Boolean, default=False)
+    analyzer_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     conn_status: Mapped[str] = mapped_column(String(20), default="pending")  # pending/online/offline
     probe_result: Mapped[dict | None] = mapped_column(JSONB)
     staff_zone_colors: Mapped[dict | None] = mapped_column(JSONB)

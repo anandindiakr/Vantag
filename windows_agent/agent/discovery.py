@@ -84,24 +84,83 @@ _RTSP_WORKERS = 8            # concurrent cv2 RTSP probes (heavier)
 # ---------------------------------------------------------------------------
 # 1) Subnet detection
 # ---------------------------------------------------------------------------
+def _is_private(ip: str) -> bool:
+    """Return True if *ip* is an RFC-1918 private or link-local address."""
+    return (
+        ip.startswith("192.168.")
+        or ip.startswith("10.")
+        or ip.startswith("172.16.") or ip.startswith("172.17.")
+        or ip.startswith("172.18.") or ip.startswith("172.19.")
+        or ip.startswith("172.2")  # 172.20–172.29
+        or ip.startswith("172.30.") or ip.startswith("172.31.")
+    )
+
+
 def _local_subnet() -> Optional[IPv4Network]:
-    """Return the agent host's /24 network, or None if it cannot be derived."""
+    """Return the agent host's /24 network using the default outbound interface.
+
+    Falls back to the first RFC-1918 address found on the host if the
+    default route points at a VPN/cloud interface.
+    """
     s = None
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # No packets are sent; this just selects the primary outbound interface.
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
-        return IPv4Network(f"{ip}/24", strict=False)
+        if _is_private(ip):
+            return IPv4Network(f"{ip}/24", strict=False)
     except Exception as e:  # noqa: BLE001
-        log.warning("subnet detect failed: %s", e)
-        return None
+        log.warning("primary subnet detect failed: %s", e)
     finally:
         if s is not None:
             try:
                 s.close()
             except Exception:  # noqa: BLE001
                 pass
+    # Primary outbound interface is non-private (VPN, cloud).
+    # Walk all IPv4 addresses on this host and return the first private one.
+    return _first_private_subnet()
+
+
+def _first_private_subnet() -> Optional[IPv4Network]:
+    """Return the /24 of the first RFC-1918 IPv4 address found on this host."""
+    try:
+        hostname = socket.gethostname()
+        for addrinfo in socket.getaddrinfo(hostname, None, socket.AF_INET):
+            ip = addrinfo[4][0]
+            if ip.startswith("127.") or ip.startswith("169.254."):
+                continue
+            if _is_private(ip):
+                return IPv4Network(f"{ip}/24", strict=False)
+    except Exception as e:  # noqa: BLE001
+        log.warning("fallback subnet detect failed: %s", e)
+    return None
+
+
+def _all_private_subnets() -> list[IPv4Network]:
+    """Return /24s for every RFC-1918 interface on this host (de-duplicated).
+
+    This catches machines with multiple adapters — e.g. both a 10.x.x.x VPN
+    adapter *and* a 192.168.x.x store LAN adapter.
+    """
+    nets: list[IPv4Network] = []
+    seen: set[str] = set()
+    try:
+        hostname = socket.gethostname()
+        for addrinfo in socket.getaddrinfo(hostname, None, socket.AF_INET):
+            ip = addrinfo[4][0]
+            if ip.startswith("127.") or ip.startswith("169.254."):
+                continue
+            if not _is_private(ip):
+                continue
+            net = IPv4Network(f"{ip}/24", strict=False)
+            key = str(net)
+            if key not in seen:
+                seen.add(key)
+                nets.append(net)
+    except Exception as e:  # noqa: BLE001
+        log.warning("all-subnets detect failed: %s", e)
+    return nets
 
 
 # ---------------------------------------------------------------------------
@@ -322,25 +381,51 @@ def _resolve_rtsp(ip: str, brand_hint: Optional[str],
 # ---------------------------------------------------------------------------
 # 5) Orchestrator
 # ---------------------------------------------------------------------------
-def run_discovery(creds: Optional[list[tuple]] = None) -> list[dict]:
+def run_discovery(creds: Optional[list[tuple]] = None,
+                  scan_subnet: Optional[str] = None) -> list[dict]:
     """Discover cameras on the local LAN.
+
+    Args:
+        creds:       Optional credential list (username, password) pairs.
+        scan_subnet: Optional CIDR string to pin the scan to a specific subnet
+                     (e.g. "192.168.254.0/24").  When set the auto-detection is
+                     skipped entirely — useful when the agent machine has a VPN
+                     adapter that grabs the default route.
 
     Returns a list of records:
       {ip, port, brand, model, rtsp_path, rtsp_url, thumbnail_b64,
        onvif, needs_credentials, used_default_credential, confidence}
     """
-    network = _local_subnet()
-    if network is None:
-        log.error("discovery aborted: could not determine local subnet")
+    # ── Determine networks to scan ─────────────────────────────────────────
+    if scan_subnet:
+        try:
+            networks = [IPv4Network(scan_subnet, strict=False)]
+            log.info("Using configured scan_subnet: %s", scan_subnet)
+        except ValueError as exc:
+            log.warning("Invalid scan_subnet '%s': %s — falling back to auto-detect", scan_subnet, exc)
+            networks = _all_private_subnets() or [_local_subnet()]
+    else:
+        networks = _all_private_subnets()
+        if not networks:
+            # Last resort: try the default route
+            net = _local_subnet()
+            networks = [net] if net else []
+
+    networks = [n for n in networks if n is not None]
+    if not networks:
+        log.error("discovery aborted: could not determine any local subnet")
         return []
 
-    log.info("camera discovery started on %s", network)
+    log.info("camera discovery started on %d subnet(s): %s",
+             len(networks), ", ".join(str(n) for n in networks))
 
-    # ONVIF hints (brand/model) keyed by ip — runs in parallel-ish (fast UDP).
+    # ── ONVIF WS-Discovery (fast UDP — covers all subnets at once) ─────────
     onvif_hints = _ws_discovery(timeout=3.0)
 
-    # TCP sweep for live hosts exposing camera ports.
-    live = _tcp_probe(network)
+    # ── TCP sweep across every detected subnet ─────────────────────────────
+    live: list[dict] = []
+    for net in networks:
+        live.extend(_tcp_probe(net))
 
     # Union of TCP-live hosts and ONVIF responders.
     candidate_ips: dict[str, dict] = {}

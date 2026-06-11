@@ -43,6 +43,9 @@ class AgentConfig:
     confidence_threshold: float = 0.6
     event_cooldown_sec: int = 30        # min seconds between same event type per camera
     log_level: str = "INFO"
+    # Set to e.g. "192.168.254.0/24" to force discovery onto a specific LAN.
+    # Leave blank to auto-detect all private (RFC-1918) subnets.
+    scan_subnet: str = ""
 
     @classmethod
     def load(cls) -> "AgentConfig":

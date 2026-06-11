@@ -39,6 +39,7 @@ class Tenant(Base):
     razorpay_customer_id: Mapped[str | None] = mapped_column(String(200))
     trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    network_settings: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # {nvr_ip, scan_subnet, ...}
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 

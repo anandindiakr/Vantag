@@ -34,11 +34,14 @@ async def get_my_tenant(
         "slug": tenant.slug,
         "email": tenant.email,
         "phone": tenant.phone,
+        "address": getattr(tenant, "address", None),
+        "city": getattr(tenant, "city", None),
         "country": tenant.country,
         "region": tenant.region,
         "plan_id": tenant.plan_id,
         "status": tenant.status,
         "language": tenant.language,
+        "network_settings": getattr(tenant, "network_settings", None) or {},
         "trial_ends_at": tenant.trial_ends_at.isoformat() if tenant.trial_ends_at else None,
         "created_at": tenant.created_at.isoformat(),
     }
@@ -49,6 +52,7 @@ class UpdateSettingsBody(BaseModel):
     phone: str | None = None
     address: str | None = None
     city: str | None = None
+    network_settings: dict | None = None  # {nvr_ip, scan_subnet, ...}
 
 
 @tenants_router.patch("/me/settings")
@@ -90,6 +94,29 @@ async def get_my_cameras(
             }
             for c in cameras
         ]
+    }
+
+
+@tenants_router.get("/me/api-key")
+async def get_my_api_key(
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Return the API key for the tenant's first registered Edge Agent."""
+    result = await session.execute(
+        select(EdgeAgent)
+        .where(EdgeAgent.tenant_id == user["tenant_id"])
+        .order_by(EdgeAgent.created_at.asc())
+        .limit(1)
+    )
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="No edge agent registered yet")
+    return {
+        "api_key": agent.api_key,
+        "agent_id": agent.id,
+        "device_type": agent.device_type,
+        "device_name": agent.device_name,
     }
 
 

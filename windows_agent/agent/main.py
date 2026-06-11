@@ -26,6 +26,17 @@ from .inference import YoloInference
 from .tray_icon import VantagTrayIcon
 from . import discovery
 
+# ── Minimise console window on Windows (runs as tray app) ────────────────────
+def _hide_console() -> None:
+    """Minimise the cmd window immediately — agent lives in the system tray."""
+    try:
+        import ctypes
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE
+    except Exception:  # noqa: BLE001
+        pass  # non-Windows or ctypes unavailable — ignore
+
 # ── Logging setup ────────────────────────────────────────────────────────────
 LOG_DIR = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Vantag")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -64,7 +75,9 @@ def run_discovery_and_report(reason: str = "startup"):
         return
     try:
         log.info("Camera discovery scan started (%s)…", reason)
-        cameras = discovery.run_discovery()
+        cameras = discovery.run_discovery(
+            scan_subnet=_config.scan_subnet or None,
+        )
         log.info("Discovery found %d candidate camera(s)", len(cameras))
         resp = _api.report_discovered(cameras)
         if resp is None:
@@ -297,6 +310,9 @@ def open_settings():
 
 def main():
     global _config, _api
+
+    # Minimise the console immediately — the agent lives in the system tray.
+    _hide_console()
 
     log.info("=" * 60)
     log.info("Vantag Windows Edge Agent v1.0.0 starting")
