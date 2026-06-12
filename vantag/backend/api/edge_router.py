@@ -1009,3 +1009,4 @@ async def download_agent(
     )
  
 # deploy-marker: ensure /api/edge/preview route is committed to remote 
+# deploy-marker2: force complete blob transfer (no-thin) 
