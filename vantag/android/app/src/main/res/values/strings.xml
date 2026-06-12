@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vantag Agent</string>
+    <string name="notification_channel_agent">Edge Agent</string>
+    <string name="notification_channel_alerts">Security Alerts</string>
+    <string name="agent_running">Vantag Edge Agent is running</string>
+    <string name="agent_stopped">Agent stopped</string>
+</resources>

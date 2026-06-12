@@ -1,0 +1,109 @@
+# ===========================================================================
+# Vantag Edge Dockerfile
+# ===========================================================================
+# Base image: NVIDIA L4T PyTorch for Jetson Orin / AGX / NX (ARM64)
+# JetPack 5.1.x | L4T R35.4.1 | PyTorch 2.1 | Python 3.8
+# ===========================================================================
+FROM nvcr.io/nvidia/l4t-pytorch:r35.4.1-pth2.1-py3
+
+LABEL maintainer="Vantag Platform <platform@vantag.ai>" \
+      description="Vantag retail AI platform — Jetson edge container" \
+      version="1.0.0"
+
+WORKDIR /app
+
+# ---------------------------------------------------------------------------
+# System dependencies
+# ---------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        # GStreamer (camera ingestion via RTSP)
+        libgstreamer1.0-dev \
+        gstreamer1.0-plugins-good \
+        gstreamer1.0-plugins-bad \
+        gstreamer1.0-plugins-ugly \
+        gstreamer1.0-tools \
+        # MQTT broker (co-located for low-latency edge deployments)
+        mosquitto \
+        mosquitto-clients \
+        # OpenCV system libraries (headless Python build links to these)
+        libopencv-dev \
+        # Video / codec utilities
+        ffmpeg \
+        v4l-utils \
+        # Build tools for Python packages with C extensions
+        gcc \
+        g++ \
+        cmake \
+        # curl / wget for health checks and model downloads
+        curl \
+        wget \
+        # Timezone data (required by some Python packages)
+        tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# ---------------------------------------------------------------------------
+# Python dependencies
+# ---------------------------------------------------------------------------
+# Upgrade pip first to ensure modern resolver behaviour.
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ---------------------------------------------------------------------------
+# Application source
+# ---------------------------------------------------------------------------
+COPY backend/  ./backend/
+COPY models/   ./models/
+
+# Mosquitto configuration (TCP + WebSocket listeners).
+COPY docker/mosquitto.conf /etc/mosquitto/mosquitto.conf
+
+# Create runtime directories.
+RUN mkdir -p /app/snapshots/reports \
+             /app/snapshots/frames \
+             /var/log/vantag \
+             /var/lib/mosquitto
+
+# ---------------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------------
+ENV PYTHONPATH=/app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV VANTAG_ENV=edge
+# TensorRT / CUDA visibility (Jetson unified memory).
+ENV CUDA_VISIBLE_DEVICES=0
+# Disable ultralytics telemetry.
+ENV YOLO_TELEMETRY=False
+# Timezone.
+ENV TZ=UTC
+
+# ---------------------------------------------------------------------------
+# Ports
+# 8000  — FastAPI REST + WebSocket
+# 1883  — MQTT TCP
+# 9001  — MQTT over WebSocket
+# ---------------------------------------------------------------------------
+EXPOSE 8000 1883 9001
+
+# ---------------------------------------------------------------------------
+# Health check — polls the FastAPI /health endpoint every 30 s.
+# ---------------------------------------------------------------------------
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# ---------------------------------------------------------------------------
+# Entrypoint
+# ---------------------------------------------------------------------------
+# Start Mosquitto in the background, then launch Uvicorn.
+# Single worker is intentional on Jetson (GPU is shared; concurrency is
+# managed inside the application via async/await and the ModelScheduler).
+CMD ["sh", "-c", \
+     "mosquitto -c /etc/mosquitto/mosquitto.conf -d && \
+      uvicorn backend.api.main:app \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --workers 1 \
+          --log-level info"]

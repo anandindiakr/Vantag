@@ -1,0 +1,33 @@
+global:
+  mqtt_broker: 127.0.0.1
+  mqtt_port: 1883
+  reconnect_backoff_max: 64
+  frame_buffer_size: 30
+  risk_score_window_seconds: 60
+  yolo_model_path: models/yolov8n.pt
+  yolo_device: cpu
+  yolo_conf_threshold: 0.25
+  product_classes:
+  - bottle
+  - cup
+  - bowl
+  - banana
+  - apple
+  - orange
+  - sandwich
+  - book
+  - vase
+  - backpack
+  - handbag
+  - suitcase
+  - laptop
+  - cell phone
+  - remote
+  - scissors
+  - teddy bear
+  - clock
+  - wine glass
+  - fork
+  - knife
+  - spoon
+cameras: []

@@ -1,0 +1,2146 @@
+{
+  "scan_time": "2026-04-06T15:04:57.803756",
+  "subnet": "192.168.1.0/24",
+  "live_hosts": [
+    "192.168.1.106",
+    "192.168.1.109",
+    "192.168.1.248",
+    "192.168.1.250",
+    "192.168.1.251",
+    "192.168.1.254"
+  ],
+  "host_details": [
+    {
+      "ip": "192.168.1.106",
+      "mac": "e8-b7-23-08-c0-a3",
+      "open_ports": [
+        554,
+        80
+      ],
+      "is_camera_candidate": true
+    },
+    {
+      "ip": "192.168.1.109",
+      "mac": "98-f1-12-f5-30-6c",
+      "open_ports": [
+        554,
+        80,
+        8000
+      ],
+      "is_camera_candidate": true
+    },
+    {
+      "ip": "192.168.1.248",
+      "mac": "2a-2a-8a-00-58-02",
+      "open_ports": [
+        554,
+        80,
+        8080,
+        8000,
+        34567
+      ],
+      "is_camera_candidate": true
+    },
+    {
+      "ip": "192.168.1.250",
+      "mac": "dc-07-f8-53-66-e7",
+      "open_ports": [
+        554,
+        80,
+        8000
+      ],
+      "is_camera_candidate": true
+    },
+    {
+      "ip": "192.168.1.251",
+      "mac": "2a-2a-8a-00-57-cb",
+      "open_ports": [
+        554,
+        80,
+        8080,
+        8000,
+        34567
+      ],
+      "is_camera_candidate": true
+    },
+    {
+      "ip": "192.168.1.254",
+      "mac": "unknown",
+      "open_ports": [
+        80,
+        8080,
+        8000
+      ],
+      "is_camera_candidate": false
+    }
+  ],
+  "camera_candidates": [
+    "192.168.1.106",
+    "192.168.1.109",
+    "192.168.1.248",
+    "192.168.1.250",
+    "192.168.1.251"
+  ],
+  "rtsp_results": {
+    "192.168.1.106": [
+      {
+        "url": "rtsp://192.168.1.106:554/",
+        "status": "open",
+        "requires_auth": false
+      }
+    ],
+    "192.168.1.109": [
+      {
+        "url": "rtsp://192.168.1.109:554/",
+        "status": "open",
+        "requires_auth": false
+      }
+    ],
+    "192.168.1.248": [
+      {
+        "url": "rtsp://192.168.1.248:554/",
+        "status": "open",
+        "requires_auth": false
+      }
+    ],
+    "192.168.1.250": [
+      {
+        "url": "rtsp://192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:admin@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:12345@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:123456@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:password@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:1234@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:888888@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://admin:666666@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:root@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://root:12345@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/stream",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/stream1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/stream2",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/live",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/live/ch00_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/live/ch01_0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/live/main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/ch01.264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/ch01.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/videoMain",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/video1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/video.h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/h264Preview_01_main",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/cam/realmonitor?channel=1&subtype=0",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/cam/realmonitor?channel=1&subtype=1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/Streaming/Channels/101",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/Streaming/Channels/102",
+        "status": "auth_required",
+        "requires_auth": true
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/ONVIF/MediaInput",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/onvif/media",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/MediaInput/h264",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/mpeg4/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/axis-media/media.amp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/user=admin_password=_channel=1_stream=0.sdp",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/videostream.cgi",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/11",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/12",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/1",
+        "status": "reachable",
+        "requires_auth": false
+      },
+      {
+        "url": "rtsp://guest:guest@192.168.1.250:554/2",
+        "status": "reachable",
+        "requires_auth": false
+      }
+    ],
+    "192.168.1.251": [
+      {
+        "url": "rtsp://192.168.1.251:554/",
+        "status": "open",
+        "requires_auth": false
+      }
+    ]
+  }
+}

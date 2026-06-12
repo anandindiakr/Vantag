@@ -1,0 +1,119 @@
+version: "3.9"
+
+# Vantag India (Retail Nazar) — Production
+# Domain: retailnazar.vantag.io
+# Currency: INR | Language: hi/en
+
+x-common-env: &common-env
+  REGION: "IN"
+  APP_NAME: "Vantag Retail Nazar"
+  DOMAIN: "retailnazar.vantag.io"
+  TZ: "Asia/Kolkata"
+  LOG_LEVEL: "INFO"
+
+services:
+  postgres_in:
+    image: postgres:16-alpine
+    container_name: vantag_postgres_in
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-vantag_in}
+    volumes:
+      - vantag_pg_in:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vantag_in
+
+  redis_in:
+    image: redis:7-alpine
+    container_name: vantag_redis_in
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - vantag_redis_in:/data
+    networks:
+      - vantag_in
+
+  mosquitto_in:
+    image: eclipse-mosquitto:2.0
+    container_name: vantag_mqtt_in
+    restart: always
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - vantag_mqtt_in:/mosquitto/data
+    networks:
+      - vantag_in
+
+  backend_in:
+    image: ghcr.io/vantag/backend:${IMAGE_TAG:-latest}
+    container_name: vantag_backend_in
+    restart: always
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@postgres_in:5432/${DB_NAME:-vantag_in}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis_in:6379
+      MQTT_HOST: mosquitto_in
+      MQTT_PORT: "1883"
+      SECRET_KEY: ${SECRET_KEY}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID_IN}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET_IN}
+      CORS_ORIGINS: "https://retailnazar.vantag.io"
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+    depends_on:
+      postgres_in:
+        condition: service_healthy
+      redis_in:
+        condition: service_started
+    networks:
+      - vantag_in
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8800/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend_in:
+    image: ghcr.io/vantag/frontend:${IMAGE_TAG:-latest}
+    container_name: vantag_frontend_in
+    restart: always
+    environment:
+      VITE_REGION: "IN"
+      VITE_APP_NAME: "Vantag Retail Nazar"
+    networks:
+      - vantag_in
+
+  nginx_in:
+    image: nginx:1.27-alpine
+    container_name: vantag_nginx_in
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/india.conf:/etc/nginx/conf.d/vantag.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      - backend_in
+      - frontend_in
+    networks:
+      - vantag_in
+
+networks:
+  vantag_in:
+    driver: bridge
+
+volumes:
+  vantag_pg_in:
+  vantag_redis_in:
+  vantag_mqtt_in:

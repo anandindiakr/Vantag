@@ -1,0 +1,147 @@
+diff --git a/vantag/frontend/web/src/hooks/useRegion.ts b/vantag/frontend/web/src/hooks/useRegion.ts
+index 194b8a5..8bc1185 100644
+--- a/vantag/frontend/web/src/hooks/useRegion.ts
++++ b/vantag/frontend/web/src/hooks/useRegion.ts
+@@ -1,27 +1,29 @@
+ import { useMemo, useEffect } from 'react';
+ import { useTranslation } from 'react-i18next';
+ import { detectRegion, type RegionConfig } from '../config/regions';
+ 
+ let _cached: RegionConfig | null = null;
+ 
+ export function useRegion(): RegionConfig {
+   if (!_cached) {
+     _cached = detectRegion();
+   }
+   const region = _cached;
+ 
+   const { i18n } = useTranslation();
+ 
+   // On first mount, switch i18n to the region's default language
+   // (only if user hasn't already picked a language)
+   useEffect(() => {
+     const stored = localStorage.getItem('vantag_lang');
+     if (stored && region.languages.some((l) => l.code === stored)) {
+       if (i18n.language !== stored) i18n.changeLanguage(stored);
+-    } else if (i18n.language !== region.defaultLang) {
++    } else {
++      // Stored value absent or not valid for this region — use region default and persist it
+       i18n.changeLanguage(region.defaultLang);
++      localStorage.setItem('vantag_lang', region.defaultLang);
+     }
+   }, [region.defaultLang, i18n]);
+ 
+   return useMemo(() => region, [region]);
+ }
+diff --git a/vantag/frontend/web/src/pages/Landing.tsx b/vantag/frontend/web/src/pages/Landing.tsx
+index f498d7d..0f0376e 100644
+--- a/vantag/frontend/web/src/pages/Landing.tsx
++++ b/vantag/frontend/web/src/pages/Landing.tsx
+@@ -326,41 +326,50 @@ export default function Landing() {
+         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+           {/* Logo */}
+           <div className="flex items-center gap-3">
+             <div className="relative w-9 h-9">
+               <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-cyan-400 to-violet-600 opacity-80" />
+               <div className="relative w-full h-full rounded-lg flex items-center justify-center">
+                 <Shield className="w-4.5 h-4.5 text-white" />
+               </div>
+             </div>
+             <span className="font-syne text-lg font-bold tracking-tight">
+               {region.brand}
+             </span>
+           </div>
+ 
+           {/* Region pill — only visible on localhost for dev testing */}
+           {IS_LOCALHOST && (
+             <div className="hidden md:flex items-center gap-1 bg-white/5 border border-white/8 rounded-full p-1">
+               {REGION_SWITCHER.map(r => (
+                 <button
+                   key={r.code}
+-                  onClick={() => { setActiveCode(r.code); i18n.changeLanguage(r.lang); }}
++                  onClick={() => {
++                    setActiveCode(r.code);
++                    // Only change language if the current one isn't supported in the target region
++                    const targetRegion = REGION_MAP[r.code];
++                    const currentLangValid = targetRegion?.languages.some((l) => l.code === i18n.language);
++                    if (!currentLangValid) {
++                      i18n.changeLanguage(r.lang);
++                      localStorage.setItem('vantag_lang', r.lang);
++                    }
++                  }}
+                   className={px-3.5 py-1.5 rounded-full text-xs font-semibold font-mono-alt tracking-wide transition-all }
+                 >
+                   {r.flag} {r.name}
+                 </button>
+               ))}
+             </div>
+           )}
+ 
+           <div className="flex items-center gap-4">
+             <LanguageSelector variant="dark" />
+             <Link to="/login" className="text-sm text-white/50 hover:text-white transition-colors font-medium">
+               Sign In
+             </Link>
+             <Link
+               to="/register"
+               className="flex items-center gap-1.5 px-4 py-2 bg-cyan-500 hover:bg-cyan-400 rounded-full text-sm font-bold text-black transition-all"
+diff --git a/vantag/frontend/web/src/pages/auth/Register.tsx b/vantag/frontend/web/src/pages/auth/Register.tsx
+index 74e5a4c..b44b4aa 100644
+--- a/vantag/frontend/web/src/pages/auth/Register.tsx
++++ b/vantag/frontend/web/src/pages/auth/Register.tsx
+@@ -1,59 +1,63 @@
+ import React, { useState } from 'react';
+ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
++import { useTranslation } from 'react-i18next';
+ import { motion } from 'framer-motion';
+ import { Shield, Eye, EyeOff, ArrowRight } from 'lucide-react';
+ import axios from 'axios';
+ import toast from 'react-hot-toast';
+ import { useRegion } from '../../hooks/useRegion';
+ import { LanguageSelector } from '../../components/LanguageSelector';
+ 
+ const COUNTRIES = [
+   { code: 'IN', name: '???? India', lang: 'hi' },
+   { code: 'SG', name: '???? Singapore', lang: 'en' },
+   { code: 'MY', name: '???? Malaysia', lang: 'ms' },
+ ];
+ 
+ export default function Register() {
+   const nav = useNavigate();
+   const region = useRegion();
+   const [params] = useSearchParams();
+   const [showPw, setShowPw] = useState(false);
+   const [loading, setLoading] = useState(false);
+   const [form, setForm] = useState({
+     name: '',
+     email: '',
+     password: '',
+     phone: '',
+     country: params.get('country') || region.region,
+     plan_id: params.get('plan') || 'starter',
+   });
+ 
+   const up = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+ 
++  const { i18n } = useTranslation();
++
+   const submit = async (e: React.FormEvent) => {
+     e.preventDefault();
+     if (form.password.length < 8) { toast.error('Password must be at least 8 characters'); return; }
+     setLoading(true);
+     try {
+-      const country = COUNTRIES.find(c => c.code === form.country);
+-      const { data } = await axios.post('/api/auth/register', { ...form, language: country?.lang || 'en' });
++      // Use the language the user actually selected, not a hardcoded region default
++      const language = localStorage.getItem('vantag_lang') || i18n.language || region.defaultLang;
++      const { data } = await axios.post('/api/auth/register', { ...form, language });
+       localStorage.setItem('vantag_token', data.access_token);
+       localStorage.setItem('vantag_tenant', JSON.stringify({ id: data.tenant_id, plan: data.plan_id, step: 1 }));
+       toast.success('Account created! Please verify your email.');
+       nav('/verify-email', { state: { email: form.email } });
+     } catch (err: any) {
+       toast.error(err?.response?.data?.detail || 'Registration failed');
+     } finally {
+       setLoading(false);
+     }
+   };

@@ -1,0 +1,7 @@
+feat: guided Setup Wizard at /setup with live diagnostics + auto-correction
+
+- 5-step wizard: Edge Agent check (auto-polls every 5s), network diagnosis (detects LAN cameras with no agent online), LAN camera discovery via scan-request, camera health with offline-cause explanations, summary
+
+- Auto-advances when checks pass; beginner-friendly fix instructions when they fail
+
+- Added to sidebar as 'Setup Wizard'
