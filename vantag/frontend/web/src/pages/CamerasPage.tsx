@@ -6,7 +6,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Camera, Wifi, WifiOff, AlertTriangle, Maximize2, RefreshCw, Plus } from 'lucide-react';
 import clsx from 'clsx';
-import { useCameras } from '../hooks/useApi';
+import { useCameras, api } from '../hooks/useApi';
 import { useVantagStore } from '../store/useVantagStore';
 
 // Auto-refresh snapshot every N ms
@@ -14,21 +14,49 @@ const SNAPSHOT_REFRESH_MS = 3000;
 
 function CameraCard({ cam }: { cam: ReturnType<typeof useCameras>['data'] extends (infer T)[] | undefined ? T : never }) {
   const nav = useNavigate();
-  const [tick, setTick]         = useState(0);
+  const [snapUrl, setSnapUrl]   = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
 
-  // Refresh snapshot periodically
+  // Fetch the live snapshot through the authenticated axios instance. A plain
+  // <img src="/api/..."> cannot attach the JWT Bearer token, so it always got
+  // 401 and showed "No preview". We pull the JPEG as a blob and refresh it.
   useEffect(() => {
-    if (!cam.online) return;
-    const id = setInterval(() => setTick((t) => t + 1), SNAPSHOT_REFRESH_MS);
-    return () => clearInterval(id);
-  }, [cam.online]);
+    if (!cam.online) {
+      setSnapUrl(null);
+      return;
+    }
+    let cancelled = false;
+    let lastUrl: string | null = null;
+
+    const fetchSnap = async () => {
+      try {
+        const res = await api.get(`/cameras/${cam.id}/snapshot`, {
+          responseType: 'blob',
+        });
+        if (cancelled) return;
+        const url = URL.createObjectURL(res.data);
+        setSnapUrl(url);
+        setImgError(false);
+        if (lastUrl) URL.revokeObjectURL(lastUrl);
+        lastUrl = url;
+      } catch {
+        if (!cancelled) setImgError(true);
+      }
+    };
+
+    fetchSnap();
+    const id = setInterval(fetchSnap, SNAPSHOT_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+    };
+  }, [cam.online, cam.id]);
 
   const recentEvents = useVantagStore((s) =>
     s.recentEvents.filter((e) => e.cameraId === cam.id).slice(0, 3)
   );
 
-  const snapshotUrl = `/api/cameras/${cam.id}/snapshot?t=${tick}`;
   const hasAlert    = recentEvents.some((e) => e.severity === 'HIGH' || e.severity === 'CRITICAL');
 
   return (
@@ -43,18 +71,16 @@ function CameraCard({ cam }: { cam: ReturnType<typeof useCameras>['data'] extend
     >
       {/* Snapshot / stream */}
       <div className="relative aspect-video bg-black">
-        {cam.online && !imgError ? (
+        {cam.online && snapUrl && !imgError ? (
           <img
-            key={tick}
-            src={snapshotUrl}
+            src={snapUrl}
             alt={cam.name}
             className="w-full h-full object-cover"
-            onError={() => setImgError(true)}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-white/20">
             <Camera className="w-10 h-10" />
-            <span className="text-xs">{cam.online ? 'No preview' : 'Offline'}</span>
+            <span className="text-xs">{cam.online ? 'Connecting…' : 'Offline'}</span>
           </div>
         )}
 
