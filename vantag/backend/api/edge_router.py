@@ -1007,3 +1007,5 @@ async def download_agent(
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+ 
+# deploy-marker: ensure /api/edge/preview route is committed to remote 
