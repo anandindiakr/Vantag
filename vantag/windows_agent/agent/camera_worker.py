@@ -547,6 +547,21 @@ class CameraWorker:
         frame_interval = 1.0 / self._target_fps
         inference_every = 2   # run AI every 2nd captured frame
 
+        # Guard: the backend must hand us a real rtsp:// URL. If it still looks
+        # encrypted ("fernet:") or isn't an rtsp/http URL, the cloud server
+        # failed to decrypt it (old build or wrong VANTAG_ENCRYPTION_KEY).
+        # Surface a single, human-readable error instead of hammering FFmpeg
+        # with an undecryptable blob.
+        _url = (self.config.rtsp_url or "").strip()
+        if _url.startswith("fernet:") or not _url.lower().startswith(("rtsp://", "http://", "https://")):
+            self.is_connected = False
+            self.error_msg = (
+                "Camera URL was not decrypted by the server. Re-save this camera "
+                "in Manage Cameras, and make sure the backend is updated."
+            )
+            log.error(f"[{self.config.name}] {self.error_msg} (got: {_url[:24]}...)")
+            return
+
         while not self._stop_event.is_set():
             cap = None
             try:
