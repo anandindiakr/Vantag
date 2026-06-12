@@ -576,6 +576,12 @@ class CameraWorker:
                 self.error_msg = ""
                 log.info(f"[{self.config.name}] RTSP connected")
 
+                # Force a live-preview push on the very first decoded frame after
+                # every (re)connect. Flaky NVR streams can drop within ~9s, before
+                # the 10s periodic timer ever fires, so without this the cloud
+                # dashboard would never receive a single still.
+                self._last_preview_t = 0.0
+
                 frame_count = 0
                 fps_t0 = time.time()
                 fps_frames = 0
