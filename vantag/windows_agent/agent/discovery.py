@@ -300,7 +300,10 @@ def _try_rtsp(ip: str, port: int, path: str,
         return None
     path = path if path.startswith("/") else f"/{path}"
     if username and password:
-        rtsp_url = f"rtsp://{username}:{password}@{ip}:{port}{path}"
+        from urllib.parse import quote
+        u = quote(str(username), safe="")
+        p = quote(str(password), safe="")
+        rtsp_url = f"rtsp://{u}:{p}@{ip}:{port}{path}"
     else:
         rtsp_url = f"rtsp://{ip}:{port}{path}"
 

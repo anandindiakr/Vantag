@@ -122,6 +122,25 @@ def _mask_rtsp(url: str) -> str:
     return re.sub(r"(rtsp://)([^@]+)@", r"\1***@", url)
 
 
+def _build_rtsp_url(ip: str, port: int, path: str,
+                    username: Optional[str], password: Optional[str]) -> str:
+    """Assemble an rtsp:// URL, URL-encoding the credentials.
+
+    Camera passwords frequently contain reserved URL characters such as
+    ``#``, ``@``, ``:``, ``/``, ``?`` or ``%``. Embedding them raw breaks the
+    URL (e.g. ``#`` truncates everything after it), so every credential is
+    percent-encoded with ``safe=''`` before it is placed in the userinfo.
+    """
+    from urllib.parse import quote
+    if not path.startswith("/"):
+        path = f"/{path}"
+    if username and password:
+        u = quote(str(username), safe="")
+        p = quote(str(password), safe="")
+        return f"rtsp://{u}:{p}@{ip}:{port}{path}"
+    return f"rtsp://{ip}:{port}{path}"
+
+
 def _parse_ts(ts: Optional[str]) -> Optional[datetime]:
     """Safely parse an ISO-8601 timestamp string, returning None on failure."""
     if not ts:
@@ -782,10 +801,7 @@ async def test_camera_connection(
     """
     # Build RTSP URL
     path = body.rtsp_path if body.rtsp_path.startswith("/") else f"/{body.rtsp_path}"
-    if body.username and body.password:
-        rtsp_url = f"rtsp://{body.username}:{body.password}@{body.ip}:{body.port}{path}"
-    else:
-        rtsp_url = f"rtsp://{body.ip}:{body.port}{path}"
+    rtsp_url = _build_rtsp_url(body.ip, body.port, path, body.username, body.password)
 
     # The backend runs in the cloud and cannot route to a private LAN address
     # (e.g. 192.168.x.x / 10.x / 172.16-31.x). A camera on the user's local
@@ -884,10 +900,7 @@ async def create_camera(
 
     # Build RTSP URL
     path = body.rtsp_path if body.rtsp_path.startswith("/") else f"/{body.rtsp_path}"
-    if body.username and body.password:
-        rtsp_url = f"rtsp://{body.username}:{body.password}@{body.ip}:{body.port}{path}"
-    else:
-        rtsp_url = f"rtsp://{body.ip}:{body.port}{path}"
+    rtsp_url = _build_rtsp_url(body.ip, body.port, path, body.username, body.password)
 
     # Parse resolution
     try:
@@ -1047,10 +1060,7 @@ def _try_rtsp_path(ip: str, port: int, path: str, username: Optional[str], passw
     Returns dict with path/thumbnail on success, None on failure.
     """
     path = path if path.startswith("/") else f"/{path}"
-    if username and password:
-        rtsp_url = f"rtsp://{username}:{password}@{ip}:{port}{path}"
-    else:
-        rtsp_url = f"rtsp://{ip}:{port}{path}"
+    rtsp_url = _build_rtsp_url(ip, port, path, username, password)
 
     cap = None
     try:
@@ -1346,7 +1356,7 @@ async def confirm_discovered_camera(
 
     # Build the final RTSP URL: prefer user credentials, else any stored URL.
     if body.username and body.password and row.ip_address:
-        rtsp_url = f"rtsp://{body.username}:{body.password}@{row.ip_address}:{port}{path}"
+        rtsp_url = _build_rtsp_url(row.ip_address, port, path, body.username, body.password)
     else:
         rtsp_url = row.get_rtsp_url() or (
             f"rtsp://{row.ip_address}:{port}{path}" if row.ip_address else None
