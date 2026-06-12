@@ -1330,7 +1330,17 @@ async def confirm_discovered_camera(
 
     probe = row.probe_result or {}
     port = probe.get("port") or 554
-    path = probe.get("rtsp_path") or "/"
+    path = probe.get("rtsp_path")
+    if not path:
+        # Discovery never resolved a working path (camera needed credentials so
+        # every probe got 401 before a frame). Fall back to the most common
+        # path for the detected brand instead of "/", which never works on
+        # real NVRs/IP-cameras. With the user's credentials this produces a
+        # stream that actually opens (e.g. Hikvision /Streaming/Channels/101).
+        brand_key = (row.brand or probe.get("brand") or "generic").strip().lower()
+        preset = _BRAND_RTSP_PRESETS.get(brand_key) or _BRAND_RTSP_PRESETS["generic"]
+        path = preset["paths"][0]
+        port = preset.get("port") or port
     if not path.startswith("/"):
         path = f"/{path}"
 
