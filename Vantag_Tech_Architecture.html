@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vantag / Nazar — Technical Architecture & Data Flow</title>
+<style>
+  :root{
+    --bg:#0a0e1a; --panel:#111827; --panel2:#0f172a;
+    --cyan:#06b6d4; --violet:#a855f7; --green:#10b981;
+    --amber:#f59e0b; --red:#ef4444; --ink:#e5e7eb; --muted:#94a3b8;
+    --line:rgba(255,255,255,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Segoe UI',-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5; padding:40px 20px;
+  }
+  .page{max-width:1100px;margin:0 auto}
+  header.hero{
+    text-align:center; padding:32px;
+    background:linear-gradient(135deg,rgba(6,182,212,.12),rgba(168,85,247,.12));
+    border:1px solid var(--line); border-radius:20px; margin-bottom:28px;
+  }
+  header.hero .badge{
+    display:inline-block;font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--cyan);border:1px solid rgba(6,182,212,.4);border-radius:999px;
+    padding:5px 14px;margin-bottom:14px;font-weight:600;
+  }
+  header.hero h1{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  header.hero h1 .grad{
+    background:linear-gradient(90deg,var(--cyan),var(--violet));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  header.hero p{color:var(--muted);margin-top:8px;font-size:14px}
+
+  .section-title{
+    font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--violet);
+    font-weight:700;margin:34px 0 16px;display:flex;align-items:center;gap:10px;
+  }
+  .section-title::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  /* Flow row */
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:nowrap}
+  .stage{
+    flex:1;background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:18px 16px;position:relative;min-width:0;
+  }
+  .stage .ico{font-size:26px;margin-bottom:8px}
+  .stage h3{font-size:15px;font-weight:700;margin-bottom:4px}
+  .stage .where{font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;margin-bottom:10px}
+  .stage ul{list-style:none;font-size:12px;color:var(--muted)}
+  .stage ul li{padding:3px 0 3px 16px;position:relative}
+  .stage ul li::before{content:"›";position:absolute;left:2px;color:var(--cyan);font-weight:700}
+  .arrow{
+    display:flex;align-items:center;justify-content:center;padding:0 6px;color:var(--cyan);
+    font-size:24px;font-weight:700;flex:0 0 34px;
+  }
+  .tag-local{color:var(--green)}
+  .tag-cloud{color:var(--violet)}
+  .tag-edge{color:var(--cyan)}
+  .border-local{border-color:rgba(16,185,129,.4)}
+  .border-cloud{border-color:rgba(168,85,247,.4)}
+  .border-edge{border-color:rgba(6,182,212,.4)}
+
+  /* split cards */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}
+  .card h4{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .card .dot{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .card ul{list-style:none}
+  .card ul li{font-size:12.5px;color:var(--muted);padding:5px 0 5px 18px;position:relative;border-bottom:1px dashed rgba(255,255,255,.05)}
+  .card ul li:last-child{border-bottom:0}
+  .card ul li::before{content:"●";position:absolute;left:0;font-size:8px;top:8px}
+  .li-yes::before{color:var(--green)}
+  .li-no::before{color:var(--red)}
+  .li-cloud::before{color:var(--violet)}
+
+  .legend{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;margin-top:14px;font-size:12px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:7px}
+  .legend .sw{width:14px;height:14px;border-radius:4px}
+
+  .callout{
+    margin-top:18px;background:linear-gradient(135deg,rgba(16,185,129,.10),rgba(6,182,212,.08));
+    border:1px solid rgba(16,185,129,.35);border-radius:16px;padding:18px 22px;
+    display:flex;gap:14px;align-items:flex-start;
+  }
+  .callout .big{font-size:26px}
+  .callout h4{font-size:15px;color:var(--green);margin-bottom:4px}
+  .callout p{font-size:13px;color:var(--ink)}
+
+  /* alerts row */
+  .alerts{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .pill{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center}
+  .pill .ico{font-size:24px;margin-bottom:6px}
+  .pill h5{font-size:13px;font-weight:700;margin-bottom:4px}
+  .pill p{font-size:11px;color:var(--muted)}
+
+  table.specs{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+  table.specs th,table.specs td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+  table.specs th{color:var(--cyan);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+  table.specs td{color:var(--muted)}
+  table.specs td:first-child{color:var(--ink);font-weight:600}
+
+  footer{margin-top:36px;text-align:center;color:var(--muted);font-size:11px;border-top:1px solid var(--line);padding-top:18px}
+
+  @media print{
+    body{background:#fff;color:#111;padding:0}
+    .stage,.card,.pill,.page{break-inside:avoid}
+    header.hero,.callout{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hero">
+    <span class="badge">Technical Architecture</span>
+    <h1>How <span class="grad">Vantag</span> Moves &amp; Protects Your Data</h1>
+    <p>Edge-first AI surveillance · Video stays in your store · Only insights reach the cloud</p>
+  </header>
+
+  <!-- DATA FLOW -->
+  <div class="section-title">End-to-End Data Flow</div>
+  <div class="flow">
+    <div class="stage border-edge">
+      <div class="ico">📹</div>
+      <h3>IP Cameras / NVR</h3>
+      <div class="where tag-edge">In-Store · Local LAN</div>
+      <ul>
+        <li>RTSP H.264/H.265 streams</li>
+        <li>Hikvision, Dahua, ONVIF</li>
+        <li>Connected to local router</li>
+      </ul>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage border-local">
+      <div class="ico">🖥️</div>
+      <h3>Edge Agent (Your PC)</h3>
+      <div class="where tag-local">In-Store · Runs Locally</div>
+      <ul>
+        <li>Pulls RTSP frames</li>
+        <li>YOLOv8 AI inference</li>
+        <li>Encrypted camera creds</li>
+        <li>Rolling local frame buffer</li>
+      </ul>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage border-cloud">
+      <div class="ico">☁️</div>
+      <h3>Vantag Cloud (VPS)</h3>
+      <div class="where tag-cloud">Secure Server · HTTPS</div>
+      <ul>
+        <li>Event metadata + scores</li>
+        <li>Evidence snapshots only</li>
+        <li>Reports &amp; analytics</li>
+        <li>No raw video stored</li>
+      </ul>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage border-edge">
+      <div class="ico">📊</div>
+      <h3>Dashboard &amp; Alerts</h3>
+      <div class="where tag-edge">Web · Mobile · Anywhere</div>
+      <ul>
+        <li>Live tiles &amp; snapshots</li>
+        <li>Incident feed</li>
+        <li>Email / push / webhook</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- WHAT STAYS LOCAL VS CLOUD -->
+  <div class="section-title">What Stays Local vs. What Goes to Cloud</div>
+  <div class="grid2">
+    <div class="card border-local">
+      <h4><span class="dot" style="background:var(--green)"></span> Stored Locally (Your Store)</h4>
+      <ul>
+        <li class="li-yes">Raw video frames &amp; RTSP streams</li>
+        <li class="li-yes">Live AI processing &amp; detection</li>
+        <li class="li-yes">Short rolling video buffer (pre/post event)</li>
+        <li class="li-yes">Encrypted camera usernames &amp; passwords</li>
+        <li class="li-no">Raw footage is <strong>never uploaded</strong> to cloud</li>
+      </ul>
+    </div>
+    <div class="card border-cloud">
+      <h4><span class="dot" style="background:var(--violet)"></span> Logged to Cloud (Encrypted, HTTPS)</h4>
+      <ul>
+        <li class="li-cloud">Event metadata: type, time, camera, confidence</li>
+        <li class="li-cloud">Single evidence snapshot per incident (JPEG)</li>
+        <li class="li-cloud">Camera online/offline heartbeat</li>
+        <li class="li-cloud">Low-res preview thumbnail for live tile</li>
+        <li class="li-cloud">PDF reports &amp; aggregate analytics</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="big">🔒</div>
+    <div>
+      <h4>Privacy by Design</h4>
+      <p>Your continuous camera video never leaves the store network. The cloud only ever receives lightweight <strong>insights</strong> — a snapshot and a few bytes of metadata when an event is detected. This keeps bandwidth low (works on 4G) and your footage private.</p>
+    </div>
+  </div>
+
+  <!-- HOW ALERTS ARE SENT -->
+  <div class="section-title">How Alerts Are Sent</div>
+  <div class="alerts">
+    <div class="pill">
+      <div class="ico">🧠</div>
+      <h5>1 · Detect</h5>
+      <p>Edge AI flags sweep, dwell, fall, queue, or watchlist match</p>
+    </div>
+    <div class="pill">
+      <div class="ico">📤</div>
+      <h5>2 · Push Event</h5>
+      <p>Agent sends event + snapshot to cloud over HTTPS</p>
+    </div>
+    <div class="pill">
+      <div class="ico">⚙️</div>
+      <h5>3 · Evaluate</h5>
+      <p>Cloud applies your zone rules &amp; alert thresholds</p>
+    </div>
+    <div class="pill">
+      <div class="ico">🔔</div>
+      <h5>4 · Notify</h5>
+      <p>Email · Push · Slack/Teams webhook fired instantly</p>
+    </div>
+  </div>
+
+  <!-- SECURITY & TRANSPORT -->
+  <div class="section-title">Security &amp; Transport</div>
+  <table class="specs">
+    <tr><th>Layer</th><th>Mechanism</th></tr>
+    <tr><td>Camera credentials</td><td>AES-encrypted at rest with a pinned server key; never exposed in plain text</td></tr>
+    <tr><td>Agent ↔ Cloud</td><td>HTTPS/TLS; authenticated per-tenant edge token</td></tr>
+    <tr><td>Live preview</td><td>WebSocket channel + authenticated snapshot blobs</td></tr>
+    <tr><td>Data isolation</td><td>Per-tenant separation; each store sees only its own cameras &amp; events</td></tr>
+    <tr><td>Bandwidth</td><td>Only snapshots + metadata leave site — typically &lt; 50 KB per event</td></tr>
+  </table>
+
+  <div class="legend">
+    <span><span class="sw" style="background:var(--cyan)"></span> Edge / Access points</span>
+    <span><span class="sw" style="background:var(--green)"></span> Stays Local</span>
+    <span><span class="sw" style="background:var(--violet)"></span> Cloud Logged</span>
+  </div>
+
+  <footer>
+    Vantag / Nazar — Retail AI Surveillance · Edge-first architecture · Generated for internal &amp; customer reference<br/>
+    To save as PDF: open this file in Chrome/Edge → Print → "Save as PDF".
+  </footer>
+
+</div>
+</body>
+</html>

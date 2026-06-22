@@ -176,7 +176,7 @@ async def step3_payment(
         update_values: dict = {"status": new_status, "onboarding_step": 4}
     else:
         # No payment — force trial mode; do NOT mark as active
-        trial_end = datetime.now(timezone.utc) + timedelta(days=14)
+        trial_end = datetime.now(timezone.utc) + timedelta(days=3)
         new_status = "trial"
         update_values = {
             "status": new_status,

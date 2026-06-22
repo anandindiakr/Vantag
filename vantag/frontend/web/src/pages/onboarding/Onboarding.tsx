@@ -56,9 +56,10 @@ function StepBar({ current }: { current: number }) {
 
 // ── PLAN DATA ─────────────────────────────────────────────────────────────
 const PLANS = [
-  { id: 'starter', name: 'Starter', cameras: '2–5', price: { IN: '₹2,999', SG: 'S$49', MY: 'RM 149' }, features: ['AI Detection Suite', 'Real-time Dashboard', 'One-Tap Door Lock', 'Email Alerts', '7-day history'] },
-  { id: 'growth', name: 'Growth', cameras: '6–15', price: { IN: '₹5,999', SG: 'S$99', MY: 'RM 299' }, highlight: true, features: ['Everything in Starter', 'Face Recognition', 'Heatmap Analytics', 'Queue Detection', 'Priority Support'] },
-  { id: 'enterprise', name: 'Enterprise', cameras: '16–30', price: { IN: '₹11,999', SG: 'S$199', MY: 'RM 599' }, features: ['Everything in Growth', 'POS Integration', 'Multi-location', 'API Access', 'Unlimited history'] },
+  { id: 'starter', name: 'Starter', cameras: '4', price: { IN: '₹1,999', SG: 'S$39', MY: 'RM 59' }, features: ['AI Detection Suite', 'Real-time Dashboard', 'One-Tap Door Lock', 'Email Alerts', '7-day history'] },
+  { id: 'growth', name: 'Growth', cameras: '10', price: { IN: '₹4,999', SG: 'S$99', MY: 'RM 149' }, highlight: true, features: ['Everything in Starter', 'Face Recognition', 'Heatmap Analytics', 'Queue Detection', 'Priority Support'] },
+  { id: 'pro', name: 'Pro', cameras: '20', price: { IN: '₹9,500', SG: 'S$189', MY: 'RM 299' }, features: ['Everything in Growth', 'POS Integration', 'Multi-location', 'API Access', '90-day history'] },
+  { id: 'proplus', name: 'Pro Plus', cameras: '30', price: { IN: '₹15,000', SG: 'S$289', MY: 'RM 449' }, features: ['Everything in Pro', 'Unlimited history', 'Custom AI Tuning', '24/7 Support', 'SLA 99.9%'] },
 ];
 
 // ── Main Onboarding Component ─────────────────────────────────────────────
@@ -131,7 +132,7 @@ export default function Onboarding() {
   const submitStep3 = async () => {
     setLoading(true);
     try {
-      // Start 14-day free trial, no payment required now
+      // Start 3-day free trial, no payment required now
       await api.post('/onboarding/step/3', {});
       setStep(4);
     } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error'); }
@@ -325,7 +326,7 @@ export default function Onboarding() {
           {step === 2 && (
             <motion.div key="s2" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} className="bg-white/3 border border-white/8 rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-1">Choose your plan</h2>
-              <p className="text-white/40 text-sm mb-8">Start with a 14-day free trial. Cancel anytime.</p>
+              <p className="text-white/40 text-sm mb-8">Start with a 3-day free trial. Cancel anytime.</p>
               <div className="space-y-3 mb-8">
                 {PLANS.map(plan => {
                   const price = plan.price[country as keyof typeof plan.price] || plan.price.IN;
@@ -371,9 +372,9 @@ export default function Onboarding() {
                 <CreditCard className="w-8 h-8 text-violet-400" />
               </div>
               <h2 className="text-2xl font-bold mb-2">Start Your Free Trial</h2>
-              <p className="text-white/40 text-sm mb-8">14 days free. No payment needed now.<br />You'll be reminded before your trial ends.</p>
+              <p className="text-white/40 text-sm mb-8">3 days free. No payment needed now.<br />You'll be reminded before your trial ends.</p>
               <div className="bg-white/5 rounded-xl p-4 mb-8 text-left space-y-2">
-                {['14-day full access — no restrictions', 'No credit card required to start', 'Cancel anytime from your dashboard', 'Razorpay payment when trial ends'].map(f => (
+                {['3-day full access — no restrictions', 'No credit card required to start', 'Cancel anytime from your dashboard', 'Razorpay payment when trial ends'].map(f => (
                   <div key={f} className="flex items-center gap-2 text-sm text-white/70">
                     <CheckCircle className="w-4 h-4 text-violet-400 flex-shrink-0" />
                     {f}

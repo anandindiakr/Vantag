@@ -5,7 +5,7 @@ PLANS: dict[str, dict] = {
     "starter": {
         "id": "starter",
         "name": "Nazar Starter",
-        "max_cameras": 5,
+        "max_cameras": 4,
         "max_edge_agents": 2,
         "features": [
             "AI Detection (Sweep, Dwell, Empty Shelf)",
@@ -16,21 +16,21 @@ PLANS: dict[str, dict] = {
             "PDF Reports",
         ],
         "prices": {
-            "INR": 2999,
-            "SGD": 49,
-            "MYR": 149,
+            "INR": 1999,
+            "SGD": 39,
+            "MYR": 59,
         },
         "razorpay_plan_ids": {
             "INR": "",   # fill after creating in Razorpay dashboard
             "SGD": "",
             "MYR": "",
         },
-        "trial_days": 14,
+        "trial_days": 3,
     },
     "growth": {
         "id": "growth",
         "name": "Nazar Growth",
-        "max_cameras": 15,
+        "max_cameras": 10,
         "max_edge_agents": 5,
         "features": [
             "Everything in Starter",
@@ -42,21 +42,21 @@ PLANS: dict[str, dict] = {
             "Priority Support",
         ],
         "prices": {
-            "INR": 5999,
+            "INR": 4999,
             "SGD": 99,
-            "MYR": 299,
+            "MYR": 149,
         },
         "razorpay_plan_ids": {
             "INR": "",
             "SGD": "",
             "MYR": "",
         },
-        "trial_days": 14,
+        "trial_days": 3,
     },
-    "enterprise": {
-        "id": "enterprise",
-        "name": "Nazar Enterprise",
-        "max_cameras": 30,
+    "pro": {
+        "id": "pro",
+        "name": "Nazar Pro",
+        "max_cameras": 20,
         "max_edge_agents": 10,
         "features": [
             "Everything in Growth",
@@ -64,21 +64,45 @@ PLANS: dict[str, dict] = {
             "Multi-location Management",
             "Custom Webhooks",
             "API Access",
-            "Unlimited event history",
+            "90-day event history",
             "Dedicated Support",
-            "SLA 99.9%",
         ],
         "prices": {
-            "INR": 11999,
-            "SGD": 199,
-            "MYR": 599,
+            "INR": 9500,
+            "SGD": 189,
+            "MYR": 299,
         },
         "razorpay_plan_ids": {
             "INR": "",
             "SGD": "",
             "MYR": "",
         },
-        "trial_days": 14,
+        "trial_days": 3,
+    },
+    "proplus": {
+        "id": "proplus",
+        "name": "Nazar Pro Plus",
+        "max_cameras": 30,
+        "max_edge_agents": 15,
+        "features": [
+            "Everything in Pro",
+            "Unlimited event history",
+            "Advanced Multi-location Analytics",
+            "Custom AI Model Tuning",
+            "24/7 Dedicated Support",
+            "SLA 99.9%",
+        ],
+        "prices": {
+            "INR": 15000,
+            "SGD": 289,
+            "MYR": 449,
+        },
+        "razorpay_plan_ids": {
+            "INR": "",
+            "SGD": "",
+            "MYR": "",
+        },
+        "trial_days": 3,
     },
 }
 
