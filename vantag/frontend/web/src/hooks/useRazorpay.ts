@@ -33,8 +33,9 @@ export interface RazorpayResponse {
   razorpay_signature: string;
 }
 
-const RAZORPAY_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
-const RAZORPAY_KEY    = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder';
+const RAZORPAY_SCRIPT     = 'https://checkout.razorpay.com/v1/checkout.js';
+// Default key from env — overridden per-region at runtime via openCheckout({ key })
+const RAZORPAY_KEY_DEFAULT = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder';
 
 function loadScript(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -60,6 +61,7 @@ export function useRazorpay() {
   }, []);
 
   const openCheckout = useCallback(async (opts: {
+    key?: string;            // Per-region Razorpay publishable key (overrides env default)
     orderId: string;
     amount: number;          // in smallest currency unit (paise / cents)
     currency: string;
@@ -71,7 +73,7 @@ export function useRazorpay() {
     if (!loaded.current) await loadScript();
 
     const rzp = new window.Razorpay({
-      key:         RAZORPAY_KEY,
+      key:         opts.key ?? RAZORPAY_KEY_DEFAULT,
       order_id:    opts.orderId,
       amount:      opts.amount,
       currency:    opts.currency,

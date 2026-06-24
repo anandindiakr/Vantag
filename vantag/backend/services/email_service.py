@@ -151,6 +151,57 @@ async def send_payment_success(to: str, name: str, plan: str, amount: str, invoi
     await send_email(to, subject, html, text)
 
 
+async def send_payment_failure(
+    to: str,
+    name: str,
+    plan: str,
+    amount: str,
+    reason: str = "Payment declined by bank",
+) -> None:
+    """Notify the user that their payment was not captured."""
+    subject = "Payment failed — action required"
+    body = f"""
+      <h2 style="font-size:22px;font-weight:700;margin:0 0 8px;">Payment failed ❌</h2>
+      <p style="color:rgba(255,255,255,0.5);margin:0 0 24px;">
+        Hi {name}, we were unable to process your payment for the
+        <strong>{plan}</strong> plan.
+      </p>
+      <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:20px;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span style="color:rgba(255,255,255,0.4);">Plan</span><span>{plan}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span style="color:rgba(255,255,255,0.4);">Amount</span><span>{amount}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span style="color:rgba(255,255,255,0.4);">Reason</span>
+          <span style="color:#f87171;">{reason}</span>
+        </div>
+      </div>
+      <p style="color:rgba(255,255,255,0.5);margin:0 0 24px;">
+        Please try again with a different card or contact your bank. Your account
+        remains on your current plan until a successful payment is made.
+      </p>
+      <div style="text-align:center;margin-bottom:24px;">
+        <a href="https://retailnazar.com/account"
+           style="display:inline-block;background:linear-gradient(135deg,#7c3aed,#4f46e5);
+                  color:#fff;text-decoration:none;padding:14px 32px;border-radius:12px;
+                  font-weight:700;font-size:15px;">
+          Retry Payment →
+        </a>
+      </div>
+      <p style="color:rgba(255,255,255,0.3);font-size:12px;">
+        If you believe this is a mistake, contact us at support@retailnazar.com.
+      </p>
+    """
+    html = _base_html(subject, body)
+    text = (
+        f"Payment failed for {plan} plan (amount: {amount}). Reason: {reason}. "
+        "Please visit https://retailnazar.com/account to retry."
+    )
+    await send_email(to, subject, html, text)
+
+
 async def send_password_reset_email(to: str, name: str, reset_link: str) -> None:
     """Send a password-reset email containing a signed link valid for 30 minutes."""
     subject = "Reset your Vantag password"

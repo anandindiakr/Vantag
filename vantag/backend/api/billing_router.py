@@ -23,6 +23,7 @@ from ..db.models.billing import Invoice, PaymentEvent, Subscription
 from ..db.models.tenant import Tenant
 from ..middleware.tenant_middleware import get_current_user_id
 from ..services.razorpay_service import create_order, verify_payment_signature, verify_webhook_signature
+from ..services.email_service import send_payment_failure, send_payment_success
 
 billing_router = APIRouter(prefix="/api/billing", tags=["billing"])
 logger = logging.getLogger("vantag.billing")
@@ -50,12 +51,22 @@ async def create_payment_order(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
+    # Validate plan exists and has a non-zero price for this region's currency
+    region = get_region(tenant.country)
+    price = get_plan_price(body.plan_id, region["currency"])
+    if price <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Plan '{body.plan_id}' is not available for currency {region['currency']}",
+        )
+
     order = create_order(tenant.country, body.plan_id, tenant.id)
 
     inv = Invoice(
         id=str(uuid.uuid4()),
         tenant_id=tenant.id,
         razorpay_order_id=order.get("id"),
+        plan_id=body.plan_id,
         amount=order.get("amount", 0) / 100,
         currency=order.get("currency", "INR"),
         status="pending",
@@ -88,8 +99,19 @@ async def verify_payment(
     if not valid:
         raise HTTPException(status_code=400, detail="Payment verification failed")
 
+    # Find the invoice to get plan_id and amount
+    inv_result = await session.execute(
+        select(Invoice).where(Invoice.razorpay_order_id == body.razorpay_order_id)
+    )
+    inv = inv_result.scalar_one_or_none()
+    plan_id = inv.plan_id if inv else tenant.plan_id
+    amount_str = f"{inv.currency} {inv.amount:.2f}" if inv else ""
+    invoice_no = inv.invoice_number if inv else body.razorpay_order_id
+
     await session.execute(
-        update(Tenant).where(Tenant.id == tenant.id).values(status="active")
+        update(Tenant)
+        .where(Tenant.id == tenant.id)
+        .values(status="active", plan_id=plan_id)
     )
     await session.execute(
         update(Invoice)
@@ -97,6 +119,22 @@ async def verify_payment(
         .values(status="paid", razorpay_payment_id=body.razorpay_payment_id)
     )
     await session.commit()
+
+    # Fire success email (best-effort — don't fail the response if email errors)
+    try:
+        plan_label = PLANS.get(plan_id, {}).get("name", plan_id)
+        tenant_email = getattr(tenant, "email", None)
+        tenant_name = getattr(tenant, "name", "Customer")
+        if tenant_email:
+            await send_payment_success(
+                to=tenant_email,
+                name=str(tenant_name),
+                plan=plan_label,
+                amount=amount_str,
+                invoice_no=invoice_no,
+            )
+    except Exception as email_exc:
+        logger.warning("Could not send payment success email: %s", email_exc)
 
     return {"success": True, "status": "active"}
 
@@ -136,6 +174,21 @@ async def _process_webhook_event(
                         "Webhook payment.captured: activated tenant=%s order=%s",
                         inv.tenant_id, order_id,
                     )
+                    # Send success email (best-effort)
+                    try:
+                        t_res = await session.execute(select(Tenant).where(Tenant.id == inv.tenant_id))
+                        t = t_res.scalar_one_or_none()
+                        if t and getattr(t, "email", None):
+                            plan_label = PLANS.get(getattr(t, "plan_id", ""), {}).get("name", t.plan_id)
+                            await send_payment_success(
+                                to=t.email,
+                                name=str(getattr(t, "name", "Customer")),
+                                plan=plan_label,
+                                amount=f"{inv.currency} {inv.amount:.2f}",
+                                invoice_no=inv.invoice_number,
+                            )
+                    except Exception as _e:
+                        logger.warning("Webhook success email failed: %s", _e)
 
         # ── Subscription renewed ──────────────────────────────────────────────
         elif event_type == "subscription.charged":
@@ -176,13 +229,38 @@ async def _process_webhook_event(
         elif event_type == "payment.failed":
             payment = data.get("payment", {}).get("entity", {})
             order_id = payment.get("order_id")
+            error_desc = (
+                payment.get("error_description")
+                or payment.get("error_code")
+                or "Payment declined by bank"
+            )
             if order_id:
+                inv_result = await session.execute(
+                    select(Invoice).where(Invoice.razorpay_order_id == order_id)
+                )
+                inv = inv_result.scalar_one_or_none()
                 await session.execute(
                     update(Invoice)
                     .where(Invoice.razorpay_order_id == order_id)
                     .values(status="failed")
                 )
-                logger.warning("Webhook payment.failed: order=%s", order_id)
+                logger.warning("Webhook payment.failed: order=%s reason=%s", order_id, error_desc)
+                # Send failure email (best-effort)
+                if inv:
+                    try:
+                        t_res = await session.execute(select(Tenant).where(Tenant.id == inv.tenant_id))
+                        t = t_res.scalar_one_or_none()
+                        if t and getattr(t, "email", None):
+                            plan_label = PLANS.get(getattr(t, "plan_id", ""), {}).get("name", t.plan_id)
+                            await send_payment_failure(
+                                to=t.email,
+                                name=str(getattr(t, "name", "Customer")),
+                                plan=plan_label,
+                                amount=f"{inv.currency} {inv.amount:.2f}",
+                                reason=str(error_desc),
+                            )
+                    except Exception as _e:
+                        logger.warning("Webhook failure email failed: %s", _e)
 
         # Mark event as processed
         await session.execute(

@@ -86,11 +86,3 @@ def verify_webhook_signature(payload: bytes, signature: str, country: str) -> bo
         return True
     expected = hmac.new(webhook_secret.encode(), payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
-
-
-WEBHOOK_EVENT_HANDLERS = {
-    "payment.captured": "handle_payment_captured",
-    "subscription.activated": "handle_subscription_activated",
-    "subscription.cancelled": "handle_subscription_cancelled",
-    "payment.failed": "handle_payment_failed",
-}

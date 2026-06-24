@@ -176,6 +176,7 @@ function BillingSection() {
       }) as { order_id: string; amount: number; currency: string };
 
       openCheckout({
+        key: plansData.razorpay_key_id || undefined,  // per-region key (IN / SG / MY)
         orderId: order.order_id,
         amount: order.amount,
         currency: order.currency,
@@ -183,9 +184,9 @@ function BillingSection() {
         onSuccess: async (response) => {
           try {
             await api.post('/billing/verify', {
-              payment_id: response.razorpay_payment_id,
-              order_id: response.razorpay_order_id,
-              signature: response.razorpay_signature,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_signature:  response.razorpay_signature,
               plan_id: plan.id,
             });
             toast.success(`Upgraded to ${plan.name}!`);
