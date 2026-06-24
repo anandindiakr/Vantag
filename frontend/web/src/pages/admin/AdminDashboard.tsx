@@ -340,11 +340,19 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       {/* Header */}
       <div className="border-b border-white/10 px-8 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ShieldAlert className="text-red-400" size={24} />
-          <div>
-            <h1 className="text-xl font-bold">Admin Panel</h1>
-            <p className="text-xs text-white/30">Platform management — super-admin only</p>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-white/60 hover:text-white transition-all"
+          >
+            <ChevronRight size={14} className="rotate-180" /> Dashboard
+          </button>
+          <div className="flex items-center gap-3">
+            <ShieldAlert className="text-red-400" size={24} />
+            <div>
+              <h1 className="text-xl font-bold">Admin Panel</h1>
+              <p className="text-xs text-white/30">Platform management — super-admin only</p>
+            </div>
           </div>
         </div>
         <button
