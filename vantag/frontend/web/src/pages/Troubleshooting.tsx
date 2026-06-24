@@ -312,6 +312,148 @@ const sections: Section[] = [
       </>
     ),
   },
+
+  // ── Beginner camera setup FAQ ───────────────────────────────────────────────
+  {
+    id: 'find-camera-ip',
+    icon: <Network size={18} />,
+    title: 'How to Find Your Camera\'s IP Address',
+    content: (
+      <>
+        <p className="text-slate-400 text-xs mb-3">
+          Every IP camera on your network has a unique address (like <code className="bg-slate-800 px-1 rounded">192.168.1.64</code>). You need this address to add the camera to Nazar. Here are 4 easy methods — try whichever is easiest for you.
+        </p>
+
+        <div className="space-y-4">
+          <div className="rounded-lg bg-slate-800/60 p-4">
+            <p className="text-xs font-semibold text-green-300 mb-2">Method 1 — Use the Fing app (easiest, no router login needed)</p>
+            <Step n={1} text={<>Download the free <strong>Fing</strong> app on your phone (available on iOS and Android).</>} />
+            <Step n={2} text={<>Connect your phone to the same Wi-Fi as your cameras.</>} />
+            <Step n={3} text={<>Open Fing and tap <strong>Scan Network</strong>. It lists every device — look for your camera brand name (e.g. "Hikvision", "Dahua", "CP Plus").</>} />
+            <Step n={4} text={<>The IP address shown next to your camera is what you enter in Nazar.</>} />
+          </div>
+
+          <div className="rounded-lg bg-slate-800/60 p-4">
+            <p className="text-xs font-semibold text-blue-300 mb-2">Method 2 — Router's Device List</p>
+            <Step n={1} text={<>Open a browser and type <code className="bg-slate-800 px-1 rounded">192.168.1.1</code> or <code className="bg-slate-800 px-1 rounded">192.168.0.1</code> in the address bar. This opens your router's settings page.</>} />
+            <Step n={2} text={<>Log in (default is usually admin / admin or admin / password — check the sticker on your router).</>} />
+            <Step n={3} text={<>Look for a section called <strong>Connected Devices</strong>, <strong>DHCP Clients</strong>, or <strong>Device List</strong>. Your camera appears here with its IP address.</>} />
+          </div>
+
+          <div className="rounded-lg bg-slate-800/60 p-4">
+            <p className="text-xs font-semibold text-amber-300 mb-2">Method 3 — Camera brand's free search tool</p>
+            <div className="text-xs text-slate-300 space-y-1">
+              <p>Most brands include a free Windows tool to find cameras automatically:</p>
+              <ul className="ml-4 space-y-1 list-disc">
+                <li><strong>Hikvision</strong> → download <em>SADP Tool</em> from hikvision.com</li>
+                <li><strong>Dahua</strong> → download <em>ConfigTool</em> from dahuasecurity.com</li>
+                <li><strong>CP Plus</strong> → download <em>IP Search Tool</em> from cpplusworld.com</li>
+                <li><strong>Generic cameras</strong> → try <em>Advanced IP Scanner</em> (free, works with all brands)</li>
+              </ul>
+              <p className="mt-2">Install the tool on any Windows PC on the same network. Run it — all cameras appear with their IPs instantly.</p>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-slate-800/60 p-4">
+            <p className="text-xs font-semibold text-purple-300 mb-2">Method 4 — Camera's own smartphone app</p>
+            <p className="text-xs text-slate-300">Most cameras include a phone app: <em>iVMS-4500</em> (Hikvision), <em>DMSS</em> (Dahua), <em>gDMSS</em>. Open the app → tap your camera → Settings or Device Info → the IP address is shown there.</p>
+          </div>
+        </div>
+
+        <Note>If you have an NVR (recorder box with multiple cameras), you only need the NVR's IP address — not the individual camera IPs. The NVR handles all cameras.</Note>
+      </>
+    ),
+  },
+  {
+    id: 'camera-compat',
+    icon: <Camera size={18} />,
+    title: 'Camera Compatibility — What Works with Nazar',
+    content: (
+      <>
+        <p className="text-slate-400 text-xs mb-3">
+          Nazar works with any IP camera or NVR that supports <strong>RTSP streaming</strong>. This includes the vast majority of cameras sold today.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div className="rounded-lg bg-green-600/10 border border-green-600/25 p-3">
+            <p className="text-xs font-semibold text-green-300 mb-2">Works with Nazar</p>
+            <ul className="text-xs text-slate-300 space-y-1 list-disc ml-4">
+              <li>Hikvision IP cameras &amp; NVRs</li>
+              <li>Dahua IP cameras &amp; NVRs</li>
+              <li>CP Plus / Godrej</li>
+              <li>Axis, Hanwha, Uniview</li>
+              <li>Reolink, TP-Link Tapo (select models)</li>
+              <li>Generic Chinese IP cameras</li>
+              <li>Any camera with RTSP support</li>
+            </ul>
+          </div>
+          <div className="rounded-lg bg-red-600/10 border border-red-600/25 p-3">
+            <p className="text-xs font-semibold text-red-300 mb-2">Does NOT work directly</p>
+            <ul className="text-xs text-slate-300 space-y-1 list-disc ml-4">
+              <li>Old analog CCTV cameras (without DVR)</li>
+              <li>USB webcams plugged into a PC</li>
+              <li>Cameras that only work via their own cloud app</li>
+              <li>Nest / Ring / Arlo (closed ecosystems)</li>
+            </ul>
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-400 mb-2">
+          <strong className="text-slate-200">Have a DVR/NVR?</strong> Great news — most modern DVRs (Hikvision, Dahua, CP Plus) support RTSP output per channel. Connect Nazar to the DVR/NVR's RTSP stream for each channel. You don't need individual camera IPs.
+        </p>
+
+        <Good>Not sure if your camera supports RTSP? Look on the box or manual for "RTSP", "IP camera", or "network camera". If it has a LAN port (RJ45) or connects to a router, it almost certainly supports RTSP.</Good>
+        <Note>Generic cameras without a brand name are usually fine — most use standard RTSP on port 554. Try the connection and Nazar will confirm if it works.</Note>
+      </>
+    ),
+  },
+  {
+    id: 'first-rtsp',
+    icon: <Eye size={18} />,
+    title: 'Building Your RTSP URL — Beginner Step-by-Step',
+    content: (
+      <>
+        <p className="text-slate-400 text-xs mb-3">
+          An RTSP URL is the "address" Nazar uses to access your camera's video. It looks like a website URL but starts with <code className="bg-slate-800 px-1 rounded">rtsp://</code>. Here's how to build it.
+        </p>
+
+        <div className="rounded-lg bg-slate-800/60 p-4 mb-4">
+          <p className="text-xs font-semibold text-slate-200 mb-3">The RTSP URL has 4 parts:</p>
+          <div className="font-mono text-xs break-all bg-slate-900 rounded p-3 text-center">
+            <span className="text-blue-300">rtsp://</span>
+            <span className="text-green-300">admin:password</span>
+            <span className="text-slate-300">@</span>
+            <span className="text-amber-300">192.168.1.64</span>
+            <span className="text-purple-300">:554/stream1</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+            <div><span className="text-blue-300 font-semibold">rtsp://</span> — always this prefix</div>
+            <div><span className="text-green-300 font-semibold">admin:password</span> — camera login</div>
+            <div><span className="text-amber-300 font-semibold">192.168.1.64</span> — camera's IP address</div>
+            <div><span className="text-purple-300 font-semibold">:554/stream1</span> — port + channel path</div>
+          </div>
+        </div>
+
+        <p className="text-xs font-semibold text-slate-200 mb-2">Common RTSP URL formats by brand:</p>
+        <div className="rounded-lg bg-slate-800/60 p-3 text-xs space-y-2">
+          <div><span className="text-slate-400 w-24 inline-block">Hikvision</span><code className="text-green-300">rtsp://admin:PASS@IP:554/Streaming/Channels/101</code></div>
+          <div><span className="text-slate-400 w-24 inline-block">Dahua</span><code className="text-green-300">rtsp://admin:PASS@IP:554/cam/realmonitor?channel=1&subtype=0</code></div>
+          <div><span className="text-slate-400 w-24 inline-block">CP Plus</span><code className="text-green-300">rtsp://admin:PASS@IP:554/h264/ch1/main/av_stream</code></div>
+          <div><span className="text-slate-400 w-24 inline-block">Generic</span><code className="text-green-300">rtsp://admin:PASS@IP:554/stream1</code></div>
+          <div><span className="text-slate-400 w-24 inline-block">Generic alt</span><code className="text-green-300">rtsp://admin:PASS@IP:554/live</code></div>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <Step n={1} text={<>Replace <code className="bg-slate-800 px-1 rounded">admin</code> and <code className="bg-slate-800 px-1 rounded">PASS</code> with your camera's actual username and password. Default is usually <em>admin / admin</em> or <em>admin / 12345</em> (check sticker on camera).</>} />
+          <Step n={2} text={<>Replace <code className="bg-slate-800 px-1 rounded">IP</code> with your camera's IP address (e.g. <em>192.168.1.64</em>).</>} />
+          <Step n={3} text={<>Paste the full URL into <em>Manage Cameras → Add Camera → RTSP URL</em> and click <strong>Test</strong> — Nazar will confirm if it connects.</>} />
+        </div>
+
+        <Note>If the Test fails, try the alternative URL format for your brand. The path after the port (e.g. <em>/stream1</em>) varies slightly between camera models.</Note>
+        <Good>Tip: You can verify any RTSP URL for free using <strong>VLC Media Player</strong> → Media → Open Network Stream → paste the URL. If VLC shows video, Nazar will too.</Good>
+      </>
+    ),
+  },
 ];
 
 export default function Troubleshooting() {

@@ -16,6 +16,8 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config.plans import PLANS, get_plan_price
+from ..config.regions import get_region
 from ..db.database import get_session
 from ..db.models.billing import Invoice, PaymentEvent, Subscription
 from ..db.models.tenant import Tenant
@@ -260,4 +262,84 @@ async def list_invoices(
             }
             for i in invoices
         ]
+    }
+
+
+@billing_router.get("/plans")
+async def get_billing_plans(
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Return plan list + Razorpay publishable key for the tenant's region.
+    The frontend uses this to render the upgrade modal without hardcoding prices."""
+    tenant_result = await session.execute(select(Tenant).where(Tenant.id == user["tenant_id"]))
+    tenant = tenant_result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    region = get_region(tenant.country)
+    currency = region["currency"]
+
+    plans_out = []
+    plan_order = ["starter", "growth", "pro", "proplus"]
+    for pid in plan_order:
+        p = PLANS.get(pid)
+        if not p:
+            continue
+        plans_out.append({
+            "id": pid,
+            "name": p["name"],
+            "max_cameras": p["max_cameras"],
+            "price": get_plan_price(pid, currency),
+            "currency": currency,
+            "currency_symbol": region["symbol"],
+            "razorpay_plan_id": p.get("razorpay_plan_ids", {}).get(currency, ""),
+            "features": p["features"],
+        })
+
+    return {
+        "razorpay_key_id": region["razorpay_key_id"],
+        "currency": currency,
+        "current_plan": tenant.plan_id,
+        "plans": plans_out,
+    }
+
+
+@billing_router.get("/status")
+async def billing_status(
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Return the tenant's current billing status, plan, and trial info."""
+    tenant_result = await session.execute(select(Tenant).where(Tenant.id == user["tenant_id"]))
+    tenant = tenant_result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    now = datetime.now(timezone.utc)
+    trial_days_left: int | None = None
+    if tenant.trial_ends_at:
+        delta = tenant.trial_ends_at - now
+        trial_days_left = max(0, delta.days)
+
+    # Latest paid invoice
+    inv_result = await session.execute(
+        select(Invoice)
+        .where(Invoice.tenant_id == tenant.id, Invoice.status == "paid")
+        .order_by(Invoice.created_at.desc())
+        .limit(1)
+    )
+    last_invoice = inv_result.scalar_one_or_none()
+
+    return {
+        "plan_id": tenant.plan_id,
+        "status": tenant.status,
+        "trial_ends_at": tenant.trial_ends_at.isoformat() if tenant.trial_ends_at else None,
+        "trial_days_left": trial_days_left,
+        "last_payment": {
+            "amount": float(last_invoice.amount),
+            "currency": last_invoice.currency,
+            "date": last_invoice.created_at.isoformat(),
+            "invoice_number": last_invoice.invoice_number,
+        } if last_invoice else None,
     }

@@ -13,8 +13,10 @@ import toast from 'react-hot-toast';
 import {
   User, Building2, Network, Download, Copy,
   CheckCircle2, Loader2, RefreshCw, Cpu,
+  CreditCard, ArrowUpCircle, Clock, Receipt, X, ChevronRight,
 } from 'lucide-react';
 import { api } from '../hooks/useApi';
+import { useRazorpay } from '../hooks/useRazorpay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +38,41 @@ interface TenantProfile {
     nvr_brand?: string;
   };
   trial_ends_at?: string;
+  created_at: string;
+}
+
+interface BillingPlan {
+  id: string;
+  name: string;
+  max_cameras: number;
+  price: number;
+  currency: string;
+  currency_symbol: string;
+  razorpay_plan_id: string;
+  features: string[];
+}
+
+interface BillingPlansResponse {
+  razorpay_key_id: string;
+  currency: string;
+  current_plan: string;
+  plans: BillingPlan[];
+}
+
+interface BillingStatus {
+  plan_id: string;
+  status: string;
+  trial_ends_at: string | null;
+  trial_days_left: number | null;
+  last_payment: { amount: number; currency: string; date: string; invoice_number: string } | null;
+}
+
+interface Invoice {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  invoice_number: string;
   created_at: string;
 }
 
@@ -95,6 +132,245 @@ function CopyButton({ text }: { text: string }) {
       {copied ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
       {copied ? 'Copied!' : 'Copy'}
     </button>
+  );
+}
+
+// ─── Billing Section Component ────────────────────────────────────────────────
+
+function BillingSection() {
+  const [status, setStatus] = useState<BillingStatus | null>(null);
+  const [plansData, setPlansData] = useState<BillingPlansResponse | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [payingPlan, setPayingPlan] = useState<string | null>(null);
+  const { openCheckout } = useRazorpay();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [s, p, inv] = await Promise.all([
+          api.get('/billing/status'),
+          api.get('/billing/plans'),
+          api.get('/billing/invoices'),
+        ]);
+        setStatus(s as BillingStatus);
+        setPlansData(p as BillingPlansResponse);
+        setInvoices((inv as { invoices: Invoice[] }).invoices ?? []);
+      } catch {
+        toast.error('Could not load billing info');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const handleUpgrade = async (plan: BillingPlan) => {
+    if (!plansData) return;
+    setPayingPlan(plan.id);
+    try {
+      const order = await api.post('/billing/order', {
+        plan_id: plan.id,
+        amount: plan.price,
+        currency: plan.currency,
+      }) as { order_id: string; amount: number; currency: string };
+
+      openCheckout({
+        orderId: order.order_id,
+        amount: order.amount,
+        currency: order.currency,
+        description: `${plan.name} Plan`,
+        onSuccess: async (response) => {
+          try {
+            await api.post('/billing/verify', {
+              payment_id: response.razorpay_payment_id,
+              order_id: response.razorpay_order_id,
+              signature: response.razorpay_signature,
+              plan_id: plan.id,
+            });
+            toast.success(`Upgraded to ${plan.name}!`);
+            setShowUpgrade(false);
+            const s = await api.get('/billing/status') as BillingStatus;
+            setStatus(s);
+          } catch {
+            toast.error('Payment verification failed. Contact support.');
+          }
+        },
+        onDismiss: () => setPayingPlan(null),
+      });
+    } catch {
+      toast.error('Could not initiate payment. Try again.');
+    } finally {
+      setPayingPlan(null);
+    }
+  };
+
+  const planLabel: Record<string, string> = {
+    starter: 'Starter',
+    growth: 'Growth',
+    pro: 'Pro',
+    proplus: 'Pro Plus',
+  };
+  const planColor: Record<string, string> = {
+    starter: 'text-slate-300',
+    growth: 'text-green-300',
+    pro: 'text-blue-300',
+    proplus: 'text-purple-300',
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-24">
+        <Loader2 className="w-5 h-5 animate-spin text-white/30" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Current plan banner */}
+      <div className="flex items-center justify-between rounded-xl bg-white/5 border border-white/10 px-5 py-4">
+        <div className="flex items-center gap-3">
+          <CreditCard className="w-5 h-5 text-indigo-300" />
+          <div>
+            <p className="text-xs text-white/40 mb-0.5">Current plan</p>
+            <p className={`text-sm font-semibold ${planColor[status?.plan_id ?? ''] ?? 'text-white'}`}>
+              {planLabel[status?.plan_id ?? ''] ?? status?.plan_id ?? '—'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {status?.trial_days_left != null && status.trial_days_left >= 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              {status.trial_days_left === 0 ? 'Trial expired' : `${status.trial_days_left} day${status.trial_days_left !== 1 ? 's' : ''} left in trial`}
+            </div>
+          )}
+          <button
+            onClick={() => setShowUpgrade(true)}
+            className="flex items-center gap-1.5 text-xs bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 text-indigo-200 rounded-lg px-3 py-1.5 transition-all"
+          >
+            <ArrowUpCircle className="w-3.5 h-3.5" />
+            Upgrade Plan
+          </button>
+        </div>
+      </div>
+
+      {/* Last payment */}
+      {status?.last_payment && (
+        <div className="rounded-xl bg-white/5 border border-white/10 px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-white/50">
+            <Receipt className="w-4 h-4" />
+            Last payment: {new Date(status.last_payment.date).toLocaleDateString()}
+          </div>
+          <p className="text-xs font-semibold text-white">
+            {status.last_payment.currency === 'INR' ? '₹' : status.last_payment.currency === 'SGD' ? 'S$' : 'RM '}
+            {status.last_payment.amount.toLocaleString()}
+          </p>
+        </div>
+      )}
+
+      {/* Invoice history */}
+      {invoices.length > 0 && (
+        <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
+          <p className="text-xs font-semibold text-white/40 px-5 pt-3 pb-2 border-b border-white/5">Invoice History</p>
+          <div className="divide-y divide-white/5">
+            {invoices.slice(0, 5).map((inv) => (
+              <div key={inv.id} className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-xs text-white/50">{inv.invoice_number} · {new Date(inv.created_at).toLocaleDateString()}</span>
+                <span className={`text-xs font-medium ${inv.status === 'paid' ? 'text-green-300' : 'text-amber-300'}`}>
+                  {inv.status === 'paid' ? '✓ ' : ''}{inv.currency === 'INR' ? '₹' : inv.currency === 'SGD' ? 'S$' : 'RM '}{inv.amount.toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade Modal */}
+      {showUpgrade && plansData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-2xl bg-[#0d1117] border border-white/10 rounded-2xl p-6 shadow-2xl"
+          >
+            <button
+              onClick={() => setShowUpgrade(false)}
+              className="absolute top-4 right-4 text-white/30 hover:text-white/70"
+            >
+              <X size={18} />
+            </button>
+            <h2 className="text-base font-semibold text-white mb-1">Choose a Plan</h2>
+            <p className="text-xs text-white/40 mb-5">All plans include a 3-day free trial for new accounts.</p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {plansData.plans.map((plan) => {
+                const isCurrent = plan.id === plansData.current_plan;
+                const isHigher = ['starter','growth','pro','proplus'].indexOf(plan.id) > ['starter','growth','pro','proplus'].indexOf(plansData.current_plan);
+                return (
+                  <div
+                    key={plan.id}
+                    className={`rounded-xl border p-4 flex flex-col gap-2 transition-all ${
+                      isCurrent
+                        ? 'border-indigo-500/40 bg-indigo-500/10'
+                        : 'border-white/10 bg-white/5 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm font-semibold ${planColor[plan.id] ?? 'text-white'}`}>{plan.name}</span>
+                      {isCurrent && <span className="text-xs text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-full">Current</span>}
+                    </div>
+                    <p className="text-xl font-bold text-white">
+                      {plan.currency_symbol}{plan.price.toLocaleString()}
+                      <span className="text-xs font-normal text-white/40">/mo</span>
+                    </p>
+                    <p className="text-xs text-white/40">Up to {plan.max_cameras} cameras</p>
+                    <ul className="text-xs text-white/50 space-y-0.5 mt-1 flex-1">
+                      {plan.features.slice(0, 4).map((f, i) => (
+                        <li key={i} className="flex items-center gap-1.5">
+                          <ChevronRight size={10} className="text-indigo-400 shrink-0" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      disabled={isCurrent || !isHigher || payingPlan === plan.id || !plan.razorpay_plan_id}
+                      onClick={() => handleUpgrade(plan)}
+                      className={`mt-2 w-full py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                        isCurrent
+                          ? 'bg-indigo-500/20 text-indigo-300 cursor-default'
+                          : isHigher && plan.razorpay_plan_id
+                          ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                          : 'bg-white/5 text-white/20 cursor-not-allowed'
+                      }`}
+                    >
+                      {payingPlan === plan.id ? (
+                        <><Loader2 size={12} className="animate-spin" /> Processing…</>
+                      ) : isCurrent ? (
+                        'Current Plan'
+                      ) : !plan.razorpay_plan_id ? (
+                        'Coming Soon'
+                      ) : isHigher ? (
+                        <><ArrowUpCircle size={12} /> Upgrade</>
+                      ) : (
+                        'Downgrade'
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {!plansData.razorpay_key_id && (
+              <p className="mt-4 text-xs text-amber-300 text-center">
+                Payment gateway not configured yet. Contact support to upgrade.
+              </p>
+            )}
+          </motion.div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -356,6 +632,11 @@ export default function AccountPage() {
           <p>Your cameras are managed under <strong className="text-white/60">Manage Cameras</strong>.</p>
           <p>To add cameras manually, go to <strong className="text-white/60">Cameras → Manage Cameras → Manual Add</strong>.</p>
         </div>
+      </SectionCard>
+
+      {/* ── Subscription & Billing ── */}
+      <SectionCard icon={CreditCard} title="Subscription & Billing">
+        <BillingSection />
       </SectionCard>
     </motion.div>
   );
