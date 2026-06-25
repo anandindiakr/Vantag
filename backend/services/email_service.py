@@ -23,11 +23,13 @@ from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
 
-_SMTP_HOST = os.getenv("VANTAG_SMTP_HOST", "smtp.gmail.com")
-_SMTP_PORT = int(os.getenv("VANTAG_SMTP_PORT", "587"))
-_SMTP_USER = os.getenv("VANTAG_SMTP_USER", "")
-_SMTP_PASS = os.getenv("VANTAG_SMTP_PASS", "")
-_FROM_ADDR = os.getenv("VANTAG_EMAIL_FROM", "Vantag <noreply@vantag.com>")
+_SMTP_HOST = (os.getenv("VANTAG_SMTP_HOST") or os.getenv("SMTP_HOST", "smtp.gmail.com"))
+_SMTP_PORT = int(os.getenv("VANTAG_SMTP_PORT") or os.getenv("SMTP_PORT", "587"))
+_SMTP_USER = (os.getenv("VANTAG_SMTP_USER") or os.getenv("SMTP_USER", ""))
+_SMTP_PASS = (os.getenv("VANTAG_SMTP_PASS") or os.getenv("SMTP_PASSWORD") or os.getenv("SMTP_PASS", ""))
+_from_name = os.getenv("SMTP_FROM_NAME", "Retail Nazar")
+_from_email = os.getenv("SMTP_FROM") or os.getenv("VANTAG_EMAIL_FROM", "noreply@retailnazar.com")
+_FROM_ADDR  = f"{_from_name} <{_from_email}>" if "@" in _from_email and "<" not in _from_email else (os.getenv("VANTAG_EMAIL_FROM") or f"{_from_name} <{_from_email}>")
 
 _DEV_MODE = not _SMTP_USER  # If no SMTP user, log emails instead of sending
 
