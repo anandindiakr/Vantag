@@ -215,7 +215,7 @@ function PricingCard({ plan, annual }: {
           <span className="font-syne text-4xl font-bold text-white leading-none">{price.toLocaleString()}</span>
           <span className="text-sm text-white/30 mb-1.5">{suffix}</span>
         </div>
-        <p className="text-xs text-white/30 mt-2 font-mono-alt">Up to {plan.cameras} cameras · 14-day free trial</p>
+        <p className="text-xs text-white/30 mt-2 font-mono-alt">Up to {plan.cameras} cameras · 3-day free trial</p>
       </div>
 
       <ul className="space-y-3 flex-1 mb-8">
@@ -240,6 +240,15 @@ function PricingCard({ plan, annual }: {
         {plan.key === 'pro' && [
           'Everything in Growth', 'Watchlist Matching', 'POS Integration',
           'Multi-location', 'Custom Webhooks + API', 'Unlimited history', 'Dedicated Support',
+        ].map(f => (
+          <li key={f} className="flex items-start gap-2.5 text-sm">
+            <CheckCircle className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+            <span className="text-white/65 font-body-alt">{f}</span>
+          </li>
+        ))}
+        {plan.key === 'proplus' && [
+          'Everything in Pro', 'Up to 30 Cameras', 'White-label Branding',
+          'Custom AI Training', 'SLA Uptime Guarantee', 'Dedicated Account Manager', 'On-site Support',
         ].map(f => (
           <li key={f} className="flex items-start gap-2.5 text-sm">
             <CheckCircle className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
@@ -786,14 +795,14 @@ export default function Landing() {
             )}
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 items-start">
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6 items-start">
             {region.plans.map(plan => (
               <PricingCard key={plan.key} plan={plan} annual={annual} />
             ))}
           </div>
 
           <p className="text-center text-xs font-mono-alt text-white/25 mt-8 tracking-wide">
-            14-day free trial on all plans · Cancel anytime · Secure payment processing
+            3-day free trial on all plans · Cancel anytime · Secure payment processing
           </p>
         </div>
       </Section>

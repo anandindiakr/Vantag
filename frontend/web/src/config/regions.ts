@@ -2,7 +2,7 @@ export type Region = 'IN' | 'MY' | 'SG';
 
 export interface PricingTier {
   name: string;
-  key: 'starter' | 'growth' | 'pro';
+  key: 'starter' | 'growth' | 'pro' | 'proplus';
   cameras: number;
   monthlyPrice: number;
   annualPrice: number;  // per month when billed annually
@@ -62,18 +62,18 @@ const REGIONS: Record<Region, RegionConfig> = {
       {
         name: 'Starter',
         key: 'starter',
-        cameras: 5,
-        monthlyPrice: 1999,
-        annualPrice: 1666,
+        cameras: 2,
+        monthlyPrice: 999,
+        annualPrice: 833,
         currency: 'INR',
         symbol: '₹',
       },
       {
         name: 'Growth',
         key: 'growth',
-        cameras: 15,
-        monthlyPrice: 4499,
-        annualPrice: 3749,
+        cameras: 5,
+        monthlyPrice: 1999,
+        annualPrice: 1666,
         currency: 'INR',
         symbol: '₹',
         popular: true,
@@ -81,6 +81,15 @@ const REGIONS: Record<Region, RegionConfig> = {
       {
         name: 'Pro',
         key: 'pro',
+        cameras: 15,
+        monthlyPrice: 4499,
+        annualPrice: 3749,
+        currency: 'INR',
+        symbol: '₹',
+      },
+      {
+        name: 'Pro Plus',
+        key: 'proplus',
         cameras: 30,
         monthlyPrice: 8999,
         annualPrice: 7499,
@@ -109,18 +118,18 @@ const REGIONS: Record<Region, RegionConfig> = {
       {
         name: 'Starter',
         key: 'starter',
-        cameras: 5,
-        monthlyPrice: 59,
-        annualPrice: 49,
+        cameras: 2,
+        monthlyPrice: 29,
+        annualPrice: 24,
         currency: 'MYR',
         symbol: 'RM',
       },
       {
         name: 'Growth',
         key: 'growth',
-        cameras: 15,
-        monthlyPrice: 149,
-        annualPrice: 124,
+        cameras: 5,
+        monthlyPrice: 59,
+        annualPrice: 49,
         currency: 'MYR',
         symbol: 'RM',
         popular: true,
@@ -128,6 +137,15 @@ const REGIONS: Record<Region, RegionConfig> = {
       {
         name: 'Pro',
         key: 'pro',
+        cameras: 15,
+        monthlyPrice: 149,
+        annualPrice: 124,
+        currency: 'MYR',
+        symbol: 'RM',
+      },
+      {
+        name: 'Pro Plus',
+        key: 'proplus',
         cameras: 30,
         monthlyPrice: 299,
         annualPrice: 249,
@@ -155,18 +173,18 @@ const REGIONS: Record<Region, RegionConfig> = {
       {
         name: 'Starter',
         key: 'starter',
-        cameras: 5,
-        monthlyPrice: 39,
-        annualPrice: 32,
+        cameras: 2,
+        monthlyPrice: 19,
+        annualPrice: 16,
         currency: 'SGD',
         symbol: 'S$',
       },
       {
         name: 'Growth',
         key: 'growth',
-        cameras: 15,
-        monthlyPrice: 99,
-        annualPrice: 82,
+        cameras: 5,
+        monthlyPrice: 39,
+        annualPrice: 32,
         currency: 'SGD',
         symbol: 'S$',
         popular: true,
@@ -174,6 +192,15 @@ const REGIONS: Record<Region, RegionConfig> = {
       {
         name: 'Pro',
         key: 'pro',
+        cameras: 15,
+        monthlyPrice: 99,
+        annualPrice: 82,
+        currency: 'SGD',
+        symbol: 'S$',
+      },
+      {
+        name: 'Pro Plus',
+        key: 'proplus',
         cameras: 30,
         monthlyPrice: 189,
         annualPrice: 157,
