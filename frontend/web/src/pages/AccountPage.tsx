@@ -199,10 +199,10 @@ export default function AccountPage() {
   }
 
   const planLabel: Record<string, string> = {
-    starter: 'Starter (Trial)',
-    basic: 'Basic',
-    pro: 'Professional',
-    enterprise: 'Enterprise',
+    starter: 'Starter',
+    growth: 'Growth',
+    pro: 'Pro',
+    proplus: 'Pro Plus',
   };
 
   const regionLabel: Record<string, string> = {

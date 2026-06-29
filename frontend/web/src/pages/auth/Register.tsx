@@ -81,7 +81,7 @@ export default function Register() {
         </div>
         <div className="bg-white/3 border border-white/8 rounded-2xl p-8">
           <h1 className="text-2xl font-bold mb-2 text-center">Create your account</h1>
-          <p className="text-white/40 text-sm text-center mb-8">14-day free trial · No credit card required</p>
+          <p className="text-white/40 text-sm text-center mb-8">3-day free trial · No credit card required</p>
           <form onSubmit={submit} className="space-y-4">
             <div>
               <label className="text-sm text-white/60 flex items-center mb-1.5">
