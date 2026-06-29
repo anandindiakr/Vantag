@@ -126,8 +126,12 @@ async def require_active_tenant(
 
     if tenant.status == "trial":
         if tenant.trial_ends_at is None:
-            # No expiry set — treat as unlimited trial
-            return user
+            # No expiry set — block access; trial_ends_at must always be set
+            raise HTTPException(
+                status_code=402,
+                detail="subscription_required",
+                headers={"X-Subscription-Status": "trial_expired"},
+            )
         trial_end = tenant.trial_ends_at
         if trial_end.tzinfo is None:
             trial_end = trial_end.replace(tzinfo=timezone.utc)

@@ -153,6 +153,22 @@ async def step3_payment(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
+    # Guard: already active — don't allow downgrade via re-submission
+    if tenant.status == "active":
+        return {"step": 3, "next": 4, "status": "active"}
+
+    # Guard: trial already started without payment — prevent trial extension
+    # A second call with no payment cannot reset trial_ends_at
+    if (
+        not body.razorpay_payment_id
+        and tenant.status == "trial"
+        and tenant.trial_ends_at is not None
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Trial already active. Please complete payment to continue.",
+        )
+
     if body.razorpay_payment_id:
         # Payment IDs provided — require full signature verification
         if not body.razorpay_order_id or not body.razorpay_signature:

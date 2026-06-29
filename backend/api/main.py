@@ -287,7 +287,7 @@ app.include_router(demo_router,       dependencies=_sub_gate)
 app.include_router(zone_router,       dependencies=_sub_gate)
 app.include_router(support_router)
 app.include_router(system_router)
-app.include_router(snapshots_router)
+app.include_router(snapshots_router,  dependencies=_sub_gate)
 app.include_router(admin_router)
 app.include_router(seo_router)
 
