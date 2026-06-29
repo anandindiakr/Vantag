@@ -96,7 +96,7 @@ PLANS: dict[str, dict] = {
             "MYR": 599,
         },
         "razorpay_plan_ids": {
-            "INR": "plan_T7WEQBukuWrPcZ",
+            "INR": "plan_T7WEQBukuWrPczi",
             "SGD": "",
             "MYR": "",
         },
