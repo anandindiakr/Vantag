@@ -21,7 +21,7 @@ PLANS: dict[str, dict] = {
             "MYR": 149,
         },
         "razorpay_plan_ids": {
-            "INR": "",   # fill after creating in Razorpay dashboard
+            "INR": "plan_T7W6SUeTnVoAyL",
             "SGD": "",
             "MYR": "",
         },
@@ -47,7 +47,7 @@ PLANS: dict[str, dict] = {
             "MYR": 299,
         },
         "razorpay_plan_ids": {
-            "INR": "",
+            "INR": "plan_T7WAyWwxVE1XKH",
             "SGD": "",
             "MYR": "",
         },
@@ -72,7 +72,7 @@ PLANS: dict[str, dict] = {
             "MYR": 449,
         },
         "razorpay_plan_ids": {
-            "INR": "",
+            "INR": "plan_T7WCJ5OfbMU10W",
             "SGD": "",
             "MYR": "",
         },
@@ -96,7 +96,7 @@ PLANS: dict[str, dict] = {
             "MYR": 599,
         },
         "razorpay_plan_ids": {
-            "INR": "",
+            "INR": "plan_T7WEQBukuWrPcZ",
             "SGD": "",
             "MYR": "",
         },
