@@ -477,8 +477,8 @@ export default function Onboarding() {
               <p className="text-white/40 text-sm mb-8">The Edge Agent runs on your device and connects your cameras to Vantag.</p>
               <div className="space-y-4 mb-8">
                 {[
-                  { icon: '📱', title: 'Android Phone or Tablet', desc: 'Best for 2–5 cameras. Uses your existing device.', type: 'android' },
-                  { icon: '💻', title: 'Windows PC', desc: 'Best for 5–30 cameras. Install on your shop PC.', type: 'windows' },
+                  { icon: '📱', title: 'Android Phone or Tablet', desc: 'Best for up to 4 cameras. Uses your existing device.', type: 'android' },
+                  { icon: '💻', title: 'Windows PC', desc: 'Best for up to 30 cameras. Install on your shop PC.', type: 'windows' },
                   { icon: '📦', title: 'Vantag Edge Box', desc: 'Plug-and-play device. Just connect power + ethernet.', type: 'edge_box' },
                 ].map(opt => (
                   <div key={opt.type} className="p-4 bg-white/3 border border-white/8 rounded-xl flex items-start gap-4">

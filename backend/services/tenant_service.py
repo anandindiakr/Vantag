@@ -54,7 +54,7 @@ async def create_tenant(
     region = country_map.get(country.upper(), "india")
 
     plan = get_plan(plan_id)
-    trial_days = plan["trial_days"] if plan else 14
+    trial_days = plan["trial_days"] if plan else 3
 
     onboarding_token = secrets.token_urlsafe(32)
 

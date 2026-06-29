@@ -126,7 +126,7 @@ const PLATFORM_FEATURES = [
 ];
 
 const EDGE_OPTIONS = [
-  { icon: Smartphone, title: 'Android Phone / Tablet', desc: 'Install on any Android device. No extra hardware for 2–5 cameras.' },
+  { icon: Smartphone, title: 'Android Phone / Tablet', desc: 'Install on any Android device. No extra hardware for up to 4 cameras.' },
   { icon: Monitor,    title: 'Windows / Mac PC',       desc: 'Run the Edge Agent on any computer already in your shop.' },
   { icon: Cpu,        title: 'Vantag Edge Box',        desc: 'Pre-configured plug-and-play device — connect power and ethernet, done.' },
 ];

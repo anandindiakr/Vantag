@@ -218,7 +218,7 @@ Tenant ID        : ${apiKey}`}</CodeBlock>
             <summary className="cursor-pointer font-bold">Do I need a PC? Can it run on a phone?</summary>
             <p className="mt-3 text-white/70">
               Low hardware requirements: any PC, tablet, Raspberry Pi 4 (or
-              newer), or an always-on Android tablet works. For 2–5 cameras, a
+              newer), or an always-on Android tablet works. For up to 4 cameras, a
               Pi 4 or an old laptop is plenty. A dedicated phone/tablet version
               is on the roadmap.
             </p>
