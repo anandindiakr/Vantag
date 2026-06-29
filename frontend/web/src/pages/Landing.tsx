@@ -238,7 +238,7 @@ function PricingCard({ plan, annual }: {
           </li>
         ))}
         {plan.key === 'pro' && [
-          'Everything in Growth', 'Watchlist Matching', 'POS Integration',
+          'Everything in Growth', 'Watchlist Matching',
           'Multi-location', 'Custom Webhooks + API', 'Unlimited history', 'Dedicated Support',
         ].map(f => (
           <li key={f} className="flex items-start gap-2.5 text-sm">
@@ -247,7 +247,7 @@ function PricingCard({ plan, annual }: {
           </li>
         ))}
         {plan.key === 'proplus' && [
-          'Everything in Pro', 'Up to 30 Cameras', 'White-label Branding',
+          'Everything in Pro', 'Up to 30 Cameras',
           'Custom AI Training', 'SLA Uptime Guarantee', 'Dedicated Account Manager', 'On-site Support',
         ].map(f => (
           <li key={f} className="flex items-start gap-2.5 text-sm">
