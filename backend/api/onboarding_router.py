@@ -135,7 +135,9 @@ async def step2_plan_selection(
         "price": price,
         "currency": region["currency"],
         "symbol": region["symbol"],
-        "razorpay_key_id": region["razorpay_key_id"],
+        "payment_gateway": region.get("payment_gateway", "razorpay"),
+        "razorpay_key_id": region.get("razorpay_key_id", ""),
+        "xendit_public_key": region.get("xendit_public_key", ""),
     }
 
 
