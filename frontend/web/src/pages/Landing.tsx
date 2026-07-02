@@ -21,9 +21,10 @@ const IS_LOCALHOST = typeof window !== 'undefined' &&
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 const REGION_SWITCHER = [
-  { code: 'IN' as const, name: 'India',     app: 'Retail Nazar', flag: '🇮🇳', lang: 'en', url: 'https://retailnazar.com' },
-  { code: 'SG' as const, name: 'Singapore', app: 'Vantag',       flag: '🇸🇬', lang: 'en', url: 'https://retail-vantag.com' },
-  { code: 'MY' as const, name: 'Malaysia',  app: 'JagaJaga',     flag: '🇲🇾', lang: 'ms', url: 'https://jagajaga.my' },
+  { code: 'IN' as const, name: 'India',       app: 'Retail Nazar',  flag: '🇮🇳', lang: 'en', url: 'https://retailnazar.com' },
+  { code: 'SG' as const, name: 'Singapore',   app: 'Vantag',        flag: '🇸🇬', lang: 'en', url: 'https://retail-vantag.com' },
+  { code: 'MY' as const, name: 'Malaysia',    app: 'JagaJaga',      flag: '🇲🇾', lang: 'ms', url: 'https://jagajaga.my' },
+  { code: 'PH' as const, name: 'Philippines', app: 'Retail Bantay', flag: '🇵🇭', lang: 'en', url: 'https://retailbantay.com' },
 ];
 
 /* ── 11 AI Feature detectors ── */
@@ -822,7 +823,7 @@ export default function Landing() {
               </div>
               <h2 className="font-syne text-3xl sm:text-4xl font-black text-white mb-4">Ready to Protect Your Store?</h2>
               <p className="text-white/45 text-lg font-body-alt mb-8 max-w-xl mx-auto">
-                Join retailers across India, Singapore and Malaysia using Vantag to stop theft before it happens.
+                Join retailers across India, Singapore, Malaysia and the Philippines using Vantag to stop theft before it happens.
               </p>
               <div className="flex flex-wrap justify-center gap-4">
                 <Link
@@ -853,7 +854,7 @@ export default function Landing() {
                 <span className="font-syne text-lg font-bold">Vantag</span>
               </div>
               <p className="text-sm text-white/35 font-body-alt leading-relaxed mb-4">
-                AI-powered retail security platform for shops across India, Singapore and Malaysia.
+                AI-powered retail security platform for shops across India, Singapore, Malaysia and the Philippines.
               </p>
               <div className="flex gap-2 flex-wrap">
                 {REGION_SWITCHER.map(r => (
@@ -924,6 +925,14 @@ export default function Landing() {
                   <span className="font-mono-alt text-[10px] text-white/20">Malaysia</span>
                 </a>
                 <a
+                  href="https://retailbantay.com"
+                  target="_blank" rel="noopener noreferrer"
+                  className={`flex items-center gap-2 font-body-alt transition-colors ${region.region === 'PH' ? 'text-cyan-400 font-semibold' : 'text-white/40 hover:text-white/80'}`}
+                >
+                  🇵🇭 <span>Retail Bantay</span>
+                  <span className="font-mono-alt text-[10px] text-white/20">Philippines</span>
+                </a>
+                <a
                   href="https://retailnazar.in"
                   target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-2 font-body-alt text-white/25 hover:text-white/60 transition-colors"
@@ -935,7 +944,7 @@ export default function Landing() {
           </div>
 
           <div className="flex items-center justify-between mt-12 pt-8 border-t border-white/5">
-            <span className="font-mono-alt text-[11px] text-white/20">© {new Date().getFullYear()} A product of AI Algo (S) Pte Ltd. · IN · SG · MY</span>
+            <span className="font-mono-alt text-[11px] text-white/20">© {new Date().getFullYear()} A product of AI Algo (S) Pte Ltd. · IN · SG · MY · PH</span>
             <span className="font-mono-alt text-[11px] text-white/20">11 AI Models · Edge-First · Hardware-Agnostic</span>
           </div>
         </div>
