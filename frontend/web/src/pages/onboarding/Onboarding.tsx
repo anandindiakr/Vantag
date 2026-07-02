@@ -371,7 +371,7 @@ export default function Onboarding() {
               <h2 className="text-2xl font-bold mb-2">Start Your Free Trial</h2>
               <p className="text-white/40 text-sm mb-8">3 days free. No payment needed now.<br />You'll be reminded before your trial ends.</p>
               <div className="bg-white/5 rounded-xl p-4 mb-8 text-left space-y-2">
-                {['3-day full access — no restrictions', 'No credit card required to start', 'Cancel anytime from your dashboard', 'Razorpay payment when trial ends'].map(f => (
+                {['3-day full access — no restrictions', 'No credit card required to start', 'Cancel anytime from your dashboard', `${regionData.paymentGateway === 'xendit' ? 'GCash / Maya' : 'Razorpay'} payment when trial ends`].map(f => (
                   <div key={f} className="flex items-center gap-2 text-sm text-white/70">
                     <CheckCircle className="w-4 h-4 text-violet-400 flex-shrink-0" />
                     {f}

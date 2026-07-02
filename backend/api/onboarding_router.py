@@ -41,6 +41,7 @@ class Step3Body(BaseModel):
     razorpay_payment_id: str | None = None
     razorpay_order_id: str | None = None
     razorpay_signature: str | None = None
+    xendit_payment_id: str | None = None
 
 
 class CameraInput(BaseModel):
@@ -159,17 +160,18 @@ async def step3_payment(
     if tenant.status == "active":
         return {"step": 3, "next": 4, "status": "active"}
 
-    # Guard: trial already started without payment — prevent trial extension
-    # A second call with no payment cannot reset trial_ends_at
+    # Guard: trial already started without payment — just advance onboarding, don't re-extend
     if (
         not body.razorpay_payment_id
+        and not body.xendit_payment_id
         and tenant.status == "trial"
         and tenant.trial_ends_at is not None
     ):
-        raise HTTPException(
-            status_code=400,
-            detail="Trial already active. Please complete payment to continue.",
+        await session.execute(
+            update(Tenant).where(Tenant.id == user["tenant_id"]).values(onboarding_step=4)
         )
+        await session.commit()
+        return {"step": 3, "next": 4, "status": "trial"}
 
     if body.razorpay_payment_id:
         # Payment IDs provided — require full signature verification
