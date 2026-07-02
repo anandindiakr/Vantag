@@ -78,7 +78,7 @@ export default function Onboarding() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
-  const [country, setCountry] = useState(regionData.region || 'IN');
+  const [country, setCountry] = useState<string>(regionData.region || 'IN');
   const [selectedPlan, setSelectedPlan] = useState('starter');
   const [agentData, setAgentData] = useState<any>(null);
   const [cameras, setCameras] = useState<CameraEntry[]>([{ ip: '', name: '', location: '', rtsp_url: '', brand: '', probeStatus: 'idle' }]);
