@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, Store, CreditCard, Camera, Smartphone, CheckCircle, ChevronRight, ChevronLeft, Loader2, Wifi, AlertCircle, Zap } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { useRazorpay } from '../../hooks/useRazorpay';
+import { usePayment } from '../../hooks/usePayment';
 import InfoTooltip from '../../components/InfoTooltip';
 
 // ── helpers ───────────────────────────────────────────────────────────────
@@ -56,16 +56,16 @@ function StepBar({ current }: { current: number }) {
 
 // ── PLAN DATA ─────────────────────────────────────────────────────────────
 const PLANS = [
-  { id: 'starter', name: 'Starter', cameras: 'Up to 4', price: { IN: '₹1,999', SG: 'S$49', MY: 'RM 149' }, features: ['AI Detection Suite', 'Real-time Dashboard', 'One-Tap Door Lock', 'Email Alerts', '7-day history'] },
-  { id: 'growth', name: 'Growth', cameras: 'Up to 10', price: { IN: '₹4,499', SG: 'S$99', MY: 'RM 299' }, highlight: true, features: ['Everything in Starter', 'Face Recognition', 'Heatmap Analytics', 'Queue Detection', 'Priority Support'] },
-  { id: 'pro', name: 'Pro', cameras: 'Up to 20', price: { IN: '₹9,999', SG: 'S$149', MY: 'RM 449' }, features: ['Everything in Growth', 'Watchlist Matching', 'Multi-location', 'Custom Webhooks + API', 'Unlimited history', 'Dedicated Support'] },
-  { id: 'proplus', name: 'Pro Plus', cameras: 'Up to 30', price: { IN: '₹15,000', SG: 'S$199', MY: 'RM 599' }, features: ['Everything in Pro', 'Custom AI Training', 'SLA Uptime Guarantee', 'Dedicated Account Manager', 'On-site Support'] },
+  { id: 'starter', name: 'Starter', cameras: 'Up to 4', price: { IN: '₹1,999', SG: 'S$49', MY: 'RM 149', PH: '₱2,499' }, features: ['AI Detection Suite', 'Real-time Dashboard', 'One-Tap Door Lock', 'Email Alerts', '7-day history'] },
+  { id: 'growth', name: 'Growth', cameras: 'Up to 10', price: { IN: '₹4,499', SG: 'S$99', MY: 'RM 299', PH: '₱5,499' }, highlight: true, features: ['Everything in Starter', 'Face Recognition', 'Heatmap Analytics', 'Queue Detection', 'Priority Support'] },
+  { id: 'pro', name: 'Pro', cameras: 'Up to 20', price: { IN: '₹9,999', SG: 'S$149', MY: 'RM 449', PH: '₱11,999' }, features: ['Everything in Growth', 'Watchlist Matching', 'Multi-location', 'Custom Webhooks + API', 'Unlimited history', 'Dedicated Support'] },
+  { id: 'proplus', name: 'Pro Plus', cameras: 'Up to 30', price: { IN: '₹15,000', SG: 'S$199', MY: 'RM 599', PH: '₱17,999' }, features: ['Everything in Pro', 'Custom AI Training', 'SLA Uptime Guarantee', 'Dedicated Account Manager', 'On-site Support'] },
 ];
 
 // ── Main Onboarding Component ─────────────────────────────────────────────
 export default function Onboarding() {
   const nav = useNavigate();
-  const { openCheckout } = useRazorpay();
+  const { pay: payNow, gateway } = usePayment();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
@@ -141,45 +141,31 @@ export default function Onboarding() {
 
   const submitStep3PayNow = async () => {
     setPayLoading(true);
-    try {
-      // 1. Create Razorpay order
-      const { data: order } = await api.post('/billing/order', { plan_id: selectedPlan });
-      const userData = JSON.parse(atob((localStorage.getItem('vantag_token') || '').split('.')[1] || 'e30='));
-
-      // 2. Open Razorpay checkout
-      await openCheckout({
-        orderId: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        description: `Vantag ${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} Plan`,
-        prefill: { email: userData.email },
-        onSuccess: async (resp) => {
-          try {
-            // 3. Verify payment signature on backend
-            await api.post('/billing/verify', {
-              razorpay_order_id: resp.razorpay_order_id,
-              razorpay_payment_id: resp.razorpay_payment_id,
-              razorpay_signature: resp.razorpay_signature,
-            });
-            // 4. Advance onboarding
-            await api.post('/onboarding/step/3', { paid: true });
-            toast.success('Payment successful! Welcome to Vantag.');
-            setStep(4);
-          } catch {
-            toast.error('Payment verification failed. Please contact support.');
-          } finally {
-            setPayLoading(false);
-          }
-        },
-        onDismiss: () => {
+    const userData = JSON.parse(atob((localStorage.getItem('vantag_token') || '').split('.')[1] || 'e30='));
+    await payNow({
+      planId: selectedPlan,
+      description: `Vantag ${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} Plan`,
+      prefill: { email: userData.email },
+      onSuccess: async () => {
+        try {
+          await api.post('/onboarding/step/3', { paid: true });
+          toast.success('Payment successful! Welcome to Vantag.');
+          setStep(4);
+        } catch {
+          toast.error('Payment verification failed. Please contact support.');
+        } finally {
           setPayLoading(false);
-          toast('Payment cancelled. You can pay later from your dashboard.', { icon: 'ℹ️' });
-        },
-      });
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Could not initiate payment');
-      setPayLoading(false);
-    }
+        }
+      },
+      onDismiss: () => {
+        setPayLoading(false);
+        toast('Payment cancelled. You can pay later from your dashboard.', { icon: 'ℹ️' });
+      },
+      onError: (msg) => {
+        toast.error(msg);
+        setPayLoading(false);
+      },
+    });
   };
 
   const submitStep4 = async () => {

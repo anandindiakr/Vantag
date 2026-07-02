@@ -1,4 +1,4 @@
-export type Region = 'IN' | 'MY' | 'SG';
+export type Region = 'IN' | 'MY' | 'SG' | 'PH';
 
 export interface PricingTier {
   name: string;
@@ -29,8 +29,10 @@ export interface RegionConfig {
   symbol: string;
   /** Country name shown in copy */
   country: string;
-  /** Razorpay / payment gateway currency */
+  /** Payment gateway currency */
   paymentCurrency: string;
+  /** Payment gateway: razorpay (IN) | xendit (PH/SG/MY) */
+  paymentGateway: 'razorpay' | 'xendit';
   /** Pricing tiers */
   plans: PricingTier[];
 }
@@ -58,6 +60,7 @@ const REGIONS: Record<Region, RegionConfig> = {
     symbol: '₹',
     country: 'India',
     paymentCurrency: 'INR',
+    paymentGateway: 'razorpay',
     plans: [
       {
         name: 'Starter',
@@ -114,11 +117,12 @@ const REGIONS: Record<Region, RegionConfig> = {
     symbol: 'RM',
     country: 'Malaysia',
     paymentCurrency: 'MYR',
+    paymentGateway: 'xendit',
     plans: [
       {
         name: 'Starter',
         key: 'starter',
-        cameras: 2,
+        cameras: 4,
         monthlyPrice: 29,
         annualPrice: 24,
         currency: 'MYR',
@@ -127,7 +131,7 @@ const REGIONS: Record<Region, RegionConfig> = {
       {
         name: 'Growth',
         key: 'growth',
-        cameras: 5,
+        cameras: 10,
         monthlyPrice: 59,
         annualPrice: 49,
         currency: 'MYR',
@@ -137,7 +141,7 @@ const REGIONS: Record<Region, RegionConfig> = {
       {
         name: 'Pro',
         key: 'pro',
-        cameras: 15,
+        cameras: 20,
         monthlyPrice: 149,
         annualPrice: 124,
         currency: 'MYR',
@@ -169,11 +173,12 @@ const REGIONS: Record<Region, RegionConfig> = {
     symbol: 'S$',
     country: 'Singapore',
     paymentCurrency: 'SGD',
+    paymentGateway: 'xendit',
     plans: [
       {
         name: 'Starter',
         key: 'starter',
-        cameras: 2,
+        cameras: 4,
         monthlyPrice: 19,
         annualPrice: 16,
         currency: 'SGD',
@@ -182,7 +187,7 @@ const REGIONS: Record<Region, RegionConfig> = {
       {
         name: 'Growth',
         key: 'growth',
-        cameras: 5,
+        cameras: 10,
         monthlyPrice: 39,
         annualPrice: 32,
         currency: 'SGD',
@@ -192,7 +197,7 @@ const REGIONS: Record<Region, RegionConfig> = {
       {
         name: 'Pro',
         key: 'pro',
-        cameras: 15,
+        cameras: 20,
         monthlyPrice: 99,
         annualPrice: 82,
         currency: 'SGD',
@@ -206,6 +211,62 @@ const REGIONS: Record<Region, RegionConfig> = {
         annualPrice: 157,
         currency: 'SGD',
         symbol: 'S$',
+      },
+    ],
+  },
+
+  PH: {
+    region: 'PH',
+    brand: 'Vantag — Retail Bantay',
+    brandShort: 'Retail Bantay',
+    domains: ['retailbantay.com', 'retailbantay.ph'],
+    languages: [
+      { code: 'en', label: 'English' },
+      { code: 'fil', label: 'Filipino' },
+    ],
+    defaultLang: 'en',
+    currency: 'PHP',
+    symbol: '₱',
+    country: 'Philippines',
+    paymentCurrency: 'PHP',
+    paymentGateway: 'xendit',
+    plans: [
+      {
+        name: 'Starter',
+        key: 'starter',
+        cameras: 4,
+        monthlyPrice: 2499,
+        annualPrice: 2082,
+        currency: 'PHP',
+        symbol: '₱',
+      },
+      {
+        name: 'Growth',
+        key: 'growth',
+        cameras: 10,
+        monthlyPrice: 5499,
+        annualPrice: 4582,
+        currency: 'PHP',
+        symbol: '₱',
+        popular: true,
+      },
+      {
+        name: 'Pro',
+        key: 'pro',
+        cameras: 20,
+        monthlyPrice: 11999,
+        annualPrice: 9999,
+        currency: 'PHP',
+        symbol: '₱',
+      },
+      {
+        name: 'Pro Plus',
+        key: 'proplus',
+        cameras: 30,
+        monthlyPrice: 17999,
+        annualPrice: 14999,
+        currency: 'PHP',
+        symbol: '₱',
       },
     ],
   },
@@ -225,6 +286,10 @@ export function detectRegion(): RegionConfig {
 
   if (host.includes('jagajaga') || host.includes('retailjagajaga')) {
     return REGIONS.MY;
+  }
+
+  if (host.includes('retailbantay') || host.includes('bantay')) {
+    return REGIONS.PH;
   }
 
   // retail-vantag.com → SG, or localhost (dev default)

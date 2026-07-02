@@ -50,7 +50,7 @@ async def create_tenant(
         slug = f"{slug_base}-{counter}"
         counter += 1
 
-    country_map = {"IN": "india", "SG": "singapore", "MY": "malaysia"}
+    country_map = {"IN": "india", "SG": "singapore", "MY": "malaysia", "PH": "philippines"}
     region = country_map.get(country.upper(), "india")
 
     plan = get_plan(plan_id)

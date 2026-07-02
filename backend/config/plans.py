@@ -17,11 +17,15 @@ PLANS: dict[str, dict] = {
         ],
         "prices": {
             "INR": 1999,
-            "SGD": 49,
-            "MYR": 149,
+            "SGD": 19,
+            "MYR": 29,
+            "PHP": 2499,
         },
         "razorpay_plan_ids": {
             "INR": "plan_T7W6SUeTnVoAyL",
+        },
+        "xendit_plan_ids": {
+            "PHP": "",   # fill after Xendit approval
             "SGD": "",
             "MYR": "",
         },
@@ -43,11 +47,15 @@ PLANS: dict[str, dict] = {
         ],
         "prices": {
             "INR": 4499,
-            "SGD": 99,
-            "MYR": 299,
+            "SGD": 39,
+            "MYR": 59,
+            "PHP": 5499,
         },
         "razorpay_plan_ids": {
             "INR": "plan_T7WAyWwxVE1XKH",
+        },
+        "xendit_plan_ids": {
+            "PHP": "",
             "SGD": "",
             "MYR": "",
         },
@@ -68,11 +76,15 @@ PLANS: dict[str, dict] = {
         ],
         "prices": {
             "INR": 9999,
-            "SGD": 149,
-            "MYR": 449,
+            "SGD": 99,
+            "MYR": 149,
+            "PHP": 11999,
         },
         "razorpay_plan_ids": {
             "INR": "plan_T7WCJ5OfbMU10W",
+        },
+        "xendit_plan_ids": {
+            "PHP": "",
             "SGD": "",
             "MYR": "",
         },
@@ -92,11 +104,15 @@ PLANS: dict[str, dict] = {
         ],
         "prices": {
             "INR": 15000,
-            "SGD": 199,
-            "MYR": 599,
+            "SGD": 189,
+            "MYR": 299,
+            "PHP": 17999,
         },
         "razorpay_plan_ids": {
             "INR": "plan_T7WEQBukuWrPczi",
+        },
+        "xendit_plan_ids": {
+            "PHP": "",
             "SGD": "",
             "MYR": "",
         },

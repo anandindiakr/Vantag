@@ -21,6 +21,9 @@ from ..db.models.billing import Invoice, PaymentEvent, Subscription
 from ..db.models.tenant import Tenant
 from ..middleware.tenant_middleware import get_current_user_id
 from ..services.razorpay_service import create_order, verify_payment_signature, verify_webhook_signature
+from ..services import xendit_service
+from ..config.plans import get_plan, get_plan_price
+from ..config.regions import get_region
 
 billing_router = APIRouter(prefix="/api/billing", tags=["billing"])
 logger = logging.getLogger("vantag.billing")
@@ -233,6 +236,120 @@ async def razorpay_webhook(
 
     # Process the event — update tenant/invoice state
     await _process_webhook_event(event_type, payload, pe.id, session)
+
+    return {"received": True, "event": event_type}
+
+
+class XenditOrderRequest(BaseModel):
+    plan_id: str
+
+
+@billing_router.post("/xendit-order")
+async def create_xendit_order(
+    body: XenditOrderRequest,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Create a Xendit invoice for the selected plan (PH/SG/MY)."""
+    tenant_result = await session.execute(select(Tenant).where(Tenant.id == user["tenant_id"]))
+    tenant = tenant_result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    region = get_region(tenant.country)
+    currency = region["currency"]
+    amount = get_plan_price(body.plan_id, currency)
+    if not amount:
+        raise HTTPException(status_code=400, detail=f"Plan '{body.plan_id}' not available in {currency}")
+
+    plan = get_plan(body.plan_id)
+    external_id = f"vantag-{tenant.id}-{uuid.uuid4().hex[:8]}"
+    base_domain = region.get("domain", "retail-vantag.com")
+
+    result = await xendit_service.create_invoice(
+        country=tenant.country,
+        external_id=external_id,
+        amount=amount,
+        currency=currency,
+        payer_email=user.get("email", ""),
+        description=f"Vantag {plan['name']} — {region['name']}",
+        success_redirect_url=f"https://{base_domain}/dashboard?payment=success",
+        failure_redirect_url=f"https://{base_domain}/onboarding?payment=failed",
+    )
+
+    inv = Invoice(
+        id=str(uuid.uuid4()),
+        tenant_id=tenant.id,
+        razorpay_order_id=external_id,  # reusing field as external_id for Xendit
+        amount=amount,
+        currency=currency,
+        status="pending",
+        invoice_number=f"INV-{uuid.uuid4().hex[:8].upper()}",
+    )
+    session.add(inv)
+    await session.commit()
+
+    return {**result, "invoice_id": inv.id}
+
+
+@billing_router.post("/xendit-webhook/{country}")
+async def xendit_webhook(
+    country: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    x_callback_token: str = Header(None, alias="x-callback-token"),
+) -> dict:
+    """Xendit webhook handler for payment events (idempotent)."""
+    body = await request.body()
+
+    if not xendit_service.verify_webhook(country.upper(), x_callback_token or ""):
+        raise HTTPException(status_code=400, detail="Invalid webhook token")
+
+    payload = json.loads(body)
+    event_type, event_id, _ = xendit_service.parse_webhook_event(payload)
+
+    if event_id:
+        existing = await session.execute(
+            select(PaymentEvent).where(PaymentEvent.razorpay_event_id == event_id)
+        )
+        if existing.scalar_one_or_none():
+            return {"status": "duplicate_ignored", "event": event_type}
+
+    pe = PaymentEvent(
+        id=str(uuid.uuid4()),
+        event_type=f"xendit.{event_type}",
+        razorpay_event_id=event_id,
+        payload=payload,
+        processed=False,
+    )
+    session.add(pe)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        return {"status": "duplicate_ignored", "event": event_type}
+
+    # Activate tenant on successful payment
+    if event_type in ("PAID", "SETTLED"):
+        external_id = payload.get("external_id") or payload.get("id")
+        if external_id:
+            inv_result = await session.execute(
+                select(Invoice).where(Invoice.razorpay_order_id == external_id)
+            )
+            inv = inv_result.scalar_one_or_none()
+            if inv:
+                await session.execute(
+                    update(Invoice).where(Invoice.id == inv.id).values(status="paid")
+                )
+                await session.execute(
+                    update(Tenant).where(Tenant.id == inv.tenant_id).values(status="active")
+                )
+                logger.info("Xendit %s: activated tenant=%s", event_type, inv.tenant_id)
+
+    await session.execute(
+        update(PaymentEvent).where(PaymentEvent.id == pe.id).values(processed=True)
+    )
+    await session.commit()
 
     return {"received": True, "event": event_type}
 

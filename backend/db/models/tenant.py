@@ -29,8 +29,8 @@ class Tenant(Base):
     phone: Mapped[str | None] = mapped_column(String(30))
     address: Mapped[str | None] = mapped_column(Text)
     city: Mapped[str | None] = mapped_column(String(100))
-    country: Mapped[str] = mapped_column(String(5), nullable=False)  # IN/SG/MY
-    region: Mapped[str] = mapped_column(String(20), nullable=False)  # india/singapore/malaysia
+    country: Mapped[str] = mapped_column(String(5), nullable=False)  # IN/SG/MY/PH
+    region: Mapped[str] = mapped_column(String(20), nullable=False)  # india/singapore/malaysia/philippines
     plan_id: Mapped[str] = mapped_column(String(50), default="starter")
     status: Mapped[str] = mapped_column(String(20), default="trial")  # trial/active/suspended/cancelled
     language: Mapped[str] = mapped_column(String(10), default="en")  # en/hi/ms/zh

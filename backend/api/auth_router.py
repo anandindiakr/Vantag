@@ -113,7 +113,7 @@ class RegisterRequest(BaseModel):
     name: str           # shop name
     email: EmailStr
     password: str
-    country: str        # IN / SG / MY
+    country: str        # IN / SG / MY / PH
     phone: str | None = None
     language: str = "en"
     plan_id: str = "starter"
