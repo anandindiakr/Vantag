@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Competitive Battlecard — Retail Nazar</title>
+<style>
+  :root{
+    --navy:#0d1b3e; --gold:#ffd200; --green:#1a7a4a; --red:#c0392b;
+    --orange:#d35400; --blue:#1a4fa0; --purple:#7b2d8b;
+    --light:#f4f6fb; --border:#d0d8e8; --text:#1a2340; --sub:#5a6a8a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#eef1f7;color:var(--text);font-size:15px}
+
+  nav{background:var(--navy);padding:16px 36px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(0,0,0,.35)}
+  nav .brand{color:var(--gold);font-size:1.05rem;font-weight:700}
+  nav .tag{color:rgba(255,255,255,.5);font-size:.72rem;margin-top:1px}
+  .tab-nav{display:flex;gap:8px}
+  .tab-btn{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:none;padding:7px 16px;border-radius:20px;cursor:pointer;font-size:.78rem;font-weight:600;transition:.2s}
+  .tab-btn.active{background:var(--gold);color:var(--navy)}
+  .tab-btn:hover:not(.active){background:rgba(255,255,255,.2);color:#fff}
+
+  .hero{background:linear-gradient(135deg,var(--navy) 0%,#1a3070 100%);color:#fff;padding:48px 36px 40px;text-align:center}
+  .hero h1{font-size:1.9rem;color:var(--gold);margin-bottom:8px}
+  .hero .subtitle{opacity:.8;font-size:.95rem;max-width:650px;margin:0 auto 22px}
+  .hero-chips{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .hero-chips span{background:rgba(255,255,255,.1);padding:7px 16px;border-radius:20px;font-size:.8rem}
+  .hero-chips strong{color:var(--gold)}
+
+  .container{max-width:1100px;margin:0 auto;padding:36px 20px}
+
+  /* TABS */
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
+
+  /* QUICK CHEAT SHEET */
+  .cheat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:32px}
+  .cheat-card{background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(13,27,62,.1);overflow:hidden}
+  .cheat-card .cheat-hdr{padding:14px 18px;font-weight:700;font-size:.88rem;display:flex;align-items:center;gap:10px}
+  .cheat-hdr.win{background:#1a7a4a;color:#fff}
+  .cheat-hdr.warn{background:#d35400;color:#fff}
+  .cheat-hdr.attack{background:var(--navy);color:var(--gold)}
+  .cheat-card .cheat-body{padding:14px 18px}
+  .cheat-body ul{list-style:none}
+  .cheat-body li{font-size:.85rem;color:var(--text);padding:5px 0;border-bottom:1px solid var(--border);line-height:1.5}
+  .cheat-body li:last-child{border-bottom:none}
+  .cheat-body li::before{content:'→ ';color:var(--gold);font-weight:700}
+
+  /* COMPARISON TABLE */
+  .comp-table-wrap{background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(13,27,62,.1);overflow:hidden;margin-bottom:28px}
+  .comp-table{width:100%;border-collapse:collapse}
+  .comp-table th{padding:14px 16px;text-align:left;font-size:.82rem;font-weight:700;letter-spacing:.3px}
+  .comp-table th:first-child{background:#f4f6fb;color:var(--sub);width:220px}
+  .comp-table th.us{background:var(--navy);color:var(--gold)}
+  .comp-table th.them1{background:#8b1a1a;color:#fff}
+  .comp-table th.them2{background:#1a3a6a;color:#fff}
+  .comp-table td{padding:12px 16px;border-bottom:1px solid var(--border);font-size:.85rem;vertical-align:middle}
+  .comp-table td:first-child{background:#fafbfd;font-weight:600;font-size:.82rem;color:var(--sub)}
+  .comp-table tr:last-child td{border-bottom:none}
+  .win-cell{color:var(--green);font-weight:700}
+  .lose-cell{color:var(--red)}
+  .neutral-cell{color:var(--orange)}
+  .tick{display:inline-block;background:#e8f5e9;color:var(--green);border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-weight:700;font-size:.8rem}
+  .cross{display:inline-block;background:#ffe8e8;color:var(--red);border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-weight:700;font-size:.8rem}
+  .partial{display:inline-block;background:#fff8e1;color:#b8860b;border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-weight:700;font-size:.75rem}
+
+  /* OBJECTIONS */
+  .obj-section{margin-bottom:28px}
+  .obj-section h3{font-size:1rem;font-weight:700;color:var(--navy);margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--border);display:flex;align-items:center;gap:10px}
+  .obj-section h3 .src{font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:12px}
+  .src-b{background:#ffe8e8;color:#8b1a1a}
+  .src-e{background:#e8f0ff;color:#1a3a6a}
+  .src-both{background:#f0e8ff;color:#5a1a8a}
+
+  .obj-card{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden}
+  .obj-card summary{padding:14px 18px;cursor:pointer;display:flex;align-items:flex-start;gap:12px;list-style:none;background:#f8faff}
+  .obj-card summary::-webkit-details-marker{display:none}
+  .obj-card summary .obj-q{flex:1;font-size:.9rem;font-weight:600;color:var(--text);line-height:1.4}
+  .obj-card summary .obj-tag{font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:10px;white-space:nowrap;flex-shrink:0}
+  .tag-price{background:#ffe8e8;color:#8b1a1a}
+  .tag-trust{background:#fff0e8;color:#8b4500}
+  .tag-feat{background:#e8f0ff;color:#1a3a6a}
+  .tag-size{background:#f0e8ff;color:#5a1a8a}
+  .obj-card summary .arrow{color:var(--sub);transition:.2s;flex-shrink:0;margin-top:2px}
+  .obj-card[open] summary{background:var(--navy)}
+  .obj-card[open] summary .obj-q{color:var(--gold)}
+  .obj-card[open] summary .arrow{color:var(--gold);transform:rotate(90deg)}
+  .obj-answer{padding:18px 20px;background:#fefefe;border-top:1px solid var(--border)}
+  .obj-answer .response{margin-bottom:12px}
+  .obj-answer .response label{font-size:.7rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:5px}
+  .obj-answer .response p{font-size:.88rem;color:var(--text);line-height:1.75}
+  .obj-answer .closer{background:#e8f5e9;border-radius:8px;padding:12px 16px}
+  .obj-answer .closer label{font-size:.7rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:5px}
+  .obj-answer .closer p{font-size:.86rem;color:#1a5c35;line-height:1.6;font-style:italic}
+
+  /* LANDMINE ALERTS */
+  .landmine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:28px}
+  .landmine-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:18px}
+  .landmine-card .lm-hdr{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .landmine-card .lm-icon{font-size:1.3rem}
+  .landmine-card h4{font-size:.9rem;font-weight:700;color:var(--red)}
+  .landmine-card .lm-body{font-size:.84rem;color:var(--sub);line-height:1.65}
+  .landmine-card .lm-counter{margin-top:10px;background:#f4f6fb;border-radius:6px;padding:10px 12px;font-size:.82rem;color:var(--text);line-height:1.6}
+  .landmine-card .lm-counter strong{color:var(--green)}
+
+  /* PROOF POINTS */
+  .proof-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:28px}
+  .proof-card{background:var(--navy);border-radius:12px;padding:22px;text-align:center}
+  .proof-card .proof-num{font-size:2.2rem;font-weight:700;color:var(--gold)}
+  .proof-card .proof-label{font-size:.82rem;color:rgba(255,255,255,.7);margin-top:6px;line-height:1.4}
+
+  /* CLOSING SCRIPTS */
+  .script-card{background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden}
+  .script-card .script-hdr{background:var(--navy);padding:12px 18px;color:#fff;font-size:.88rem;font-weight:700;display:flex;align-items:center;gap:10px}
+  .script-card .script-hdr .scenario-tag{background:var(--gold);color:var(--navy);font-size:.7rem;padding:3px 9px;border-radius:10px}
+  .script-card .script-body{padding:18px}
+  .script-card .script-body p{font-size:.88rem;color:var(--text);line-height:1.8;font-style:italic;background:#f8faff;padding:14px;border-radius:8px;border-left:3px solid var(--gold)}
+
+  /* PRICING DEFENSE */
+  .pricing-table{width:100%;border-collapse:collapse;font-size:.85rem;margin-bottom:20px}
+  .pricing-table th{background:var(--navy);color:var(--gold);padding:11px 14px;text-align:left}
+  .pricing-table td{padding:10px 14px;border-bottom:1px solid var(--border)}
+  .pricing-table tr:nth-child(even) td{background:#f4f6fb}
+  .pricing-table .ours{background:#e8f5e9 !important;font-weight:700;color:var(--green)}
+
+  footer{background:var(--navy);color:rgba(255,255,255,.5);text-align:center;padding:22px;font-size:.76rem;margin-top:40px}
+  footer strong{color:var(--gold)}
+
+  @media(max-width:700px){
+    .tab-nav{flex-wrap:wrap;gap:5px}
+    .comp-table{font-size:.75rem}
+    .comp-table td,.comp-table th{padding:8px 10px}
+    .hero h1{font-size:1.4rem}
+    nav{padding:12px 16px;flex-wrap:wrap;gap:10px}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div>
+    <div class="brand">Retail Nazar — Competitive Battlecard</div>
+    <div class="tag">FIELD SALES ONLY — Do Not Share With Prospects</div>
+  </div>
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn" onclick="switchTab('bazaar')">vs Bazaar Suraksha</button>
+    <button class="tab-btn" onclick="switchTab('enalytix')">vs Enalytix</button>
+    <button class="tab-btn" onclick="switchTab('objections')">Objections</button>
+    <button class="tab-btn" onclick="switchTab('closing')">Closing Scripts</button>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>Competitive Battlecard</h1>
+  <p class="subtitle">How to win against Bazaar Suraksha and Enalytix in the field — objection handling, proof points, and closing scripts</p>
+  <div class="hero-chips">
+    <span><strong>Main Rivals:</strong> Bazaar Suraksha (closest) + Enalytix (best-funded)</span>
+    <span><strong>Our SMB Sweet Spot:</strong> Kirana, Electronics, Jewellery, Pharmacy</span>
+    <span><strong>Our Core Moat:</strong> WhatsApp + Dashboard + ₹999 entry</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ============ TAB: OVERVIEW ============ -->
+  <div class="tab-panel active" id="tab-overview">
+
+    <div class="cheat-grid">
+      <div class="cheat-card">
+        <div class="cheat-hdr win">Our 5 Strongest Win Reasons</div>
+        <div class="cheat-body">
+          <ul>
+            <li>WhatsApp alerts — India's most used app. Zero app download needed</li>
+            <li>₹999/month — cheapest full-featured option in India</li>
+            <li>Works with existing CP Plus / Hikvision cameras — no hardware cost</li>
+            <li>Footfall analytics + security in one dashboard — competitors split this</li>
+            <li>3-second alert speed — verified; competitors are 30–120 seconds</li>
+          </ul>
+        </div>
+      </div>
+      <div class="cheat-card">
+        <div class="cheat-hdr warn">Our 3 Weaknesses — Know These</div>
+        <div class="cheat-body">
+          <ul>
+            <li>Newer brand vs. Enalytix (Biba, Puma track record)</li>
+            <li>No POS/billing fraud detection yet (Tentosoft has this)</li>
+            <li>iOS app is newer; Android more battle-tested</li>
+          </ul>
+        </div>
+      </div>
+      <div class="cheat-card">
+        <div class="cheat-hdr attack">Their Attack Lines &amp; Your Counter</div>
+        <div class="cheat-body">
+          <ul>
+            <li>"We've been around longer" → You: "We're 2026 AI, not 2018 rules-based"</li>
+            <li>"Our clients include Puma/Biba" → You: "We're built for YOUR store, not Puma's store"</li>
+            <li>"We have more features" → You: "Name one you use daily. We have the ones that matter"</li>
+            <li>"Your price is too low" → You: "Affordable ≠ cheap. Our alert speed is 40x faster"</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="proof-grid">
+      <div class="proof-card">
+        <div class="proof-num">&lt;3s</div>
+        <div class="proof-label">Alert delivery time via WhatsApp — fastest in market</div>
+      </div>
+      <div class="proof-card">
+        <div class="proof-num">₹999</div>
+        <div class="proof-label">Monthly entry price — 10–50x cheaper than global alternatives</div>
+      </div>
+      <div class="proof-card">
+        <div class="proof-num">0</div>
+        <div class="proof-label">New hardware required — works with cameras already installed</div>
+      </div>
+      <div class="proof-card">
+        <div class="proof-num">3-day</div>
+        <div class="proof-label">Free trial — no credit card needed. See it working on YOUR cameras</div>
+      </div>
+      <div class="proof-card">
+        <div class="proof-num">5-in-1</div>
+        <div class="proof-label">Detection types: loitering + shoplifting + zone + crowd + sweep</div>
+      </div>
+      <div class="proof-card">
+        <div class="proof-num">500M+</div>
+        <div class="proof-label">WhatsApp users in India. Every store owner already uses it</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ TAB: vs BAZAAR SURAKSHA ============ -->
+  <div class="tab-panel" id="tab-bazaar">
+
+    <div style="background:#fff8f8;border:1px solid #ffa0a0;border-radius:10px;padding:20px;margin-bottom:24px">
+      <h3 style="color:#8b1a1a;margin-bottom:8px">Who is Bazaar Suraksha? (Know Your Enemy)</h3>
+      <p style="font-size:.88rem;color:#5a1a1a;line-height:1.7">Made by Neuroneticvision (India). Android app launched November 2025. Uses on-device AI on existing CCTV. Claims to send WhatsApp video alerts. Targets Indian stores including kirana, supermarkets, and malls. Very early stage — no public pricing, no iOS app, no footfall analytics, no dashboard. Their biggest advantage: they are also Indian, also WhatsApp-first. Their biggest weakness: they are a mobile app, not a proper SaaS platform.</p>
+    </div>
+
+    <div class="comp-table-wrap">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="us">Retail Nazar</th>
+            <th class="them1">Bazaar Suraksha</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>WhatsApp Alerts</td><td class="win-cell"><span class="tick">✓</span> Yes — with video clip</td><td><span class="tick">✓</span> Yes (claimed)</td></tr>
+          <tr><td>Alert Speed</td><td class="win-cell">&lt;3 seconds (verified)</td><td class="neutral-cell">Unknown / unverified</td></tr>
+          <tr><td>Works with existing CCTV</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td><span class="partial">~</span> Partial — limited brands</td></tr>
+          <tr><td>CP Plus support</td><td class="win-cell"><span class="tick">✓</span> Full support</td><td class="lose-cell"><span class="cross">✗</span> Not confirmed</td></tr>
+          <tr><td>Hikvision / Dahua</td><td class="win-cell"><span class="tick">✓</span> Full support</td><td><span class="partial">~</span> Partial</td></tr>
+          <tr><td>ONVIF compatibility</td><td class="win-cell"><span class="tick">✓</span> Full</td><td class="lose-cell"><span class="cross">✗</span> Not confirmed</td></tr>
+          <tr><td>Shoplifting/Concealment Detection</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td><span class="tick">✓</span> Yes</td></tr>
+          <tr><td>Loitering Detection</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td><span class="tick">✓</span> Yes</td></tr>
+          <tr><td>Unauthorized Zone Entry</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td class="lose-cell"><span class="cross">✗</span> No</td></tr>
+          <tr><td>Crowd Density Alerts</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td><span class="tick">✓</span> Yes</td></tr>
+          <tr><td>Footfall Analytics Dashboard</td><td class="win-cell"><span class="tick">✓</span> Full dashboard</td><td class="lose-cell"><span class="cross">✗</span> No</td></tr>
+          <tr><td>Web Dashboard (PC access)</td><td class="win-cell"><span class="tick">✓</span> Yes — full SaaS</td><td class="lose-cell"><span class="cross">✗</span> Mobile app only</td></tr>
+          <tr><td>iOS App</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td class="lose-cell"><span class="cross">✗</span> Android only</td></tr>
+          <tr><td>Multi-store management</td><td class="win-cell"><span class="tick">✓</span> Multi-tenant SaaS</td><td class="lose-cell"><span class="cross">✗</span> Single store app</td></tr>
+          <tr><td>Repeat Offender Tracking</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td><span class="tick">✓</span> Yes</td></tr>
+          <tr><td>Transparent SaaS Pricing</td><td class="win-cell"><span class="tick">✓</span> ₹999–₹5,999/mo</td><td class="lose-cell"><span class="cross">✗</span> No published price</td></tr>
+          <tr><td>Free Trial</td><td class="win-cell"><span class="tick">✓</span> 3-day free trial</td><td class="lose-cell"><span class="cross">✗</span> Unknown</td></tr>
+          <tr><td>24/7 Support (email + WhatsApp)</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td class="neutral-cell"><span class="partial">?</span> Unknown</td></tr>
+          <tr><td>Company Scale / Credibility</td><td class="win-cell">Pvt. Ltd., registered, team visible</td><td class="neutral-cell">Early-stage startup, limited info</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-bottom:24px">
+      <h3 style="color:var(--navy);margin-bottom:14px;font-size:1rem">When a prospect mentions Bazaar Suraksha — Say This</h3>
+      <div class="script-card">
+        <div class="script-hdr"><span class="scenario-tag">Script 1</span> Prospect: "I saw Bazaar Suraksha — it's similar and maybe cheaper"</div>
+        <div class="script-body"><p>"Bazaar Suraksha is a mobile app — you need to keep your phone running it 24/7. Retail Nazar is a full SaaS platform — it runs on our servers, you just receive the WhatsApp alert. Also, have they told you the price? They don't publish any pricing — that usually means it changes based on how much they think you'll pay. Our pricing is fixed and transparent — ₹999 on the website right now. And we have a web dashboard so your accountant, your store manager, and you can all see footfall reports. Can Bazaar Suraksha give you a footfall trend report for the last 30 days? We can. Want to try our 3-day free trial on your actual cameras today?"</p></div>
+      </div>
+      <div class="script-card">
+        <div class="script-hdr"><span class="scenario-tag">Script 2</span> Prospect: "I already downloaded Bazaar Suraksha app"</div>
+        <div class="script-body"><p>"Great — you're already thinking smart about security. Can I ask — did it work with your CP Plus cameras? And were the alerts getting to you within a few seconds? The challenge with phone-based apps is that if your phone's battery dies or the internet drops, alerts stop. Retail Nazar runs on cloud servers — we keep alerting even if your phone is off. And we give you a dashboard on your PC or laptop as well, not just a phone app. Try both for 3 days — no payment needed — and see which one you actually rely on."</p></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ TAB: vs ENALYTIX ============ -->
+  <div class="tab-panel" id="tab-enalytix">
+
+    <div style="background:#f0f4ff;border:1px solid #a0b8ff;border-radius:10px;padding:20px;margin-bottom:24px">
+      <h3 style="color:#1a2e80;margin-bottom:8px">Who is Enalytix? (Know Your Enemy)</h3>
+      <p style="font-size:.88rem;color:#1a2e60;line-height:1.7">Noida-based, bootstrapped, ₹12.5 Crore annual revenue (FY25), 400+ store deployments. Clients: Biba, Mufti, Puma. Converts passive CCTV to real-time alerts. Thin-edge architecture — no GPU servers required. No WhatsApp alerts — uses dashboard-based alerts. Enterprise pricing, not SMB-friendly. Their biggest strength: proven track record, big brand clients, profitable. Their biggest weakness: enterprise-only, expensive, no WhatsApp, no kirana focus, no transparent pricing.</p>
+    </div>
+
+    <div class="comp-table-wrap">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="us">Retail Nazar</th>
+            <th class="them2">Enalytix</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>WhatsApp Alerts</td><td class="win-cell"><span class="tick">✓</span> Yes — WhatsApp-first</td><td class="lose-cell"><span class="cross">✗</span> No — dashboard only</td></tr>
+          <tr><td>Alert Speed</td><td class="win-cell">&lt;3 seconds WhatsApp</td><td class="neutral-cell">Dashboard — requires login</td></tr>
+          <tr><td>SMB / Kirana pricing</td><td class="win-cell"><span class="tick">✓</span> ₹999–₹5,999/month</td><td class="lose-cell"><span class="cross">✗</span> Enterprise only — custom quotes</td></tr>
+          <tr><td>Transparent pricing on website</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td class="lose-cell"><span class="cross">✗</span> No — request demo</td></tr>
+          <tr><td>Free Trial</td><td class="win-cell"><span class="tick">✓</span> 3-day free, no card</td><td class="lose-cell"><span class="cross">✗</span> No free trial</td></tr>
+          <tr><td>Works with CP Plus cameras</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td><span class="partial">~</span> Not specifically mentioned</td></tr>
+          <tr><td>Kirana / small store focus</td><td class="win-cell"><span class="tick">✓</span> Primary market</td><td class="lose-cell"><span class="cross">✗</span> Enterprise brands only</td></tr>
+          <tr><td>Minimum store size</td><td class="win-cell">Any size — even 1 camera</td><td class="lose-cell">Multi-location enterprise</td></tr>
+          <tr><td>Footfall Analytics</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td><span class="tick">✓</span> Yes (enterprise)</td></tr>
+          <tr><td>Pilferage / Shoplifting detection</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td><span class="tick">✓</span> Yes</td></tr>
+          <tr><td>Unauthorized Zone Entry</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td class="neutral-cell"><span class="partial">~</span> Partial</td></tr>
+          <tr><td>Crowd Alerts</td><td class="win-cell"><span class="tick">✓</span> Yes</td><td class="neutral-cell"><span class="partial">~</span> Not specified for SMB</td></tr>
+          <tr><td>Mobile App (iOS + Android)</td><td class="win-cell"><span class="tick">✓</span> Both</td><td class="lose-cell"><span class="cross">✗</span> No public mobile app</td></tr>
+          <tr><td>Sign-up without sales call</td><td class="win-cell"><span class="tick">✓</span> Self-serve on website</td><td class="lose-cell"><span class="cross">✗</span> Requires sales demo</td></tr>
+          <tr><td>Established clients (proof)</td><td class="neutral-cell">Building — early traction</td><td class="win-cell">Biba, Mufti, Puma, 400+ stores</td></tr>
+          <tr><td>Middle East expansion</td><td class="neutral-cell">Planned</td><td class="lose-cell">Already eyeing it — faster mover</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-bottom:24px">
+      <h3 style="color:var(--navy);margin-bottom:14px;font-size:1rem">When a prospect mentions Enalytix — Say This</h3>
+      <div class="script-card">
+        <div class="script-hdr"><span class="scenario-tag">Script 1</span> Prospect: "I've heard of Enalytix — big clients like Biba use them"</div>
+        <div class="script-body"><p>"Absolutely — Enalytix is excellent for a chain of 50+ fashion stores with an IT team managing dashboards. For your store here in Noida, their solution would cost you ₹15,000–₹25,000 per month, require a dedicated staff member to check dashboards, and still won't send you a WhatsApp alert when something happens. With Retail Nazar, when someone suspicious lingers near your jewellery counter, your phone buzzes immediately on WhatsApp — with video. You don't need to log into a dashboard. You don't need an IT manager. And you start at ₹999 a month, with a 3-day free trial on your existing cameras. Which of those sounds more useful for YOUR store?"</p></div>
+      </div>
+      <div class="script-card">
+        <div class="script-hdr"><span class="scenario-tag">Script 2</span> Prospect (chain store owner): "We need something proven, Enalytix has 400 stores"</div>
+        <div class="script-body"><p>"Their 400 stores are enterprise chains — Biba, Puma, Mufti. Those are great references for enterprise clients. But here is the thing: they built their system for stores with IT managers and centralized monitoring rooms. Your store managers are on the floor — they need a WhatsApp ping, not a dashboard alert they have to remember to check. We are building specifically for India's retail SMB market, and our technology is 2026 AI — not 2018 rules-based detection. Let's do a 3-day live proof-of-concept on your cameras. If it catches even one shoplifting incident your team would have missed, you've already got your money's worth for the year."</p></div>
+      </div>
+      <div class="script-card">
+        <div class="script-hdr"><span class="scenario-tag">Script 3</span> Prospect: "Enalytix is a Noida company too, I trust local"</div>
+        <div class="script-body"><p>"We are also Noida! BrainGuardX AI Technologies Pvt. Ltd. — our team is right here. You can meet us in person, visit our office. The difference is Enalytix is targeting companies like Reliance Retail and asking ₹20,000+ per month. We exist specifically for stores like yours — we know the kirana market, we know CP Plus cameras (which 70% of Noida stores use), and we have set our price so that even a single-store pharmacy owner can afford it. You are our core customer. At Enalytix, you are a small account they won't prioritize for support."</p></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ TAB: OBJECTIONS ============ -->
+  <div class="tab-panel" id="tab-objections">
+
+    <div class="obj-section">
+      <h3>Price Objections <span class="src src-both">Both Competitors Trigger These</span></h3>
+
+      <details class="obj-card">
+        <summary><span class="obj-q">"Your price looks low — is it a quality issue?"</span><span class="obj-tag tag-price">Price / Trust</span><span class="arrow">›</span></summary>
+        <div class="obj-answer">
+          <div class="response"><label>Context</label><p>Prospect is comparing to higher-priced alternatives or is suspicious of low pricing.</p></div>
+          <div class="response"><label>Your Response</label><p>"Great question — our price is low because we built the platform on modern cloud infrastructure that scales efficiently. Enalytix charges ₹15,000–₹25,000/month because they built enterprise hardware infrastructure years ago with high overhead. We built natively on cloud in 2025 — our cost structure is different. Our alert speed of under 3 seconds is actually FASTER than systems costing 10x more. The 3-day free trial lets you verify this yourself on your own cameras — no payment needed."</p></div>
+          <div class="closer"><label>Trial Close</label><p>"Would you like to start the 3-day trial today so you can judge quality yourself, rather than on price?"</p></div>
+        </div>
+      </details>
+
+      <details class="obj-card">
+        <summary><span class="obj-q">"I don't want to pay monthly — can I buy outright?"</span><span class="obj-tag tag-price">Price / Model</span><span class="arrow">›</span></summary>
+        <div class="obj-answer">
+          <div class="response"><label>Context</label><p>Traditional Indian retailer mindset — one-time payment preference.</p></div>
+          <div class="response"><label>Your Response</label><p>"I understand — most retailers prefer to own. Here's why a monthly model actually protects you: with a one-time purchase, if the software breaks, you pay again for upgrades. With us, your ₹999/month includes: constant AI model updates (so detection keeps improving), cloud server maintenance, 24/7 support, and new features as we build them. It's like Jio broadband — you pay monthly and it keeps getting better. A CCTV DVR you buy once will be outdated in 2 years. Our AI gets smarter every month."</p></div>
+          <div class="closer"><label>Trial Close</label><p>"Start the 3-day free trial — experience the value, then decide if ₹999/month is worth it. That's ₹33 per day — less than one cup of coffee at a petrol pump."</p></div>
+        </div>
+      </details>
+    </div>
+
+    <div class="obj-section">
+      <h3>Trust &amp; Proof Objections <span class="src src-e">Enalytix Comparison Triggers These</span></h3>
+
+      <details class="obj-card">
+        <summary><span class="obj-q">"You're new — do you have any big clients? Enalytix has Biba and Puma."</span><span class="obj-tag tag-trust">Trust / Proof</span><span class="arrow">›</span></summary>
+        <div class="obj-answer">
+          <div class="response"><label>Context</label><p>Prospect is risk-averse and looking for social proof from large brand clients.</p></div>
+          <div class="response"><label>Your Response</label><p>"Biba and Puma are great references — for Biba and Puma. They are large chains with IT teams and centralized security operations. Our platform is designed for the 15 million kirana, pharmacy, electronics, and jewellery stores in India — stores like yours. When Biba started, they weren't a big brand either. We launched in 2026 with the most advanced AI detection available today — not a 2018 system that's been applied to retail. And we give you a 3-day live trial on your cameras with no payment — Enalytix won't do that. Our result speaks from your own store."</p></div>
+          <div class="closer"><label>Trial Close</label><p>"The only reference that matters is YOUR store. Let me set up the trial — if it catches something in 3 days, you have your proof."</p></div>
+        </div>
+      </details>
+
+      <details class="obj-card">
+        <summary><span class="obj-q">"What if your company shuts down in 1 year? I'll lose all my data."</span><span class="obj-tag tag-trust">Trust / Longevity</span><span class="arrow">›</span></summary>
+        <div class="obj-answer">
+          <div class="response"><label>Context</label><p>Legitimate concern about startup longevity — treat it seriously, don't dismiss.</p></div>
+          <div class="response"><label>Your Response</label><p>"That's a fair concern and I respect you for asking it. Three things that protect you: First, your CCTV cameras stay with you — we only process the video stream, we don't control your hardware. If we shut down tomorrow, your cameras still work. Second, your alert history and footfall data can be exported anytime — it's your data and we give you full export functionality. Third, BrainGuardX AI Technologies Pvt. Ltd. is a registered company with active clients — we're not a 2-person side project. And as we grow (which we are), we become more stable, not less."</p></div>
+          <div class="closer"><label>Trial Close</label><p>"The 3-day trial also lets you see how we handle onboarding and support — judge us on how we actually operate, not on hypothetical futures."</p></div>
+        </div>
+      </details>
+    </div>
+
+    <div class="obj-section">
+      <h3>Feature / Technical Objections <span class="src src-b">Bazaar Suraksha Comparison Triggers These</span></h3>
+
+      <details class="obj-card">
+        <summary><span class="obj-q">"Bazaar Suraksha also gives WhatsApp alerts — what's different?"</span><span class="obj-tag tag-feat">Feature</span><span class="arrow">›</span></summary>
+        <div class="obj-answer">
+          <div class="response"><label>Context</label><p>Prospect has researched and found the most direct competitor feature match.</p></div>
+          <div class="response"><label>Your Response</label><p>"Good research! The key differences: (1) Bazaar Suraksha is an Android phone app — it runs on your phone and stops if your phone battery dies or you close the app. Retail Nazar runs on cloud servers — it monitors 24/7 regardless of your phone status. (2) Bazaar Suraksha has no dashboard — no footfall reports, no weekly trend data, no PC access. We give you a full analytics dashboard. (3) They have no public pricing — that means they quote differently for different people. Our pricing is fixed: ₹999/month, on the website, no surprises. (4) No iOS app — if you or any of your family uses an iPhone, they can't monitor. We have both iOS and Android."</p></div>
+          <div class="closer"><label>Trial Close</label><p>"Try both. I'm confident after 3 days you'll see the difference between an app and a proper platform."</p></div>
+        </div>
+      </details>
+
+      <details class="obj-card">
+        <summary><span class="obj-q">"My cameras are CP Plus — will it really work?"</span><span class="obj-tag tag-feat">Technical</span><span class="arrow">›</span></summary>
+        <div class="obj-answer">
+          <div class="response"><label>Context</label><p>CP Plus is India's #1 selling CCTV brand. Prospect is rightfully cautious about compatibility.</p></div>
+          <div class="response"><label>Your Response</label><p>"CP Plus is our most tested camera brand in India — specifically because it's the most common in Indian stores. We've integrated directly with CP Plus RTSP streams and tested extensively in Indian retail environments. We also support Hikvision, Dahua, and any ONVIF-compatible camera. Give me your CP Plus model number right now — I can tell you in 2 minutes if it's on our certified compatible list. In fact, let's just do the 3-day trial — you'll see it connect to your cameras live."</p></div>
+          <div class="closer"><label>Trial Close</label><p>"The trial is the best proof — live connection to your CP Plus cameras, real alerts to your WhatsApp."</p></div>
+        </div>
+      </details>
+
+      <details class="obj-card">
+        <summary><span class="obj-q">"My internet speed is not great — will alerts be delayed?"</span><span class="obj-tag tag-feat">Technical</span><span class="arrow">›</span></summary>
+        <div class="obj-answer">
+          <div class="response"><label>Context</label><p>Very valid concern for Indian retail stores — especially semi-urban locations.</p></div>
+          <div class="response"><label>Your Response</label><p>"We built Retail Nazar specifically for Indian internet conditions — that was a conscious design decision. Our system measures your available bandwidth in real time and adjusts the alert payload accordingly: on good connections, you get a 10-second video clip; on slower connections, you still get the alert and a still image within 3 seconds. We also have a failover system — if WhatsApp delivery is delayed, we send an SMS backup. You will always get the alert. We've tested on connections as slow as 1 Mbps — the system still delivers."</p></div>
+          <div class="closer"><label>Trial Close</label><p>"Your internet conditions are the exact conditions we designed for — the trial will prove it on your actual connection."</p></div>
+        </div>
+      </details>
+
+      <details class="obj-card">
+        <summary><span class="obj-q">"Too many false alerts will distract my staff"</span><span class="obj-tag tag-feat">Feature / UX</span><span class="arrow">›</span></summary>
+        <div class="obj-answer">
+          <div class="response"><label>Context</label><p>Prospect has likely experienced poor rules-based systems with constant false alerts.</p></div>
+          <div class="response"><label>Your Response</label><p>"This is actually our biggest design philosophy — we call it 'precision over recall'. Old CCTV systems used motion detection and generated hundreds of false alerts per day. Our AI is trained on actual shoplifting behavior patterns in Indian stores — not just any movement. We include a confidence score with every alert. You can set the sensitivity threshold — if you want only high-confidence alerts, we can configure that in your dashboard. Most of our users start at medium sensitivity during the trial and then fine-tune to their preference. The goal is that every WhatsApp alert you receive is worth looking at."</p></div>
+          <div class="closer"><label>Trial Close</label><p>"The 3-day trial will show you the alert quality. If you get a false alert, tell us the scenario — we'll tune the sensitivity setting before you commit."</p></div>
+        </div>
+      </details>
+    </div>
+
+    <div class="obj-section">
+      <h3>Internal / Decision Objections <span class="src src-both">Universal</span></h3>
+
+      <details class="obj-card">
+        <summary><span class="obj-q">"Let me think about it / I'll check with my partner"</span><span class="obj-tag tag-size">Stalling</span><span class="arrow">›</span></summary>
+        <div class="obj-answer">
+          <div class="response"><label>Context</label><p>Classic stall — usually means: price concern, trust concern, or needs more info.</p></div>
+          <div class="response"><label>Your Response</label><p>"Absolutely — this is a business decision and you should think it through. Can I ask what specifically you want to think about? If it's the price, the trial is free — no thinking required on that. If it's whether it works with your cameras — the trial answers that in 3 days. If it's whether your staff will use it — your staff doesn't need to do anything, the alerts come directly to your WhatsApp. The 3-day trial removes 100% of the risk from this decision. What exactly is stopping us from starting it right now?"</p></div>
+          <div class="closer"><label>Trial Close</label><p>"Let's start the trial today. After 3 days, show it to your partner and decide together — with real results from your own store as evidence."</p></div>
+        </div>
+      </details>
+
+      <details class="obj-card">
+        <summary><span class="obj-q">"We already have security guards — why do I need this?"</span><span class="obj-tag tag-size">Need / ROI</span><span class="arrow">›</span></summary>
+        <div class="obj-answer">
+          <div class="response"><label>Context</label><p>Common in jewelry, electronics stores. Guards give false sense of security.</p></div>
+          <div class="response"><label>Your Response</label><p>"Security guards are excellent for deterrence — but they can't watch 4 camera feeds simultaneously while also greeting customers and handling cash. Our AI watches all your cameras simultaneously, 24/7, without getting tired or distracted. More importantly: guards can't send you a WhatsApp alert when you're at home at 9pm and someone suspicious is at your store. Retail Nazar supplements your guard — it gives them an alert too so they know exactly where to look. Your guard becomes more effective, not replaced."</p></div>
+          <div class="closer"><label>ROI Close</label><p>"One piece of jewellery stolen costs ₹5,000–₹50,000. Our yearly subscription at ₹999/month is ₹11,988. If we prevent one theft in a year, we've paid for ourselves 4 times over. Does that math work for you?"</p></div>
+        </div>
+      </details>
+
+    </div>
+
+  </div>
+
+  <!-- ============ TAB: CLOSING SCRIPTS ============ -->
+  <div class="tab-panel" id="tab-closing">
+
+    <h3 style="color:var(--navy);margin-bottom:20px;font-size:1.1rem">Proven Closing Techniques for Indian Retail Stores</h3>
+
+    <div class="script-card">
+      <div class="script-hdr"><span class="scenario-tag">The 3-Day Trial Close</span> For any hesitant prospect</div>
+      <div class="script-body"><p>"I'm not asking you to buy anything today. I'm asking you to try Retail Nazar on YOUR cameras for 3 days — completely free, no credit card, no commitment. If in 3 days you haven't received a single useful alert, don't pay us a rupee. But if your WhatsApp buzzes with a real incident from your store — something your staff would have missed — that's your proof. Can we set that up right now? It takes 15 minutes to connect to your cameras."</p></div>
+    </div>
+
+    <div class="script-card">
+      <div class="script-hdr"><span class="scenario-tag">The ROI Close</span> For price-sensitive owners</div>
+      <div class="script-body"><p>"Let me show you a quick calculation. Your Starter plan is ₹999/month — that's ₹33 per day. One incident of shoplifting at your [electronics/jewellery/pharmacy] store costs you how much? Even ₹2,000? That's 2 months of subscription. Most of our store owners tell us they catch 1–3 incidents per month they would have missed before. At ₹999, you only need to prevent ONE theft in a whole year to be in profit. The question isn't whether ₹999 is affordable — the question is whether the risk of NOT having it is affordable."</p></div>
+    </div>
+
+    <div class="script-card">
+      <div class="script-hdr"><span class="scenario-tag">The WhatsApp Demo Close</span> On-site visit or phone call</div>
+      <div class="script-body"><p>"Let me show you something — [open phone] — this is what you get on WhatsApp when an alert fires. [Show demo screenshot or video]. This came to the store owner's phone in under 3 seconds. He was at lunch, 2 kilometers away. He called his staff immediately. They caught the person. Now — if this happened at YOUR store right now and you were at lunch, how would you know? That's the gap we close. Shall we connect your cameras and make sure the next time this happens, you know within 3 seconds?"</p></div>
+    </div>
+
+    <div class="script-card">
+      <div class="script-hdr"><span class="scenario-tag">The Urgency Close</span> For stalling prospects</div>
+      <div class="script-body"><p>"I completely respect that you want to think it over. But here's a reality: every day without this system is a day your store is unprotected from exactly the incidents we've talked about. The 3-day trial is genuinely free — there's no financial risk in starting today. The only risk is continuing to leave your store exposed while you think about it. Can I be direct? What is the one thing that would need to be true for you to say yes today?"</p></div>
+    </div>
+
+    <div class="script-card">
+      <div class="script-hdr"><span class="scenario-tag">The Multi-Store Close</span> For chain store owners</div>
+      <div class="script-body"><p>"For a single store, our Starter plan at ₹999 gives you everything. But here's where it gets powerful — for your 3 stores, our Growth plan at ₹1,999 covers all three. That's ₹666 per store per month — about the cost of one extra hour of a security guard. And you get one unified dashboard showing all 3 stores' footfall, all alerts, everything in one view. Your accountant can run reports across all stores. Your manager can monitor remotely. That's the power of a real multi-tenant SaaS platform — which is something Bazaar Suraksha can't give you."</p></div>
+    </div>
+
+    <div class="script-card">
+      <div class="script-hdr"><span class="scenario-tag">The Referral Plant Close</span> After a positive meeting</div>
+      <div class="script-body"><p>"Before I go — since you're going to start the trial, I want to ask one thing. You know most store owners in this market, right? If Retail Nazar works for you the way I'm saying it will — and I'm confident it will — would you be open to introducing us to 2 or 3 other store owners you know? We have a referral program: for every store you refer that signs up, you get one month free. So essentially your subscription could become free if you refer 12 stores a year. That's our way of saying — we grow together."</p></div>
+    </div>
+
+    <div style="background:var(--navy);border-radius:12px;padding:28px;margin-top:24px;color:#fff">
+      <h3 style="color:var(--gold);margin-bottom:16px;font-size:1rem">The One Conversation That Wins Every Time</h3>
+      <ol style="padding-left:20px;line-height:2;font-size:.9rem;color:rgba(255,255,255,.85)">
+        <li>Ask: <em>"What is your biggest security headache right now?"</em> — let them speak 2 minutes</li>
+        <li>Reflect their pain back: <em>"So the issue is [X], and right now there's no way for you to know when [X] happens unless someone tells you?"</em></li>
+        <li>Bridge: <em>"What if I could show you exactly what happened, on video, on your WhatsApp, within 3 seconds — without buying any new hardware?"</em></li>
+        <li>Trial offer: <em>"We have a 3-day free trial. 15 minutes to connect. No payment. No commitment."</em></li>
+        <li>Close: <em>"Shall we connect your cameras right now, or should I come by tomorrow morning at 10?"</em></li>
+      </ol>
+    </div>
+
+  </div>
+
+</div>
+
+<footer>
+  <strong>BrainGuardX AI Technologies Pvt. Ltd. — Retail Nazar™</strong> | Competitive Battlecard | FIELD SALES INTERNAL DOCUMENT<br/>
+  Do not share with prospects or competitors. For internal sales team use only.
+</footer>
+
+<script>
+function switchTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+</script>
+
+</body>
+</html>

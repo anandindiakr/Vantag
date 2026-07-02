@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retail Nazar — Customer Success Program</title>
+<style>
+  :root {
+    --navy: #0d1b3e; --navy-light: #1a2d5a; --gold: #ffd200; --gold-dark: #e6bc00;
+    --white: #ffffff; --gray: #f4f6fb; --text: #1a1a2e;
+    --green: #16a34a; --green-light: #dcfce7;
+    --yellow: #ca8a04; --yellow-light: #fef9c3;
+    --red: #dc2626; --red-light: #fee2e2;
+    --blue: #2563eb; --blue-light: #dbeafe;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray); color: var(--text); font-size: 15px; }
+
+  /* TAB NAV */
+  .tabnav { background: var(--navy); padding: 0 16px; display: flex; overflow-x: auto; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.3); position: sticky; top: 0; z-index: 100; }
+  .tabnav-brand { color: var(--gold); font-weight: 800; font-size: 16px; padding: 14px 16px 14px 0; border-right: 1px solid #ffffff20; margin-right: 8px; flex-shrink: 0; }
+  .tab-btn { color: #aab; background: none; border: none; border-bottom: 3px solid transparent; padding: 14px 12px; font-size: 13px; font-weight: 500; cursor: pointer; flex-shrink: 0; transition: all .2s; }
+  .tab-btn:hover { color: var(--gold); }
+  .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+  /* HERO */
+  .hero { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); color: white; padding: 28px 20px 24px; }
+  .hero h1 { color: var(--gold); font-size: 24px; margin-bottom: 6px; }
+  .hero p { color: #aab; font-size: 14px; max-width: 700px; }
+  .hero-stats { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
+  .h-stat { background: rgba(255,255,255,.1); border-radius: 10px; padding: 12px 18px; text-align: center; }
+  .h-stat .v { font-size: 22px; font-weight: 800; color: var(--gold); }
+  .h-stat .l { font-size: 11px; color: #aab; margin-top: 2px; }
+
+  /* PANELS */
+  .panel { display: none; max-width: 940px; margin: 0 auto; padding: 24px 16px 60px; }
+  .panel.active { display: block; }
+
+  /* CARDS */
+  .card { background: white; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; }
+  .card-header { background: var(--navy); color: white; padding: 14px 20px; display: flex; align-items: center; gap: 10px; }
+  .card-header h2 { font-size: 16px; flex: 1; }
+  .card-header .badge { background: var(--gold); color: var(--navy); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+  .card-body { padding: 20px; }
+
+  /* TIMELINE */
+  .timeline { position: relative; padding-left: 32px; }
+  .timeline::before { content: ''; position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+  .tl-item { position: relative; margin-bottom: 28px; }
+  .tl-dot { position: absolute; left: -28px; top: 4px; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 2px var(--border); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; }
+  .dot-day0 { background: var(--navy); color: white; }
+  .dot-day1 { background: var(--blue); color: white; }
+  .dot-day3 { background: var(--green); color: white; }
+  .dot-day7 { background: var(--gold); color: var(--navy); }
+  .dot-day30 { background: var(--red); color: white; }
+  .tl-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 4px; }
+  .tl-title { font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+  .tl-body { font-size: 13px; color: #444; line-height: 1.7; }
+  .tl-actions { margin-top: 10px; }
+  .action-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+  .action-item input[type=checkbox] { margin-top: 3px; accent-color: var(--navy); width: 15px; height: 15px; flex-shrink: 0; }
+
+  /* HEALTH SCORE */
+  .health-calc { background: var(--gray); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .health-calc h3 { font-size: 15px; color: var(--navy); margin-bottom: 14px; }
+  .hc-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .hc-row label { width: 160px; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+  .hc-row input[type=range] { flex: 1; min-width: 120px; accent-color: var(--navy); }
+  .hc-row .val { width: 40px; text-align: right; font-weight: 700; color: var(--navy); font-size: 14px; }
+  .hc-row .wt { font-size: 11px; color: #888; width: 50px; }
+  .health-result { text-align: center; padding: 20px; border-radius: 10px; margin-top: 16px; transition: all .3s; }
+  .health-score-num { font-size: 56px; font-weight: 900; line-height: 1; }
+  .health-label { font-size: 16px; font-weight: 700; margin-top: 6px; }
+  .health-action { font-size: 13px; margin-top: 8px; }
+  .health-green { background: var(--green-light); color: var(--green); }
+  .health-yellow { background: var(--yellow-light); color: var(--yellow); }
+  .health-red { background: var(--red-light); color: var(--red); }
+
+  /* HEALTH METER BAR */
+  .meter-bar { height: 12px; border-radius: 10px; background: var(--border); margin: 10px 0; overflow: hidden; }
+  .meter-fill { height: 100%; border-radius: 10px; transition: width .5s, background .3s; }
+
+  /* HEALTH SCORE TABLE */
+  .hs-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  .hs-table th { background: var(--navy); color: white; padding: 10px 12px; text-align: left; font-size: 12px; }
+  .hs-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  .hs-table tr:last-child td { border: none; }
+  .hs-table tr:nth-child(even) td { background: #f9fafb; }
+
+  /* CHURN SIGNALS */
+  .signal { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 8px; margin-bottom: 8px; }
+  .signal-crit { background: #fff1f2; border-left: 4px solid var(--red); }
+  .signal-high { background: #fffbeb; border-left: 4px solid #f59e0b; }
+  .signal-med { background: #f0fdf4; border-left: 4px solid var(--green); }
+  .signal-icon { font-size: 18px; flex-shrink: 0; }
+  .signal h4 { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+  .signal p { font-size: 12px; color: #555; }
+
+  /* NPS */
+  .nps-scale { display: flex; gap: 4px; flex-wrap: wrap; margin: 12px 0; }
+  .nps-btn { width: 42px; height: 42px; border-radius: 8px; border: none; font-weight: 700; font-size: 15px; cursor: pointer; transition: transform .1s; }
+  .nps-btn:hover { transform: scale(1.1); }
+  .nps-btn.det { background: #fee2e2; color: #991b1b; }
+  .nps-btn.pas { background: #fef9c3; color: #92400e; }
+  .nps-btn.pro { background: #dcfce7; color: #166534; }
+  .nps-result { padding: 14px; border-radius: 8px; margin-top: 12px; display: none; font-size: 14px; }
+  .nps-det { background: var(--red-light); color: var(--red); }
+  .nps-pas { background: var(--yellow-light); color: var(--yellow); }
+  .nps-pro { background: var(--green-light); color: var(--green); }
+
+  /* METRICS GRID */
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .metric-card { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+  .metric-card .val { font-size: 30px; font-weight: 900; color: var(--navy); }
+  .metric-card .tgt { font-size: 11px; color: #888; background: var(--gray); padding: 2px 8px; border-radius: 10px; display: inline-block; margin: 4px 0; }
+  .metric-card .name { font-size: 13px; color: #555; }
+
+  /* ESCALATION */
+  .escalation { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .esc-card { border-radius: 10px; padding: 16px; }
+  .esc-l1 { background: var(--green-light); border: 1px solid #bbf7d0; }
+  .esc-l2 { background: var(--yellow-light); border: 1px solid #fde68a; }
+  .esc-l3 { background: var(--red-light); border: 1px solid #fecaca; }
+  .esc-card h3 { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+  .esc-l1 h3 { color: var(--green); }
+  .esc-l2 h3 { color: var(--yellow); }
+  .esc-l3 h3 { color: var(--red); }
+  .esc-card .time { font-size: 11px; font-weight: 700; margin-bottom: 8px; }
+  .esc-card ul { font-size: 12px; padding-left: 16px; line-height: 1.9; }
+
+  /* CALENDAR */
+  .cal-week { margin-bottom: 20px; }
+  .cal-week h3 { background: var(--navy); color: var(--gold); padding: 8px 14px; border-radius: 6px 6px 0 0; font-size: 13px; }
+  .cal-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 14px; border-bottom: 1px solid var(--border); background: white; font-size: 13px; }
+  .cal-item:last-child { border: none; border-radius: 0 0 6px 6px; }
+  .cal-day { width: 50px; font-weight: 700; color: var(--navy); flex-shrink: 0; font-size: 12px; }
+  .cal-auto { background: var(--blue-light); color: var(--blue); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 8px; margin-right: 6px; }
+  .cal-human { background: var(--green-light); color: var(--green); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 8px; margin-right: 6px; }
+
+  /* UPSELL */
+  .upsell-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .upsell-table th { background: var(--navy); color: white; padding: 10px 12px; text-align: left; font-size: 12px; }
+  .upsell-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .upsell-table tr:last-child td { border: none; }
+  .upsell-table tr:nth-child(even) td { background: #f9fafb; }
+
+  /* WA MSG */
+  .wa-msg { background: #dcf8c6; border-radius: 0 12px 12px 12px; padding: 12px 14px; margin: 10px 0; font-size: 13px; max-width: 90%; position: relative; }
+  .wa-msg::before { content: ''; position: absolute; top: 0; left: -8px; width: 0; height: 0; border-right: 8px solid #dcf8c6; border-bottom: 8px solid transparent; }
+
+  @media (max-width: 600px) {
+    .hero-stats { gap: 10px; }
+    .h-stat { flex: 1; min-width: 100px; }
+    .metrics-grid { grid-template-columns: 1fr 1fr; }
+    .escalation { grid-template-columns: 1fr; }
+    .hc-row label { width: 130px; }
+  }
+  @media print {
+    .tabnav { display: none; }
+    .panel { display: block !important; }
+    body { background: white; }
+    .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TAB NAV -->
+<nav class="tabnav">
+  <div class="tabnav-brand">Retail Nazar CS</div>
+  <button class="tab-btn active" onclick="showTab('onboarding')">Onboarding</button>
+  <button class="tab-btn" onclick="showTab('health')">Health Score</button>
+  <button class="tab-btn" onclick="showTab('churn')">Churn Prevention</button>
+  <button class="tab-btn" onclick="showTab('nps')">NPS Program</button>
+  <button class="tab-btn" onclick="showTab('upsell')">Upsell</button>
+  <button class="tab-btn" onclick="showTab('calendar')">Comm. Calendar</button>
+  <button class="tab-btn" onclick="showTab('metrics')">Metrics</button>
+  <button class="tab-btn" onclick="showTab('escalation')">Escalation</button>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>Customer Success Program</h1>
+  <p>BrainGuardX AI Technologies Pvt. Ltd. — Retail Nazar | Internal CS Team Reference | Version 1.0</p>
+  <div class="hero-stats">
+    <div class="h-stat"><div class="v">≥40%</div><div class="l">Trial Conversion Target</div></div>
+    <div class="h-stat"><div class="v">≥85%</div><div class="l">Month-1 Retention</div></div>
+    <div class="h-stat"><div class="v">&lt;5%</div><div class="l">Monthly Churn Target</div></div>
+    <div class="h-stat"><div class="v">≥45</div><div class="l">NPS Target (Month 3)</div></div>
+    <div class="h-stat"><div class="v">₹2,200+</div><div class="l">ARPU Target</div></div>
+  </div>
+</div>
+
+<!-- ===================== ONBOARDING PANEL ===================== -->
+<div id="tab-onboarding" class="panel active">
+  <div class="card">
+    <div class="card-header"><h2>The "Nazar First Week" Onboarding Journey</h2><span class="badge">Day 0–30</span></div>
+    <div class="card-body">
+      <p style="font-size:13px; color:#666; margin-bottom:20px; background:#eff6ff; border-left:3px solid #3b82f6; padding:10px 14px; border-radius:0 6px 6px 0;">
+        <strong>Core Philosophy:</strong> A customer who sees value in the first 7 days has <strong>3x lower churn rate</strong>. Our goal is one meaningful alert in the first 48 hours.
+      </p>
+
+      <div class="timeline">
+
+        <div class="tl-item">
+          <div class="tl-dot dot-day0">0</div>
+          <div class="tl-label">Day 0 — Trial Registration</div>
+          <div class="tl-title">Automated Welcome Sequence</div>
+          <div class="tl-body">Triggered immediately when customer signs up at retailnazar.com/register</div>
+          <div class="tl-actions">
+            <div class="action-item"><input type="checkbox"><span>Welcome email sent (see Template W1 below)</span></div>
+            <div class="action-item"><input type="checkbox"><span>WhatsApp welcome sent: "Namaste [Name] ji! Aapka Retail Nazar trial shuru ho gaya 🎉"</span></div>
+            <div class="action-item"><input type="checkbox"><span>Customer added to CRM — Status: "New Trial"</span></div>
+            <div class="action-item"><input type="checkbox"><span>CS team notified: "[Name] — [Store] just signed up"</span></div>
+            <div class="action-item"><input type="checkbox"><span>24-hour setup call scheduled in CS calendar</span></div>
+          </div>
+          <div style="background:#fef9c3; border-radius:8px; padding:12px 14px; margin-top:12px;">
+            <strong style="font-size:12px; color:#92400e;">EMAIL TEMPLATE W1 — Welcome</strong><br>
+            <span style="font-size:12px;">Subject: "Welcome to Retail Nazar — Your store's AI guardian is ready 👁"</span><br>
+            <ul style="font-size:13px; padding-left:18px; margin-top:6px; line-height:1.9;">
+              <li>Warm personal welcome (English + 2 lines Hindi)</li>
+              <li>3-step setup guide with dashboard link</li>
+              <li>Direct WhatsApp number for setup help</li>
+              <li>Today's goal: "Connect your first camera"</li>
+              <li>Signed personally by Anand (founder/CS lead)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot dot-day1">1</div>
+          <div class="tl-label">Day 1 — Setup Support (Human)</div>
+          <div class="tl-title">Target: Camera Connected + First Alert</div>
+          <div class="tl-body">CS rep calls/WhatsApps customer by 11 AM</div>
+          <div class="tl-actions">
+            <div class="action-item"><input type="checkbox"><span>Call by 11 AM: "Kya aapne cameras connect karne ki koshish ki? Main 10 min mein help kar sakta hoon"</span></div>
+            <div class="action-item"><input type="checkbox"><span>Screen share / phone walkthrough for setup</span></div>
+            <div class="action-item"><input type="checkbox"><span>Confirm camera live and visible in dashboard</span></div>
+            <div class="action-item"><input type="checkbox"><span>Trigger first test alert with rep on call</span></div>
+            <div class="action-item"><input type="checkbox"><span>Update CRM: "Camera connected" ✅</span></div>
+          </div>
+          <div style="background:#fff1f2; border-radius:8px; padding:12px 14px; margin-top:12px; font-size:13px;">
+            <strong>If customer hasn't started by 6 PM:</strong><br>
+            <div class="wa-msg" style="margin-top:8px;">Koi baat nahi [Name] ji — bohot log busy hote hain pehle din. Kal subah 10 baje kya aap free hoge? Main personally help karunga setup mein — 15 minute lagenge 🙂</div>
+          </div>
+          <div style="background:#f0fdf4; border-radius:8px; padding:12px 14px; margin-top:10px;">
+            <strong style="font-size:12px; color:#166534;">QUICK TROUBLESHOOTING:</strong>
+            <ul style="font-size:12px; padding-left:18px; margin-top:6px; line-height:1.9;">
+              <li>Camera not showing → Check IP address, ONVIF enabled, same network</li>
+              <li>Alert not firing → Check sensitivity settings, camera angle</li>
+              <li>WhatsApp alert missing → Verify phone format (+91XXXXXXXXXX)</li>
+              <li>Slow loading → Check internet speed (2 Mbps upload min)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot dot-day3">3</div>
+          <div class="tl-label">Days 2–3 — First Value Moment</div>
+          <div class="tl-title">Target: At Least 1 Meaningful Alert</div>
+          <div class="tl-actions">
+            <div class="action-item"><input type="checkbox"><span>Day 2 morning WhatsApp check-in: "Koi alert aaya kya? 😊"</span></div>
+            <div class="action-item"><input type="checkbox"><span>If alert received — celebrate! Explain what it detected.</span></div>
+            <div class="action-item"><input type="checkbox"><span>Show how to review footage for the alert</span></div>
+            <div class="action-item"><input type="checkbox"><span>Day 3: Mid-trial check email (Template W3)</span></div>
+          </div>
+          <div style="background:#fef9c3; border-radius:8px; padding:12px 14px; margin-top:10px;">
+            <strong style="font-size:12px; color:#92400e;">EMAIL TEMPLATE W3 — Mid-Trial</strong><br>
+            <span style="font-size:12px;">Subject: "48 hours in — what's Retail Nazar showing you?"</span><br>
+            Content: Ask about alerts, feature highlight (footfall), tip on sensitivity, trial days remaining, soft CTA to upgrade.
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot dot-day0" style="background:#7c3aed;">5</div>
+          <div class="tl-label">Day 5–6 — Pre-Conversion</div>
+          <div class="tl-title">Target: Convert to Paid Before Day 7</div>
+          <div class="tl-actions">
+            <div class="action-item"><input type="checkbox"><span>Day 5: CS rep calls for 10-min "Trial Review Call"</span></div>
+            <div class="action-item"><input type="checkbox"><span>Ask: "Kaisa chal raha hai? Koi useful alerts aaye? Kaunsi feature sabse zyada useful lagi?"</span></div>
+            <div class="action-item"><input type="checkbox"><span>If positive → Assumptive close: "Abhi signup karte hain — Noida offer valid hai"</span></div>
+            <div class="action-item"><input type="checkbox"><span>Day 6: Automated "Trial Ending" email (W6)</span></div>
+            <div class="action-item"><input type="checkbox"><span>Day 6 evening WhatsApp: "Kal trial khatam ho raha hai — aaj lock karte hain?"</span></div>
+          </div>
+          <div style="background:#ede9fe; border-radius:8px; padding:12px 14px; margin-top:10px; font-size:13px;">
+            <strong>Conversion Decision Tree:</strong>
+            <ul style="padding-left:18px; margin-top:6px; line-height:2;">
+              <li>Alert received + Positive → Assumptive close</li>
+              <li>Alert received + "Will think" → Urgency close + social proof</li>
+              <li>No alert received → Tech check first, offer 2-day trial extension</li>
+              <li>No engagement at all → Re-engage call + offer personal setup session</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot dot-day7">7</div>
+          <div class="tl-label">Day 7 — New Paid Customer</div>
+          <div class="tl-title">Make Them Feel They Made the Right Decision</div>
+          <div class="tl-actions">
+            <div class="action-item"><input type="checkbox"><span>Congratulations email + WhatsApp</span></div>
+            <div class="action-item"><input type="checkbox"><span>Invoice/receipt sent (Razorpay)</span></div>
+            <div class="action-item"><input type="checkbox"><span>Plan details confirmed in writing</span></div>
+            <div class="action-item"><input type="checkbox"><span>CRM updated: Status → "Paid"</span></div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot dot-day0" style="background:#0284c7;">14</div>
+          <div class="tl-label">Day 10–14</div>
+          <div class="tl-title">Feature Education + First Upsell Opportunity</div>
+          <div class="tl-actions">
+            <div class="action-item"><input type="checkbox"><span>Day 10: "How is it going?" check-in call (15 min)</span></div>
+            <div class="action-item"><input type="checkbox"><span>If on Starter → "Have you considered connecting more cameras?"</span></div>
+            <div class="action-item"><input type="checkbox"><span>Introduce referral program: "Dost ki dukaan bhi hai? Refer karo — ek mahina free"</span></div>
+            <div class="action-item"><input type="checkbox"><span>Day 14: Feature education email (footfall analytics)</span></div>
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-dot dot-day30">30</div>
+          <div class="tl-label">Day 21–30</div>
+          <div class="tl-title">NPS Survey + Month-1 Review</div>
+          <div class="tl-actions">
+            <div class="action-item"><input type="checkbox"><span>Day 21: First NPS survey sent</span></div>
+            <div class="action-item"><input type="checkbox"><span>Day 21: Month-1 Review call — summarize alerts caught, footfall, usage</span></div>
+            <div class="action-item"><input type="checkbox"><span>Day 28: Monthly report email (automated)</span></div>
+            <div class="action-item"><input type="checkbox"><span>If NPS ≥ 8: Ask for Google Review + referral</span></div>
+            <div class="action-item"><input type="checkbox"><span>Collect testimonial if highly satisfied</span></div>
+          </div>
+        </div>
+
+      </div><!-- end timeline -->
+    </div>
+  </div>
+</div>
+
+<!-- ===================== HEALTH SCORE PANEL ===================== -->
+<div id="tab-health" class="panel">
+  <div class="card">
+    <div class="card-header"><h2>Customer Health Score Calculator</h2><span class="badge">Live Tool</span></div>
+    <div class="card-body">
+      <div class="health-calc">
+        <h3>Enter Customer Data — Get Health Score (0–100)</h3>
+
+        <div class="hc-row">
+          <label>Login Frequency</label>
+          <input type="range" min="0" max="20" value="10" oninput="updateHealth()" id="r_login">
+          <span class="val" id="v_login">10</span>
+          <span class="wt">/ 20 pts</span>
+        </div>
+        <div class="hc-row">
+          <label>Cameras Connected</label>
+          <input type="range" min="0" max="20" value="10" oninput="updateHealth()" id="r_cam">
+          <span class="val" id="v_cam">10</span>
+          <span class="wt">/ 20 pts</span>
+        </div>
+        <div class="hc-row">
+          <label>Alerts Reviewed</label>
+          <input type="range" min="0" max="20" value="10" oninput="updateHealth()" id="r_alert">
+          <span class="val" id="v_alert">10</span>
+          <span class="wt">/ 20 pts</span>
+        </div>
+        <div class="hc-row">
+          <label>WhatsApp Engagement</label>
+          <input type="range" min="0" max="15" value="8" oninput="updateHealth()" id="r_wa">
+          <span class="val" id="v_wa">8</span>
+          <span class="wt">/ 15 pts</span>
+        </div>
+        <div class="hc-row">
+          <label>Support Tickets</label>
+          <input type="range" min="0" max="10" value="10" oninput="updateHealth()" id="r_sup">
+          <span class="val" id="v_sup">10</span>
+          <span class="wt">/ 10 pts</span>
+        </div>
+        <div class="hc-row">
+          <label>Payment On Time</label>
+          <input type="range" min="0" max="15" value="15" oninput="updateHealth()" id="r_pay">
+          <span class="val" id="v_pay">15</span>
+          <span class="wt">/ 15 pts</span>
+        </div>
+
+        <div class="meter-bar"><div class="meter-fill" id="meterFill" style="width:63%; background: var(--green);"></div></div>
+
+        <div class="health-result health-green" id="healthResult">
+          <div class="health-score-num" id="healthScore">63</div>
+          <div class="health-label" id="healthLabel">🟢 HEALTHY</div>
+          <div class="health-action" id="healthAction">Focus on upsell, referral, and annual plan conversion.</div>
+        </div>
+      </div>
+
+      <h3 style="margin: 20px 0 12px; font-size:15px;">Health Score Factors — Full Reference</h3>
+      <table class="hs-table">
+        <thead><tr><th>Factor</th><th>Weight</th><th>How to Measure</th></tr></thead>
+        <tbody>
+          <tr><td>Login Frequency</td><td>20 pts</td><td>Dashboard logins in last 30 days (0 = 0 pts, weekly = 10, daily = 20)</td></tr>
+          <tr><td>Cameras Connected</td><td>20 pts</td><td>% of plan cameras actually connected (0% = 0, 50% = 10, 100% = 20)</td></tr>
+          <tr><td>Alerts Reviewed</td><td>20 pts</td><td>% of AI alerts opened/reviewed by customer</td></tr>
+          <tr><td>WhatsApp Engagement</td><td>15 pts</td><td>Replies to CS messages in last 14 days</td></tr>
+          <tr><td>Support Tickets</td><td>10 pts</td><td>0 unresolved = 10 pts | 1 unresolved = 5 pts | 2+ = 0 pts</td></tr>
+          <tr><td>Payment On Time</td><td>15 pts</td><td>On time = 15 | 1–7 days late = 7 | 7+ days = 0</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin: 20px 0 12px; font-size:15px;">Action by Health Tier</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+        <div style="background:var(--green-light); border-radius:10px; padding:16px; border:1px solid #bbf7d0;">
+          <h4 style="color:var(--green); margin-bottom:8px;">🟢 GREEN (70–100)</h4>
+          <ul style="font-size:13px; padding-left:16px; line-height:2;">
+            <li>Monthly newsletter only</li>
+            <li>Push referral program</li>
+            <li>Suggest upgrade / annual plan</li>
+            <li>Request case study</li>
+            <li>Google Review ask</li>
+          </ul>
+        </div>
+        <div style="background:var(--yellow-light); border-radius:10px; padding:16px; border:1px solid #fde68a;">
+          <h4 style="color:var(--yellow); margin-bottom:8px;">🟡 YELLOW (40–69)</h4>
+          <ul style="font-size:13px; padding-left:16px; line-height:2;">
+            <li>Personal call within 48 hours</li>
+            <li>"Sab theek chal raha hai?" check-in</li>
+            <li>Identify specific pain point</li>
+            <li>Offer free optimization session</li>
+            <li>Send relevant tutorial</li>
+          </ul>
+        </div>
+        <div style="background:var(--red-light); border-radius:10px; padding:16px; border:1px solid #fecaca;">
+          <h4 style="color:var(--red); margin-bottom:8px;">🔴 RED (0–39)</h4>
+          <ul style="font-size:13px; padding-left:16px; line-height:2;">
+            <li>Senior CS or Founder call within 24h</li>
+            <li>Rescue offer: discount or extension</li>
+            <li>On-site visit (Noida/Delhi)</li>
+            <li>Root cause analysis</li>
+            <li>If unsaveable: graceful offboard</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== CHURN PANEL ===================== -->
+<div id="tab-churn" class="panel">
+  <div class="card">
+    <div class="card-header"><h2>Churn Prevention Playbook</h2><span class="badge">Save Rate Target: 40%</span></div>
+    <div class="card-body">
+      <h3 style="margin-bottom:14px; font-size:15px;">Warning Signals — Priority Order</h3>
+
+      <div class="signal signal-crit">
+        <div class="signal-icon">🚨</div>
+        <div><h4>CRITICAL: Payment failed + no response to reminder</h4><p>Action within 2 hours. Personal call from CS rep. Check if account access issue.</p></div>
+      </div>
+      <div class="signal signal-crit">
+        <div class="signal-icon">🚨</div>
+        <div><h4>CRITICAL: Support ticket open 48+ hours unresolved</h4><p>Immediate escalation to Level 2. Customer must be contacted before resolution.</p></div>
+      </div>
+      <div class="signal signal-high">
+        <div class="signal-icon">⚠️</div>
+        <div><h4>HIGH: No login in 14 days</h4><p>Personal WhatsApp within 24 hours. Offer setup optimization session.</p></div>
+      </div>
+      <div class="signal signal-high">
+        <div class="signal-icon">⚠️</div>
+        <div><h4>HIGH: NPS score below 6</h4><p>Personal call within 2 hours. Find root cause. Escalate to founder if needed.</p></div>
+      </div>
+      <div class="signal signal-high">
+        <div class="signal-icon">⚠️</div>
+        <div><h4>MEDIUM: Camera disconnected 7+ days, no setup call</h4><p>Proactive outreach. On-site setup offer.</p></div>
+      </div>
+      <div class="signal signal-med">
+        <div class="signal-icon">💡</div>
+        <div><h4>LOW: Only 1 of 3+ plan cameras connected after 14 days</h4><p>Feature education. Offer "camera setup day" for unused cameras.</p></div>
+      </div>
+      <div class="signal signal-med">
+        <div class="signal-icon">💡</div>
+        <div><h4>LOW: "Forward to owner" language in WhatsApp</h4><p>Decision maker not engaged. Request direct intro to owner.</p></div>
+      </div>
+
+      <h3 style="margin: 24px 0 14px; font-size:15px;">Cancellation Save Protocol</h3>
+      <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 16px; margin-bottom:16px; font-size:13px;">
+        <strong style="color: var(--orange);">NEVER process cancellation immediately.</strong>
+        <p style="margin-top:6px;">ALWAYS say: "Ek kaam karein — aap cancel karne se pehle 2 minute baat kar lete hain? Main personally ensure karna chahta hoon ki koi problem hai toh fix ho sake."</p>
+      </div>
+
+      <h4 style="font-size:13px; margin-bottom:10px; color: var(--navy);">Save Offer Hierarchy (use in this order):</h4>
+      <ol style="font-size:13px; padding-left:20px; line-height:2.2;">
+        <li>Free setup optimization session — remove friction first</li>
+        <li>Downgrade to lower plan (not cancel) — preserve relationship</li>
+        <li>1-month pause — "We'll keep your data safe"</li>
+        <li>50% off next 2 months — value reaffirmation</li>
+        <li>Founder call — last resort for high-value (₹3,499+ plan) accounts</li>
+      </ol>
+
+      <h3 style="margin: 24px 0 14px; font-size:15px;">Churn Intervention Scripts</h3>
+
+      <div style="margin-bottom:14px;">
+        <strong style="font-size:13px; color:#555; display:block; margin-bottom:6px;">For "No login in 14 days":</strong>
+        <div class="wa-msg">[Name] ji, main check kar raha tha — aapne kuch time se dashboard nahi dekha. Kya sab theek hai? Koi problem aayi toh main help kar sakta hoon. Ya agar aap chahein toh main ek baar camera check karne aa sakta hoon — free of cost 🙂</div>
+      </div>
+
+      <div>
+        <strong style="font-size:13px; color:#555; display:block; margin-bottom:6px;">For "Cancellation requested":</strong>
+        <div class="wa-msg">Zaroor — lekin ek kaam karein. Pehle 2 minute baat kar lete hain? Agar koi problem hai toh fix ho sakti hai. Agar uske baad bhi lagta hai ki cancel karna hai, toh bilkul karo. Main abhi free hoon — kya main call kar sakta hoon?</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== NPS PANEL ===================== -->
+<div id="tab-nps" class="panel">
+  <div class="card">
+    <div class="card-header"><h2>NPS Program</h2><span class="badge">Target ≥45 by Month 3</span></div>
+    <div class="card-body">
+
+      <h3 style="margin-bottom:12px; font-size:15px;">When to Survey</h3>
+      <table class="hs-table" style="margin-bottom:20px;">
+        <thead><tr><th>Timing</th><th>Type</th><th>Channel</th></tr></thead>
+        <tbody>
+          <tr><td>Day 21 of first subscription</td><td>Early NPS (most important)</td><td>WhatsApp + Email</td></tr>
+          <tr><td>Monthly (ongoing)</td><td>Pulse NPS</td><td>Email</td></tr>
+          <tr><td>After support ticket resolved</td><td>CSAT</td><td>WhatsApp</td></tr>
+          <tr><td>3 days before renewal</td><td>Pre-renewal NPS</td><td>Email + WhatsApp</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-bottom:12px; font-size:15px;">NPS Question</h3>
+      <div style="background: var(--gray); border-radius:10px; padding:16px; margin-bottom:20px;">
+        <p style="font-size:14px; font-weight:600; color: var(--navy); margin-bottom:8px;">Hindi:</p>
+        <p style="font-size:14px; font-style:italic; margin-bottom:12px;">"0 se 10 ke scale pe, aap Retail Nazar ko apne kisi dost ya business partner ko recommend karne ki kitni possibility rakhte hain?"</p>
+        <p style="font-size:14px; font-weight:600; color: var(--navy); margin-bottom:8px;">English:</p>
+        <p style="font-size:14px; font-style:italic;">"On a scale of 0–10, how likely are you to recommend Retail Nazar to a fellow shop owner?"</p>
+        <br>
+        <p style="font-size:13px; font-weight:600;">Follow-up (open text):</p>
+        <p style="font-size:13px; font-style:italic;">"Yeh rating kyun di? Aapka feedback bahut important hai."</p>
+      </div>
+
+      <h3 style="margin-bottom:12px; font-size:15px;">NPS Simulator — Check What to Do</h3>
+      <p style="font-size:13px; color:#666; margin-bottom:10px;">Select the score a customer gave:</p>
+      <div class="nps-scale">
+        <button class="nps-btn det" onclick="showNPS(0)">0</button>
+        <button class="nps-btn det" onclick="showNPS(1)">1</button>
+        <button class="nps-btn det" onclick="showNPS(2)">2</button>
+        <button class="nps-btn det" onclick="showNPS(3)">3</button>
+        <button class="nps-btn det" onclick="showNPS(4)">4</button>
+        <button class="nps-btn det" onclick="showNPS(5)">5</button>
+        <button class="nps-btn det" onclick="showNPS(6)">6</button>
+        <button class="nps-btn pas" onclick="showNPS(7)">7</button>
+        <button class="nps-btn pas" onclick="showNPS(8)">8</button>
+        <button class="nps-btn pro" onclick="showNPS(9)">9</button>
+        <button class="nps-btn pro" onclick="showNPS(10)">10</button>
+      </div>
+      <div class="nps-result" id="npsResult"></div>
+
+      <h3 style="margin: 24px 0 12px; font-size:15px;">Response Templates by Score</h3>
+
+      <div style="background: var(--green-light); border-radius:8px; padding:14px; margin-bottom:12px; border-left:4px solid var(--green);">
+        <strong style="color:var(--green); font-size:12px; text-transform:uppercase; letter-spacing:1px;">Promoter (9–10) Response:</strong>
+        <div class="wa-msg" style="margin-top:8px;">Bahut shukriya [Name] ji! 🙏 Aapka support bahut maayne rakhta hai humein. Kya hum aapka review Google pe share kar sakte hain? [Google link]. Aur agar aapke kisi business partner ko bhi aisi zaroorat ho — unhe batana, unhe 50% off milega 😊</div>
+        <p style="font-size:12px; margin-top:8px; color:#555;">Also ask for: Testimonial quote, WhatsApp group referral, LinkedIn recommendation</p>
+      </div>
+
+      <div style="background: var(--yellow-light); border-radius:8px; padding:14px; margin-bottom:12px; border-left:4px solid #f59e0b;">
+        <strong style="color:var(--yellow); font-size:12px; text-transform:uppercase; letter-spacing:1px;">Passive (7–8) — Improve to Promoter:</strong>
+        <div class="wa-msg" style="margin-top:8px;">Aapne 8 diya — bahut shukriya! Main curious tha ki 10 banana ke liye hum kya kar sakte hain aapke liye? Koi specific cheez hai? 🙂</div>
+      </div>
+
+      <div style="background: var(--red-light); border-radius:8px; padding:14px; border-left:4px solid var(--red);">
+        <strong style="color:var(--red); font-size:12px; text-transform:uppercase; letter-spacing:1px;">Detractor (0–6) — Call within 2 HOURS:</strong>
+        <p style="font-size:13px; margin-top:8px;">Call script: "Namaste [Name] ji — main Retail Nazar ke CS team se hoon. Aapne jo rating di, main personally call karna chahta tha. Kya hua? Main personally ensure karunga ki yeh theek ho."</p>
+        <p style="font-size:12px; margin-top:8px; color:#991b1b;"><strong>Do NOT delegate this call.</strong> Senior CS or founder must handle.</p>
+      </div>
+
+      <h3 style="margin: 20px 0 10px; font-size:15px;">NPS Monthly Targets</h3>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:100px; text-align:center; background:white; border:1px solid var(--border); border-radius:10px; padding:14px;">
+          <div style="font-size:24px; font-weight:900; color:var(--navy);">&gt;30</div>
+          <div style="font-size:12px; color:#888; margin-top:4px;">Month 1 Target</div>
+        </div>
+        <div style="flex:1; min-width:100px; text-align:center; background:white; border:1px solid var(--border); border-radius:10px; padding:14px;">
+          <div style="font-size:24px; font-weight:900; color:var(--navy);">&gt;45</div>
+          <div style="font-size:12px; color:#888; margin-top:4px;">Month 3 Target</div>
+        </div>
+        <div style="flex:1; min-width:100px; text-align:center; background:white; border:1px solid var(--border); border-radius:10px; padding:14px;">
+          <div style="font-size:24px; font-weight:900; color:var(--navy);">&gt;55</div>
+          <div style="font-size:12px; color:#888; margin-top:4px;">Month 6 Target</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== UPSELL PANEL ===================== -->
+<div id="tab-upsell" class="panel">
+  <div class="card">
+    <div class="card-header"><h2>Upsell & Expansion Program</h2><span class="badge">Target: 10% Upsell/Month</span></div>
+    <div class="card-body">
+      <h3 style="margin-bottom:14px; font-size:15px;">Upgrade Triggers</h3>
+      <table class="upsell-table">
+        <thead><tr><th>Current → Next</th><th>Trigger Signal</th><th>Pitch Angle</th><th>Price Delta</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Starter → Growth</strong></td><td>Customer mentions 3rd camera or asks about more cameras</td><td>"Growth covers 5 cameras + enhanced AI — ₹1,000 more, 3x protection"</td><td>+₹1,000/mo</td></tr>
+          <tr><td><strong>Growth → Pro</strong></td><td>Mentions second location or Delhi store</td><td>"Pro covers 10 cameras across multiple locations"</td><td>+₹1,500/mo</td></tr>
+          <tr><td><strong>Pro → Pro+</strong></td><td>8+ cameras connected, asks about analytics</td><td>"Pro+ gives unlimited cameras + advanced analytics + priority support"</td><td>+₹2,500/mo</td></tr>
+          <tr><td><strong>Any → Annual</strong></td><td>Any paid customer at month 3+ with good health score</td><td>"Annual plan = pay for 10 months, get 12 — save ₹[2×monthly]"</td><td>-2 months cost</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin: 20px 0 12px; font-size:15px;">Upsell Conversation Template</h3>
+      <div class="wa-msg" style="max-width:95%;">[Name] ji, main aapke account data dekh raha tha — aap bahut actively use kar rahe ho 👍<br><br>Maine notice kiya ki aapke [trigger observation]. Ek cheez bata sakta hoon — [plan name] mein aapko [specific benefit] milega. Difference sirf ₹[amount] per month hai.<br><br>Kya aap ek minute mein compare dekhna chahenge? 🙂</div>
+
+      <h3 style="margin: 20px 0 12px; font-size:15px;">Referral Program — Turn Customers into Growth Engine</h3>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:14px;">
+        <div style="background: var(--green-light); border-radius:10px; padding:16px; border:1px solid #bbf7d0; text-align:center;">
+          <div style="font-size:28px; font-weight:900; color:var(--green);">1 Month</div>
+          <div style="font-size:13px; color:#444; margin-top:4px;">Free for referring customer</div>
+        </div>
+        <div style="background: var(--blue-light); border-radius:10px; padding:16px; border:1px solid #bfdbfe; text-align:center;">
+          <div style="font-size:28px; font-weight:900; color:var(--blue);">50% Off</div>
+          <div style="font-size:13px; color:#444; margin-top:4px;">First month for referred store</div>
+        </div>
+        <div style="background: var(--yellow-light); border-radius:10px; padding:16px; border:1px solid #fde68a; text-align:center;">
+          <div style="font-size:28px; font-weight:900; color:var(--yellow);">Ask at</div>
+          <div style="font-size:13px; color:#444; margin-top:4px;">Day 30 when NPS ≥ 8</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== CALENDAR PANEL ===================== -->
+<div id="tab-calendar" class="panel">
+  <div class="card">
+    <div class="card-header"><h2>Monthly Communication Calendar</h2><span class="badge">Per Customer</span></div>
+    <div class="card-body">
+      <p style="font-size:13px; color:#666; margin-bottom:16px;">
+        <span class="cal-auto">AUTO</span> = automated email/WA &nbsp;|&nbsp;
+        <span class="cal-human">HUMAN</span> = CS rep personally sends
+      </p>
+
+      <div class="cal-week">
+        <h3>Week 1 — Trial Period</h3>
+        <div class="cal-item"><div class="cal-day">Day 1</div><span><span class="cal-auto">AUTO</span> Welcome email + WhatsApp (W1)</span></div>
+        <div class="cal-item"><div class="cal-day">Day 1</div><span><span class="cal-human">HUMAN</span> Setup check call by 11 AM</span></div>
+        <div class="cal-item"><div class="cal-day">Day 3</div><span><span class="cal-auto">AUTO</span> Mid-trial check email (W3) — "48 hours in, what are you seeing?"</span></div>
+        <div class="cal-item"><div class="cal-day">Day 5</div><span><span class="cal-human">HUMAN</span> Trial Review Call — 10 minutes, conversion push</span></div>
+        <div class="cal-item"><div class="cal-day">Day 6</div><span><span class="cal-auto">AUTO</span> Trial Ending email (W6) + urgency WA</span></div>
+      </div>
+
+      <div class="cal-week">
+        <h3>Week 2 — New Paid Customer</h3>
+        <div class="cal-item"><div class="cal-day">Day 7</div><span><span class="cal-auto">AUTO</span> Congratulations email + invoice</span></div>
+        <div class="cal-item"><div class="cal-day">Day 10</div><span><span class="cal-human">HUMAN</span> "How is it going?" check-in call (15 min) + referral intro</span></div>
+        <div class="cal-item"><div class="cal-day">Day 14</div><span><span class="cal-auto">AUTO</span> Feature education email: Footfall Analytics tutorial</span></div>
+      </div>
+
+      <div class="cal-week">
+        <h3>Week 3–4 — Engagement & NPS</h3>
+        <div class="cal-item"><div class="cal-day">Day 21</div><span><span class="cal-auto">AUTO</span> NPS survey sent (WhatsApp + Email)</span></div>
+        <div class="cal-item"><div class="cal-day">Day 21</div><span><span class="cal-human">HUMAN</span> Month-1 Review call — alerts summary, usage report</span></div>
+        <div class="cal-item"><div class="cal-day">Day 28</div><span><span class="cal-auto">AUTO</span> Monthly Report email (alerts caught, footfall stats)</span></div>
+        <div class="cal-item"><div class="cal-day">Day 30</div><span><span class="cal-human">HUMAN</span> Referral ask if NPS ≥ 8 | Testimonial ask if NPS ≥ 9</span></div>
+      </div>
+
+      <div class="cal-week">
+        <h3>Ongoing Monthly (All Active Customers)</h3>
+        <div class="cal-item"><div class="cal-day">1st</div><span><span class="cal-auto">AUTO</span> "Retail Security Digest" — monthly newsletter with tips</span></div>
+        <div class="cal-item"><div class="cal-day">15th</div><span><span class="cal-auto">AUTO</span> Feature tip or product update WhatsApp</span></div>
+        <div class="cal-item"><div class="cal-day">25th</div><span><span class="cal-auto">AUTO</span> Renewal reminder (billing in 5 days) — invoice preview</span></div>
+        <div class="cal-item"><div class="cal-day">Monthly</div><span><span class="cal-human">HUMAN</span> Health Score check — intervene if YELLOW or RED</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== METRICS PANEL ===================== -->
+<div id="tab-metrics" class="panel">
+  <div class="card">
+    <div class="card-header"><h2>CS Team KPIs & Targets</h2><span class="badge">Track Weekly</span></div>
+    <div class="card-body">
+      <div class="metrics-grid">
+        <div class="metric-card"><div class="val">≥40%</div><div class="tgt">Target</div><div class="name">Trial-to-Paid Conversion</div></div>
+        <div class="metric-card"><div class="val">≥70%</div><div class="tgt">Target</div><div class="name">Day-7 Activation Rate</div></div>
+        <div class="metric-card"><div class="val">≥85%</div><div class="tgt">Target</div><div class="name">Month-1 Retention</div></div>
+        <div class="metric-card"><div class="val">≥75%</div><div class="tgt">Target</div><div class="name">Month-3 Retention</div></div>
+        <div class="metric-card"><div class="val">&lt;5%</div><div class="tgt">Target</div><div class="name">Monthly Churn Rate</div></div>
+        <div class="metric-card"><div class="val">≥45</div><div class="tgt">Month 3</div><div class="name">NPS Score</div></div>
+        <div class="metric-card"><div class="val">₹2,200+</div><div class="tgt">Target</div><div class="name">ARPU (Avg Revenue/User)</div></div>
+        <div class="metric-card"><div class="val">₹26,400+</div><div class="tgt">Target</div><div class="name">Customer Lifetime Value</div></div>
+        <div class="metric-card"><div class="val">&lt;4hr</div><div class="tgt">Target</div><div class="name">Support Response Time</div></div>
+        <div class="metric-card"><div class="val">≥10%</div><div class="tgt">Per Month</div><div class="name">Upsell Rate</div></div>
+        <div class="metric-card"><div class="val">40%</div><div class="tgt">Target</div><div class="name">At-Risk Customer Save Rate</div></div>
+        <div class="metric-card"><div class="val">≥3</div><div class="tgt">Monthly</div><div class="name">Referrals per 10 Customers</div></div>
+      </div>
+
+      <h3 style="margin: 24px 0 12px; font-size:15px;">How to Calculate Key Metrics</h3>
+      <table class="hs-table">
+        <thead><tr><th>Metric</th><th>Formula</th><th>Data Source</th></tr></thead>
+        <tbody>
+          <tr><td>Trial Conversion Rate</td><td>Paid Signups ÷ Total Trials × 100</td><td>CRM / Razorpay</td></tr>
+          <tr><td>Monthly Churn Rate</td><td>Cancelled this month ÷ Active at month start × 100</td><td>CRM</td></tr>
+          <tr><td>ARPU</td><td>Total MRR ÷ Total Active Customers</td><td>Razorpay + CRM</td></tr>
+          <tr><td>CLV</td><td>ARPU × Average Months Before Churn</td><td>Calculated monthly</td></tr>
+          <tr><td>NPS</td><td>% Promoters (9-10) − % Detractors (0-6)</td><td>Survey responses</td></tr>
+          <tr><td>Day-7 Activation</td><td>Customers with ≥1 alert in 7 days ÷ New signups × 100</td><td>Platform + CRM</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== ESCALATION PANEL ===================== -->
+<div id="tab-escalation" class="panel">
+  <div class="card">
+    <div class="card-header"><h2>Support Escalation Matrix</h2><span class="badge">3-Tier System</span></div>
+    <div class="card-body">
+      <div class="escalation">
+        <div class="esc-card esc-l1">
+          <h3>Level 1 — CS Rep</h3>
+          <p class="time" style="color: var(--green);">Resolve within: 2 hours</p>
+          <ul>
+            <li>Camera setup help</li>
+            <li>Alert configuration</li>
+            <li>App/dashboard navigation</li>
+            <li>Password reset</li>
+            <li>Billing queries</li>
+            <li>WhatsApp alert setup</li>
+          </ul>
+        </div>
+        <div class="esc-card esc-l2">
+          <h3>Level 2 — Senior CS / Tech</h3>
+          <p class="time" style="color: var(--yellow);">Resolve within: 8 hours</p>
+          <ul>
+            <li>Camera won't connect after troubleshooting</li>
+            <li>Missing historical footage</li>
+            <li>False alert rate too high</li>
+            <li>Performance issues (slow)</li>
+            <li>Multi-location setup issues</li>
+          </ul>
+        </div>
+        <div class="esc-card esc-l3">
+          <h3>Level 3 — Engineering</h3>
+          <p class="time" style="color: var(--red);">Resolve within: 24 hours</p>
+          <ul>
+            <li>Data breach or security concern</li>
+            <li>Platform outage affecting customer</li>
+            <li>AI detection incorrect after calibration</li>
+            <li>Integration issues</li>
+            <li>Database / account data issues</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="background: var(--navy); color: white; border-radius: 10px; padding: 20px; margin-top: 20px;">
+        <h3 style="color: var(--gold); margin-bottom: 12px; font-size:15px;">Escalation Rules</h3>
+        <table style="width:100%; font-size:13px; border-collapse:collapse;">
+          <tr style="border-bottom:1px solid #ffffff20;"><td style="padding:8px 0; color:#aab; width:40%;">L1 → L2 triggers:</td><td style="padding:8px 0;">Unresolved after 2 hrs OR customer unhappy with response</td></tr>
+          <tr style="border-bottom:1px solid #ffffff20;"><td style="padding:8px 0; color:#aab;">L2 → L3 triggers:</td><td style="padding:8px 0;">Technical issue confirmed + unresolved after 4 hours</td></tr>
+          <tr style="border-bottom:1px solid #ffffff20;"><td style="padding:8px 0; color:#aab;">Any → Founder:</td><td style="padding:8px 0;">Customer threatens public complaint, legal action, OR ARPU &gt; ₹5,000/month</td></tr>
+          <tr><td style="padding:8px 0; color:#aab;">Max response time:</td><td style="padding:8px 0;">No customer should wait more than 24 hrs for any response</td></tr>
+        </table>
+      </div>
+
+      <div style="margin-top:20px;">
+        <h3 style="font-size:15px; margin-bottom:12px;">Support Contact Info</h3>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:12px; font-size:13px;">
+          <div style="background:white; border:1px solid var(--border); border-radius:8px; padding:14px;"><strong>Email Support</strong><br>support@retailnazar.com<br><span style="color:#888; font-size:12px;">Mon–Sat, 9 AM–7 PM</span></div>
+          <div style="background:white; border:1px solid var(--border); border-radius:8px; padding:14px;"><strong>WhatsApp CS</strong><br>[CS WhatsApp number]<br><span style="color:#888; font-size:12px;">Mon–Sat, 9 AM–7 PM</span></div>
+          <div style="background:white; border:1px solid var(--border); border-radius:8px; padding:14px;"><strong>Partner / Reseller</strong><br>partners@retailnazar.com<br><span style="color:#888; font-size:12px;">Mon–Fri, 10 AM–6 PM</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div style="text-align:center; color:#999; font-size:12px; padding: 20px 0;">
+  Retail Nazar Customer Success Program v1.0 &nbsp;|&nbsp; BrainGuardX AI Technologies Pvt. Ltd.<br>
+  support@retailnazar.com &nbsp;|&nbsp; retailnazar.com &nbsp;|&nbsp; Confidential — Internal CS Team Use Only
+</div>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function updateHealth() {
+  const ids = ['login','cam','alert','wa','sup','pay'];
+  let total = 0;
+  ids.forEach(id => {
+    const v = parseInt(document.getElementById('r_' + id).value);
+    document.getElementById('v_' + id).textContent = v;
+    total += v;
+  });
+  const score = total;
+  document.getElementById('healthScore').textContent = score;
+  const fill = document.getElementById('meterFill');
+  const result = document.getElementById('healthResult');
+  const label = document.getElementById('healthLabel');
+  const action = document.getElementById('healthAction');
+  fill.style.width = score + '%';
+  if (score >= 70) {
+    fill.style.background = 'var(--green)';
+    result.className = 'health-result health-green';
+    label.textContent = '🟢 HEALTHY';
+    action.textContent = 'Focus on upsell, referral, and annual plan conversion.';
+  } else if (score >= 40) {
+    fill.style.background = '#ca8a04';
+    result.className = 'health-result health-yellow';
+    label.textContent = '🟡 AT RISK';
+    action.textContent = 'Intervene within 48 hours. Personal call from CS rep.';
+  } else {
+    fill.style.background = 'var(--red)';
+    result.className = 'health-result health-red';
+    label.textContent = '🔴 DANGER — IMMEDIATE ACTION';
+    action.textContent = 'Senior CS or Founder call within 24 hours. Emergency save play.';
+  }
+}
+
+function showNPS(score) {
+  const el = document.getElementById('npsResult');
+  el.style.display = 'block';
+  if (score <= 6) {
+    el.className = 'nps-result nps-det';
+    el.innerHTML = '<strong>DETRACTOR (Score: ' + score + ')</strong><br>Call within 2 hours. Senior CS must handle personally. Find root cause, offer rescue. Do not delegate.';
+  } else if (score <= 8) {
+    el.className = 'nps-result nps-pas';
+    el.innerHTML = '<strong>PASSIVE (Score: ' + score + ')</strong><br>Call to ask "what would make it a 10?" — find the gap and close it. Aim to convert to Promoter.';
+  } else {
+    el.className = 'nps-result nps-pro';
+    el.innerHTML = '<strong>PROMOTER (Score: ' + score + ')</strong><br>Ask for Google Review, testimonial, and referral. Offer referral discount. Potential brand ambassador.';
+  }
+}
+</script>
+</body>
+</html>

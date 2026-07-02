@@ -54,7 +54,7 @@ export default function HowItWorks({ embedded = false }: { embedded?: boolean })
           />
           <Step num={2} icon="💳"
             title={t('how.s2.title', 'Pay in your currency')}
-            body={t('how.s2.body', 'Secure payments in INR, SGD and MYR. Monthly or annual. Cancel anytime.')}
+            body={t('how.s2.body', 'Secure payments in INR, SGD, MYR and PHP. Monthly or annual. Cancel anytime.')}
           />
           <Step num={3} icon="⬇️"
             title={t('how.s3.title', 'Download the Edge Agent')}

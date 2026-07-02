@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reseller / System Integrator / OEM Partnership Agreement – Retail Nazar</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:       #0d2b55;
+      --navy-mid:   #1a3f7a;
+      --navy-light: #2a5298;
+      --accent:     #c8a84b;
+      --rule:       #b0bec5;
+      --text:       #1a1a2e;
+      --muted:      #4a5568;
+      --bg:         #ffffff;
+      --bg-alt:     #f4f6fb;
+      --border:     #d0d9e8;
+    }
+
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 10.5pt;
+      line-height: 1.75;
+      color: var(--text);
+      background: #e8ecf0;
+    }
+
+    /* ── Page / Print Shell ───────────────────────────────────────── */
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 20px auto;
+      background: var(--bg);
+      padding: 22mm 20mm 22mm 22mm;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.18);
+    }
+
+    /* ── Header ──────────────────────────────────────────────────── */
+    .doc-header {
+      border-top: 6px solid var(--navy);
+      border-bottom: 2px solid var(--accent);
+      padding: 18px 0 14px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .doc-header .brand-block { flex: 1; }
+    .brand-name {
+      font-family: 'Arial', sans-serif;
+      font-size: 22pt;
+      font-weight: 900;
+      color: var(--navy);
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+    }
+    .brand-name span { color: var(--accent); }
+    .brand-sub {
+      font-family: 'Arial', sans-serif;
+      font-size: 8pt;
+      color: var(--muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    .doc-header .doc-meta {
+      text-align: right;
+      font-family: 'Arial', sans-serif;
+      font-size: 8pt;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .doc-meta .doc-ref {
+      font-size: 9pt;
+      font-weight: 700;
+      color: var(--navy);
+    }
+
+    /* ── Document Title ───────────────────────────────────────────── */
+    .doc-title-block {
+      text-align: center;
+      margin-bottom: 22px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .doc-title {
+      font-family: 'Arial', sans-serif;
+      font-size: 15pt;
+      font-weight: 900;
+      color: var(--navy);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1.3;
+    }
+    .doc-subtitle {
+      font-family: 'Arial', sans-serif;
+      font-size: 9pt;
+      color: var(--muted);
+      margin-top: 5px;
+      letter-spacing: 0.5px;
+    }
+    .doc-version {
+      display: inline-block;
+      margin-top: 8px;
+      background: var(--navy);
+      color: #fff;
+      font-family: 'Arial', sans-serif;
+      font-size: 7.5pt;
+      padding: 2px 10px;
+      border-radius: 2px;
+      letter-spacing: 1px;
+    }
+
+    /* ── Partner Type Selector ────────────────────────────────────── */
+    .partner-type-box {
+      background: var(--bg-alt);
+      border: 1.5px solid var(--navy-light);
+      border-radius: 4px;
+      padding: 14px 18px;
+      margin-bottom: 22px;
+    }
+    .partner-type-box .ptb-title {
+      font-family: 'Arial', sans-serif;
+      font-size: 9pt;
+      font-weight: 700;
+      color: var(--navy);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    .partner-type-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 24px;
+    }
+    .partner-type-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Arial', sans-serif;
+      font-size: 9.5pt;
+      color: var(--text);
+    }
+    .partner-type-item .checkbox-sq {
+      width: 14px;
+      height: 14px;
+      border: 1.5px solid var(--navy);
+      display: inline-block;
+      flex-shrink: 0;
+      background: #fff;
+    }
+    .partner-type-item .pt-label { font-weight: 600; }
+    .partner-type-item .pt-desc {
+      font-size: 8pt;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    /* ── Parties Block ────────────────────────────────────────────── */
+    .parties-block {
+      background: var(--bg-alt);
+      border-left: 4px solid var(--navy);
+      padding: 14px 16px;
+      margin-bottom: 22px;
+      font-size: 9.5pt;
+    }
+    .parties-block .pb-title {
+      font-family: 'Arial', sans-serif;
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: var(--navy);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .party-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed var(--border);
+    }
+    .party-row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .party-label {
+      font-family: 'Arial', sans-serif;
+      font-weight: 700;
+      color: var(--navy-light);
+      min-width: 80px;
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding-top: 1px;
+    }
+    .party-details { flex: 1; line-height: 1.6; }
+    .party-details strong { color: var(--navy); }
+    .fill-line {
+      display: inline-block;
+      border-bottom: 1px solid #999;
+      min-width: 200px;
+      margin: 0 4px;
+    }
+    .fill-line-long {
+      display: inline-block;
+      border-bottom: 1px solid #999;
+      min-width: 300px;
+      margin: 0 4px;
+    }
+
+    /* ── Recitals ─────────────────────────────────────────────────── */
+    .recitals-block {
+      margin-bottom: 22px;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+    }
+    .recitals-block .rec-title {
+      font-family: 'Arial', sans-serif;
+      font-size: 9pt;
+      font-weight: 700;
+      color: var(--navy);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .recital-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 5px;
+      font-size: 9.5pt;
+    }
+    .recital-item .rec-alpha {
+      font-weight: 700;
+      color: var(--navy-light);
+      min-width: 20px;
+    }
+
+    /* ── Section Headings ─────────────────────────────────────────── */
+    .section {
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+    }
+    .section-heading {
+      font-family: 'Arial', sans-serif;
+      font-size: 10.5pt;
+      font-weight: 900;
+      color: var(--bg);
+      background: var(--navy);
+      padding: 6px 12px;
+      margin-bottom: 10px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-heading .sec-num {
+      background: var(--accent);
+      color: var(--navy);
+      font-size: 9pt;
+      padding: 1px 7px;
+      border-radius: 2px;
+      font-weight: 900;
+    }
+
+    /* ── Clause Numbering ─────────────────────────────────────────── */
+    .clause {
+      margin-bottom: 8px;
+      display: flex;
+      gap: 10px;
+      font-size: 9.5pt;
+      line-height: 1.7;
+    }
+    .clause .cn {
+      font-family: 'Arial', sans-serif;
+      font-weight: 700;
+      color: var(--navy-light);
+      min-width: 38px;
+      flex-shrink: 0;
+      padding-top: 1px;
+    }
+    .clause .ct { flex: 1; }
+    .clause .ct strong { color: var(--navy); }
+
+    /* Sub-clauses */
+    .sub-clause {
+      margin: 5px 0 5px 48px;
+      display: flex;
+      gap: 10px;
+      font-size: 9.5pt;
+      line-height: 1.7;
+    }
+    .sub-clause .scn {
+      font-family: 'Arial', sans-serif;
+      font-weight: 700;
+      color: var(--navy-light);
+      min-width: 42px;
+      flex-shrink: 0;
+    }
+    .sub-clause .sct { flex: 1; }
+
+    /* Sub-sub-clauses */
+    .subsub-clause {
+      margin: 4px 0 4px 90px;
+      display: flex;
+      gap: 10px;
+      font-size: 9pt;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+    .subsub-clause .sscn {
+      font-family: 'Arial', sans-serif;
+      font-weight: 600;
+      color: var(--navy-light);
+      min-width: 46px;
+      flex-shrink: 0;
+    }
+    .subsub-clause .ssct { flex: 1; color: var(--text); }
+
+    /* ── Tier Table ───────────────────────────────────────────────── */
+    .tier-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0 14px;
+      font-size: 8.5pt;
+      font-family: 'Arial', sans-serif;
+    }
+    .tier-table th {
+      background: var(--navy);
+      color: #fff;
+      padding: 7px 10px;
+      text-align: left;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .tier-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .tier-table tr:nth-child(even) td { background: var(--bg-alt); }
+    .tier-table tr:hover td { background: #e8edf8; }
+    .tier-table .tier-name {
+      font-weight: 700;
+      color: var(--navy);
+    }
+    .tier-table .highlight { color: var(--navy-light); font-weight: 700; }
+
+    /* ── Info Box ─────────────────────────────────────────────────── */
+    .info-box {
+      background: #eef2fb;
+      border-left: 3px solid var(--navy-light);
+      padding: 8px 12px;
+      margin: 8px 0;
+      font-size: 9pt;
+      font-family: 'Arial', sans-serif;
+      color: var(--muted);
+    }
+    .info-box strong { color: var(--navy); }
+
+    .warning-box {
+      background: #fff8e1;
+      border-left: 3px solid var(--accent);
+      padding: 8px 12px;
+      margin: 8px 0;
+      font-size: 9pt;
+      font-family: 'Arial', sans-serif;
+      color: #5d4037;
+    }
+    .warning-box strong { color: #7b4f00; }
+
+    /* ── Schedule A ───────────────────────────────────────────────── */
+    .schedule-block {
+      border: 2px solid var(--navy);
+      border-radius: 4px;
+      margin-bottom: 22px;
+      page-break-inside: avoid;
+    }
+    .schedule-header {
+      background: var(--navy);
+      color: #fff;
+      padding: 10px 16px;
+      font-family: 'Arial', sans-serif;
+      font-size: 11pt;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .schedule-body { padding: 16px; }
+    .schedule-field {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed var(--border);
+      font-size: 9.5pt;
+    }
+    .schedule-field:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .sf-label {
+      font-family: 'Arial', sans-serif;
+      font-weight: 700;
+      color: var(--navy);
+      min-width: 180px;
+      font-size: 9pt;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      padding-top: 2px;
+    }
+    .sf-value {
+      flex: 1;
+      border-bottom: 1px solid #aaa;
+      min-height: 22px;
+      padding-bottom: 2px;
+      color: var(--muted);
+      font-style: italic;
+      font-size: 9pt;
+    }
+    .sf-value.multiline {
+      border-bottom: none;
+      border: 1px solid #ccc;
+      min-height: 50px;
+      padding: 4px 6px;
+      border-radius: 2px;
+    }
+
+    /* ── Signature Block ──────────────────────────────────────────── */
+    .sig-section {
+      margin-top: 28px;
+      page-break-inside: avoid;
+    }
+    .sig-section-title {
+      font-family: 'Arial', sans-serif;
+      font-size: 10pt;
+      font-weight: 900;
+      color: var(--navy);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 2px solid var(--navy);
+      padding-bottom: 6px;
+      margin-bottom: 18px;
+    }
+    .sig-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+    }
+    .sig-block {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 16px;
+      background: var(--bg-alt);
+    }
+    .sig-block-title {
+      font-family: 'Arial', sans-serif;
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: var(--navy);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sig-field {
+      margin-bottom: 10px;
+      font-size: 9pt;
+    }
+    .sig-field .sf-lbl {
+      font-family: 'Arial', sans-serif;
+      font-size: 7.5pt;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    .sig-field .sf-line {
+      border-bottom: 1px solid #888;
+      min-height: 22px;
+      width: 100%;
+    }
+    .sig-field .sf-line.sig-area {
+      min-height: 50px;
+      border: 1px dashed #aaa;
+      border-radius: 2px;
+      background: #fff;
+    }
+    .seal-box {
+      border: 1px dashed var(--navy-light);
+      border-radius: 50%;
+      width: 70px;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Arial', sans-serif;
+      font-size: 7pt;
+      color: var(--muted);
+      text-align: center;
+      margin: 8px auto 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Disclaimer ───────────────────────────────────────────────── */
+    .disclaimer {
+      margin-top: 28px;
+      padding: 12px 16px;
+      background: #fff3e0;
+      border: 1px solid #ffcc80;
+      border-radius: 3px;
+      font-family: 'Arial', sans-serif;
+      font-size: 8pt;
+      color: #5d4037;
+      line-height: 1.6;
+    }
+    .disclaimer strong { color: #bf360c; }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    .doc-footer {
+      margin-top: 24px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'Arial', sans-serif;
+      font-size: 7.5pt;
+      color: var(--muted);
+    }
+    .doc-footer .footer-brand { font-weight: 700; color: var(--navy); }
+
+    /* ── Utility ──────────────────────────────────────────────────── */
+    .text-center { text-align: center; }
+    .mt-8 { margin-top: 8px; }
+    .mt-14 { margin-top: 14px; }
+    .mb-6 { margin-bottom: 6px; }
+    .bold { font-weight: 700; }
+    .navy { color: var(--navy); }
+    .italic { font-style: italic; }
+    .small { font-size: 8.5pt; }
+    .page-break { page-break-before: always; }
+
+    /* ── Print CSS ────────────────────────────────────────────────── */
+    @media print {
+      body { background: #fff; font-size: 10pt; }
+      .page {
+        width: 100%;
+        margin: 0;
+        padding: 15mm 15mm 15mm 18mm;
+        box-shadow: none;
+      }
+      .section { page-break-inside: avoid; }
+      .sig-section { page-break-inside: avoid; }
+      .schedule-block { page-break-inside: avoid; }
+      .page-break { page-break-before: always; }
+      a { color: inherit; text-decoration: none; }
+    }
+
+    @page {
+      size: A4;
+      margin: 15mm 15mm 15mm 18mm;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══════════════════════════════════════════════════════════════
+       HEADER
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="doc-header">
+    <div class="brand-block">
+      <div class="brand-name">Retail<span>Nazar</span></div>
+      <div class="brand-sub">AI Retail Surveillance &nbsp;|&nbsp; retailnazar.com</div>
+      <div class="brand-sub" style="margin-top:3px;">A Product of BrainGuardX AI Technologies Pvt. Ltd.</div>
+    </div>
+    <div class="doc-meta">
+      <div class="doc-ref">BGXT-PARTNER-AGR-v1.0</div>
+      <div>Document Date: <span class="fill-line" style="min-width:90px;">&nbsp;</span></div>
+      <div>Agreement No.: <span class="fill-line" style="min-width:90px;">&nbsp;</span></div>
+      <div style="margin-top:4px;">support@retailnazar.com</div>
+      <div>retailnazar.com</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       DOCUMENT TITLE
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="doc-title-block">
+    <div class="doc-title">Reseller / System Integrator / OEM<br>Partnership Agreement</div>
+    <div class="doc-subtitle">Retail Nazar AI Retail Surveillance Platform &nbsp;&bull;&nbsp; BrainGuardX AI Technologies Pvt. Ltd.</div>
+    <div class="doc-version">Version 1.0 &nbsp;|&nbsp; Governed by Indian Law &nbsp;|&nbsp; Jurisdiction: Gautam Buddha Nagar, Uttar Pradesh</div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       PARTNER TYPE SELECTOR
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="partner-type-box">
+    <div class="ptb-title">Partnership Type (Select Applicable — to be marked before execution)</div>
+    <div class="partner-type-grid">
+      <div class="partner-type-item">
+        <span class="checkbox-sq"></span>
+        <div>
+          <div class="pt-label">Authorized Reseller</div>
+          <div class="pt-desc">Resells Retail Nazar subscriptions to end customers</div>
+        </div>
+      </div>
+      <div class="partner-type-item">
+        <span class="checkbox-sq"></span>
+        <div>
+          <div class="pt-label">System Integrator Partner</div>
+          <div class="pt-desc">Integrates Retail Nazar into broader retail/tech solutions</div>
+        </div>
+      </div>
+      <div class="partner-type-item">
+        <span class="checkbox-sq"></span>
+        <div>
+          <div class="pt-label">OEM / White-Label Partner</div>
+          <div class="pt-desc">Rebrands and distributes the platform under own brand</div>
+        </div>
+      </div>
+      <div class="partner-type-item">
+        <span class="checkbox-sq"></span>
+        <div>
+          <div class="pt-label">Referral Partner</div>
+          <div class="pt-desc">Refers prospective customers; earns referral commission</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       PARTIES
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="parties-block">
+    <div class="pb-title">Parties to this Agreement</div>
+    <div class="party-row">
+      <div class="party-label">Principal</div>
+      <div class="party-details">
+        <strong>BrainGuardX AI Technologies Pvt. Ltd.</strong> (hereinafter referred to as <strong>"BGXT"</strong> or <strong>"Principal"</strong>),
+        a company incorporated under the Companies Act, 2013, having its registered office at
+        <span class="fill-line-long">[Registered Office Address, City, State – PIN]</span>,
+        operating the Retail Nazar AI retail surveillance platform at <strong>retailnazar.com</strong>.
+      </div>
+    </div>
+    <div class="party-row">
+      <div class="party-label">Partner</div>
+      <div class="party-details">
+        <strong><span class="fill-line-long">[Full Legal Name of Partner Entity / Individual]</span></strong>
+        (hereinafter referred to as <strong>"Partner"</strong>),
+        a <span class="fill-line" style="min-width:160px;">[company / LLP / proprietorship / individual]</span>
+        having its principal place of business / registered address at
+        <span class="fill-line-long">[Partner Address, City, State – PIN]</span>,
+        represented by <span class="fill-line" style="min-width:160px;">[Authorized Signatory Name]</span>,
+        in the capacity of <span class="fill-line" style="min-width:120px;">[Designation]</span>.
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       RECITALS
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="recitals-block">
+    <div class="rec-title">Recitals</div>
+    <div class="recital-item"><span class="rec-alpha">A.</span><span>BGXT has developed and operates <strong>Retail Nazar</strong>, an AI-powered retail surveillance Software-as-a-Service (SaaS) platform that provides real-time video analytics, footfall intelligence, shrinkage detection, and operational insights to retail businesses.</span></div>
+    <div class="recital-item"><span class="rec-alpha">B.</span><span>The Partner has the requisite expertise, market presence, and customer relationships to promote, resell, integrate, or white-label the Retail Nazar platform within the Territory specified in Schedule A.</span></div>
+    <div class="recital-item"><span class="rec-alpha">C.</span><span>BGXT desires to appoint the Partner, and the Partner desires to be appointed, as a partner of BGXT for the purposes set out herein, subject to the terms and conditions of this Agreement.</span></div>
+    <div class="recital-item"><span class="rec-alpha">D.</span><span>Both Parties intend to enter into a mutually beneficial commercial relationship that promotes the adoption of Retail Nazar while protecting the intellectual property, commercial interests, and brand integrity of BGXT.</span></div>
+  </div>
+
+  <p style="font-size:9.5pt; margin-bottom:18px; font-style:italic; color:var(--muted);">
+    <strong style="color:var(--navy);">NOW, THEREFORE,</strong> in consideration of the mutual covenants, representations, and agreements set forth herein, and for other good and valuable consideration, the receipt and sufficiency of which are hereby acknowledged, the Parties agree as follows:
+  </p>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 1 – APPOINTMENT
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">1</span> Appointment</div>
+
+    <div class="clause">
+      <span class="cn">1.1</span>
+      <span class="ct"><strong>Appointment.</strong> Subject to the terms and conditions of this Agreement, BGXT hereby appoints the Partner, and the Partner hereby accepts such appointment, as a non-exclusive partner of BGXT for the promotion, marketing, resale, integration, or white-labeling (as applicable to the selected Partnership Type) of the Retail Nazar platform within the Territory specified in Schedule A.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">1.2</span>
+      <span class="ct"><strong>Exclusivity.</strong> The appointment under Clause 1.1 is non-exclusive unless BGXT expressly grants exclusive rights in writing in Schedule A. Exclusive appointments, if any, shall be subject to minimum performance thresholds as specified in Schedule A and may be revoked upon failure to meet such thresholds for two (2) consecutive quarters.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">1.3</span>
+      <span class="ct"><strong>Territory.</strong> The Partner's appointment is limited to the territory specified in Schedule A (the <strong>"Territory"</strong>). In the absence of a specific territory designation, the Territory shall be the Republic of India on a non-exclusive basis. The Partner shall not actively solicit customers outside the Territory without BGXT's prior written consent.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">1.4</span>
+      <span class="ct"><strong>Term.</strong> This Agreement shall commence on the date of execution by both Parties (the <strong>"Effective Date"</strong>) and shall remain in force for an initial period of one (1) year (the <strong>"Initial Term"</strong>). Thereafter, this Agreement shall automatically renew for successive periods of one (1) year each (each a <strong>"Renewal Term"</strong>), unless either Party provides written notice of non-renewal at least sixty (60) days prior to the expiry of the then-current term.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">1.5</span>
+      <span class="ct"><strong>BGXT's Right to Sell Directly.</strong> Notwithstanding the appointment of the Partner, BGXT expressly retains the right to market, promote, and sell the Retail Nazar platform directly to any customer, including customers within the Partner's Territory, at any time and without any obligation to pay commission to the Partner in respect of such direct sales. BGXT shall not be liable to the Partner for any loss of business arising from BGXT's direct sales activities.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">1.6</span>
+      <span class="ct"><strong>No Agency.</strong> The Partner is an independent contractor and is not an agent, employee, joint venture partner, or legal representative of BGXT. The Partner has no authority to bind BGXT contractually or otherwise, and shall not represent itself as having such authority. Each Party shall be solely responsible for its own employees, contractors, and business operations.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">1.7</span>
+      <span class="ct"><strong>Sub-Appointment.</strong> The Partner shall not appoint sub-resellers, sub-distributors, or sub-agents without the prior written consent of BGXT. Any approved sub-appointment shall be subject to terms no less restrictive than those contained in this Agreement, and the Partner shall remain fully liable for the acts and omissions of any approved sub-appointee.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 2 – PARTNER TIERS AND BENEFITS
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">2</span> Partner Tiers and Benefits</div>
+
+    <div class="clause">
+      <span class="cn">2.1</span>
+      <span class="ct"><strong>Tier Structure.</strong> BGXT operates a tiered partnership program. The applicable tier for the Partner is as selected in the Partnership Type checkbox above and confirmed in Schedule A. The benefits, obligations, and commission rates for each tier are set out below and in Schedule A.</span>
+    </div>
+
+    <table class="tier-table" style="margin-left:48px; width:calc(100% - 48px);">
+      <thead>
+        <tr>
+          <th>Tier</th>
+          <th>Commission / Revenue Share</th>
+          <th>Minimum Active Subscribers</th>
+          <th>Key Benefits</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="tier-name">Referral Partner</td>
+          <td class="highlight">10% of first-year MRR per referred customer</td>
+          <td>None</td>
+          <td>Referral link, basic marketing kit</td>
+        </tr>
+        <tr>
+          <td class="tier-name">Authorized Reseller</td>
+          <td class="highlight">20% recurring revenue share</td>
+          <td>5 active subscribers</td>
+          <td>Reseller portal, co-branded materials, priority support</td>
+        </tr>
+        <tr>
+          <td class="tier-name">System Integrator</td>
+          <td class="highlight">25% recurring + co-branding rights</td>
+          <td>10 active subscribers/quarter</td>
+          <td>API access, co-branding, BGXT certification, dedicated account manager</td>
+        </tr>
+        <tr>
+          <td class="tier-name">OEM / White-Label</td>
+          <td class="highlight">Custom pricing (Schedule A)</td>
+          <td>25 subscribers/quarter</td>
+          <td>Full white-label, custom domain, Tier 1 support responsibility, White-Label Addendum</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="clause mt-8">
+      <span class="cn">2.2</span>
+      <span class="ct"><strong>Referral Partner.</strong> A Referral Partner earns a commission of ten percent (10%) of the Monthly Recurring Revenue (MRR) generated from each customer referred by the Partner and successfully onboarded by BGXT, for the first twelve (12) months of such customer's subscription. No minimum subscriber obligation applies. Referral Partners have no resale, integration, or white-label rights.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">2.3</span>
+      <span class="ct"><strong>Authorized Reseller.</strong> An Authorized Reseller earns a recurring revenue share of twenty percent (20%) on the net subscription fees of all customers brought by the Partner and maintained as active subscribers. The Partner must maintain a minimum of five (5) active paying subscribers at all times during the term. Failure to maintain this minimum for two (2) consecutive quarters may result in tier downgrade or termination as per Clause 9.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">2.4</span>
+      <span class="ct"><strong>System Integrator Partner.</strong> A System Integrator Partner earns a recurring revenue share of twenty-five percent (25%) on net subscription fees, along with co-branding rights as specified in Clause 10. The Partner must:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">2.4.1</span>
+      <span class="sct">Complete BGXT's mandatory product certification program (online, approximately four (4) hours) within sixty (60) days of the Effective Date;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">2.4.2</span>
+      <span class="sct">Maintain a minimum of ten (10) active paying subscribers per quarter; and</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">2.4.3</span>
+      <span class="sct">Participate in quarterly business review meetings with BGXT as specified in Clause 9.3.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">2.5</span>
+      <span class="ct"><strong>OEM / White-Label Partner.</strong> An OEM / White-Label Partner operates under custom pricing terms negotiated separately and documented in Schedule A and a separate White-Label Addendum (the <strong>"White-Label Addendum"</strong>), which shall form part of this Agreement upon execution. The Partner must maintain a minimum of twenty-five (25) active subscribers per quarter. OEM-specific terms are further detailed in Clause 5.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">2.6</span>
+      <span class="ct"><strong>Tier Upgrades and Downgrades.</strong> BGXT may, at its sole discretion, upgrade the Partner's tier upon consistent outperformance of targets. BGXT may downgrade the Partner's tier upon failure to meet minimum subscriber obligations for two (2) consecutive quarters, with thirty (30) days' prior written notice. Tier changes shall take effect from the beginning of the next calendar quarter.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 3 – COMMISSION STRUCTURE AND PAYMENT
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">3</span> Commission Structure and Payment</div>
+
+    <div class="clause">
+      <span class="cn">3.1</span>
+      <span class="ct"><strong>Commission Basis.</strong> All commissions and revenue shares payable under this Agreement shall be calculated on the <strong>net subscription fee</strong> actually received by BGXT from the end customer, which shall exclude:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">3.1.1</span>
+      <span class="sct">Goods and Services Tax (GST) and any other applicable taxes or levies;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">3.1.2</span>
+      <span class="sct">Payment gateway fees, transaction charges, and bank charges;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">3.1.3</span>
+      <span class="sct">Refunds, credits, or adjustments issued to the end customer; and</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">3.1.4</span>
+      <span class="sct">Any discounts approved by BGXT in writing.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">3.2</span>
+      <span class="ct"><strong>Payment Schedule.</strong> BGXT shall calculate and pay commissions on a monthly basis. Commission statements shall be generated by the 10th day of each calendar month for the preceding month's eligible revenue, and payment shall be made by the <strong>15th day of each calendar month</strong> via bank transfer (NEFT/RTGS/IMPS) to the Partner's designated bank account.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">3.3</span>
+      <span class="ct"><strong>Minimum Payout Threshold.</strong> If the total commission payable to the Partner in any given month is less than <strong>Rupees Five Thousand (₹5,000)</strong>, BGXT shall not be obligated to make payment in that month. Such amount shall be accumulated and carried forward to the following month(s) until the cumulative amount reaches or exceeds the threshold, at which point it shall be paid in the next regular payment cycle.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">3.4</span>
+      <span class="ct"><strong>Commission on Upgrades.</strong> Where an end customer upgrades their subscription plan, the Partner shall earn commission on the incremental revenue attributable to the upgrade, calculated on a pro-rata basis for the remainder of the billing cycle, and on the full upgraded subscription fee from the next billing cycle onwards.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">3.5</span>
+      <span class="ct"><strong>Chargeback and Clawback.</strong> If an end customer cancels their subscription or requests a refund within sixty (60) days of the subscription commencement date (the <strong>"Chargeback Period"</strong>), any commission paid to the Partner in respect of such customer shall be subject to clawback. BGXT shall deduct the clawed-back amount from the Partner's next commission payment. If no future commission is payable, the Partner shall repay the clawed-back amount within thirty (30) days of BGXT's written demand.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">3.6</span>
+      <span class="ct"><strong>Tax Deduction at Source (TDS).</strong> All commission payments shall be subject to deduction of Tax Deducted at Source (TDS) as applicable under the Income Tax Act, 1961, and any other applicable Indian tax laws. BGXT shall issue TDS certificates (Form 16A) to the Partner within the timelines prescribed by law. The Partner shall provide its PAN and other tax details as required by BGXT.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">3.7</span>
+      <span class="ct"><strong>GST Compliance.</strong> The Partner shall be responsible for its own GST registration and compliance obligations. Where applicable, the Partner shall issue a valid GST invoice to BGXT for commission amounts, and BGXT shall make payment against such invoice. The Partner warrants that it shall comply with all applicable GST laws and regulations.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">3.8</span>
+      <span class="ct"><strong>Dispute of Commission Statements.</strong> The Partner must raise any dispute regarding a commission statement within fifteen (15) days of receipt. Failure to raise a dispute within this period shall be deemed acceptance of the statement. Disputed amounts shall be resolved in good faith within thirty (30) days of the dispute being raised.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">3.9</span>
+      <span class="ct"><strong>No Commission on Direct Sales.</strong> The Partner shall not be entitled to any commission on customers who approach BGXT directly, customers who were already in BGXT's CRM prior to the Partner's introduction, or customers introduced by another partner, unless BGXT expressly agrees otherwise in writing.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 4 – PARTNER OBLIGATIONS
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">4</span> Partner Obligations</div>
+
+    <div class="clause">
+      <span class="cn">4.1</span>
+      <span class="ct"><strong>Product Training.</strong> The Partner shall ensure that all personnel involved in the promotion, sale, integration, or support of the Retail Nazar platform complete BGXT's mandatory product training program. The training is conducted online and requires approximately four (4) hours to complete. Training must be completed within sixty (60) days of the Effective Date and refreshed annually or upon BGXT's request following significant product updates.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">4.2</span>
+      <span class="ct"><strong>Approved Marketing Materials.</strong> The Partner shall use only BGXT-approved marketing materials, brochures, presentations, and collateral in its promotional activities. The Partner shall not create, publish, or distribute any marketing materials relating to Retail Nazar without BGXT's prior written approval. BGXT shall provide a standard marketing kit to the Partner upon execution of this Agreement.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">4.3</span>
+      <span class="ct"><strong>Accurate Representations.</strong> The Partner shall not make any representations, warranties, or claims regarding the Retail Nazar platform that exceed or are inconsistent with BGXT's official product documentation, specifications, and marketing materials. The Partner shall not make any guarantees of specific outcomes, performance metrics, or results to end customers unless expressly authorized by BGXT in writing.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">4.4</span>
+      <span class="ct"><strong>Pipeline Reporting.</strong> The Partner shall submit a monthly pipeline report to BGXT by the 5th day of each calendar month, detailing:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">4.4.1</span>
+      <span class="sct">Prospective customers in the sales pipeline (name, industry, estimated deal size, stage);</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">4.4.2</span>
+      <span class="sct">Customers onboarded in the preceding month;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">4.4.3</span>
+      <span class="sct">Customer churn or cancellations; and</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">4.4.4</span>
+      <span class="sct">Any customer complaints or escalations received.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">4.5</span>
+      <span class="ct"><strong>Professional Conduct.</strong> The Partner shall maintain the highest standards of professional conduct in all interactions with end customers, prospects, and third parties in connection with the Retail Nazar platform. The Partner shall not engage in any conduct that may damage the reputation, goodwill, or brand of BGXT or Retail Nazar.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">4.6</span>
+      <span class="ct"><strong>Minimum Resale Price.</strong> The Partner shall not offer, sell, or promote the Retail Nazar platform at a price below BGXT's published Minimum Resale Price (MRP) as communicated by BGXT from time to time. Any discounting below the MRP requires BGXT's prior written approval on a case-by-case basis. Unauthorized discounting shall constitute a material breach of this Agreement.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">4.7</span>
+      <span class="ct"><strong>Non-Poaching of BGXT's Direct Customers.</strong> The Partner shall not solicit, approach, or attempt to convert any customer that is already a direct customer of BGXT (i.e., a customer that has subscribed to Retail Nazar directly through BGXT's website or sales team) to a reseller-managed account without BGXT's prior written consent. A list of BGXT's direct customers shall be maintained in the Partner portal and updated periodically.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">4.8</span>
+      <span class="ct"><strong>Confidentiality of Commercial Terms.</strong> The Partner shall keep strictly confidential all pricing, commission rates, discount structures, and commercial terms disclosed by BGXT under or in connection with this Agreement. The Partner shall not disclose such information to any third party, including end customers, without BGXT's prior written consent.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">4.9</span>
+      <span class="ct"><strong>Compliance with Laws.</strong> The Partner shall comply with all applicable laws, regulations, and guidelines in the Territory in connection with its activities under this Agreement, including but not limited to data protection laws, consumer protection laws, advertising standards, and anti-bribery and corruption laws.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">4.10</span>
+      <span class="ct"><strong>Customer Contracts.</strong> The Partner shall ensure that all end customers enter into BGXT's standard End User License Agreement (EULA) and Terms of Service prior to accessing the Retail Nazar platform. The Partner shall not modify or waive any terms of BGXT's standard customer agreements without BGXT's prior written consent.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 5 – OEM / WHITE-LABEL SPECIFIC TERMS
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">5</span> OEM / White-Label Specific Terms</div>
+
+    <div class="info-box">
+      <strong>Applicability:</strong> This Section 5 applies exclusively to Partners who have selected the <strong>OEM / White-Label Partner</strong> tier. All other Partners may disregard this section. OEM Partners must also execute a separate White-Label Addendum, which shall form an integral part of this Agreement.
+    </div>
+
+    <div class="clause mt-8">
+      <span class="cn">5.1</span>
+      <span class="ct"><strong>White-Label Rights.</strong> Subject to the terms of this Agreement and the White-Label Addendum, BGXT grants the OEM Partner a limited, non-exclusive, non-transferable, revocable license to rebrand and distribute the Retail Nazar platform under the Partner's own brand name (the <strong>"Partner Brand"</strong>) within the Territory during the term of this Agreement.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">5.2</span>
+      <span class="ct"><strong>"Powered by" Attribution.</strong> Notwithstanding the white-label rights granted under Clause 5.1, the OEM Partner shall retain BGXT's attribution in the following minimum format on the platform interface, login page, and documentation: <strong>"Powered by Retail Nazar"</strong> or such other attribution format as BGXT may specify in writing. BGXT may, at its sole discretion, waive this requirement for specific OEM Partners upon written agreement.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">5.3</span>
+      <span class="ct"><strong>Support Responsibilities.</strong> The OEM Partner shall be solely responsible for providing Tier 1 customer support (first-line support, basic troubleshooting, account management) to its end customers. BGXT shall provide Tier 2 and Tier 3 support (technical escalations, platform bugs, infrastructure issues) to the OEM Partner's designated technical contact, subject to BGXT's standard support SLAs.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">5.4</span>
+      <span class="ct"><strong>White-Label Setup Fee.</strong> A one-time white-label setup fee of <strong>Rupees Fifty Thousand (₹50,000)</strong> (or such other amount as negotiated and specified in Schedule A) shall be payable by the OEM Partner to BGXT upon execution of the White-Label Addendum. This fee covers:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">5.4.1</span>
+      <span class="sct">Custom domain configuration and SSL certificate setup;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">5.4.2</span>
+      <span class="sct">Brand customization (logo, color scheme, platform name) on the standard white-label template;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">5.4.3</span>
+      <span class="sct">Initial technical onboarding and configuration support; and</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">5.4.4</span>
+      <span class="sct">Access to the OEM Partner portal and documentation.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">5.5</span>
+      <span class="ct"><strong>Custom Domain.</strong> BGXT shall configure the Retail Nazar platform to operate under the OEM Partner's custom domain (e.g., app.partnerbrand.com) as part of the white-label setup. The OEM Partner shall be responsible for procuring and maintaining the domain name and providing necessary DNS access to BGXT for configuration purposes.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">5.6</span>
+      <span class="ct"><strong>Regulatory Compliance.</strong> The OEM Partner shall be solely responsible for ensuring that its branded version of the platform complies with all applicable laws, regulations, and industry standards in the Territory, including but not limited to data protection and privacy laws (including the Digital Personal Data Protection Act, 2023), CCTV and surveillance regulations, consumer protection laws, and any sector-specific regulations applicable to the OEM Partner's end customers. BGXT shall not be liable for any regulatory non-compliance arising from the OEM Partner's branded deployment.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">5.7</span>
+      <span class="ct"><strong>Sub-Brand Restrictions.</strong> The OEM Partner's sub-brand or white-label brand name shall not be confusingly similar to "Retail Nazar," "BrainGuardX," or any other trademark or brand name owned or used by BGXT. BGXT reserves the right to object to and require the Partner to change any sub-brand name that BGXT reasonably determines to be confusingly similar to its own brands.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">5.8</span>
+      <span class="ct"><strong>Data Segregation.</strong> BGXT shall ensure that end customer data of the OEM Partner's branded deployment is logically segregated from data of other BGXT customers. The OEM Partner shall be the data fiduciary for its end customers' data and shall execute a Data Processing Agreement with BGXT as required under applicable data protection laws.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 6 – INTELLECTUAL PROPERTY
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">6</span> Intellectual Property</div>
+
+    <div class="clause">
+      <span class="cn">6.1</span>
+      <span class="ct"><strong>BGXT's Ownership.</strong> All intellectual property rights in and to the Retail Nazar platform, including but not limited to the AI models, machine learning algorithms, computer vision systems, software code, databases, user interfaces, APIs, documentation, trademarks, trade names, logos, and all related technology (collectively, the <strong>"BGXT IP"</strong>), are and shall remain the exclusive property of BGXT. Nothing in this Agreement shall be construed as transferring or assigning any ownership rights in the BGXT IP to the Partner.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">6.2</span>
+      <span class="ct"><strong>License to Partner.</strong> BGXT grants the Partner a limited, non-exclusive, non-transferable, revocable license to use the BGXT IP solely for the purposes of performing its obligations and exercising its rights under this Agreement during the term. This license does not include the right to sublicense, modify, reverse engineer, decompile, or create derivative works of the BGXT IP.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">6.3</span>
+      <span class="ct"><strong>Use of Retail Nazar Logo and Trademarks.</strong> The Partner may use the "Retail Nazar" name, logo, and associated trademarks solely with BGXT's prior written permission and strictly in accordance with BGXT's brand guidelines as provided from time to time. Any use of BGXT's trademarks outside the scope of this Agreement or BGXT's brand guidelines shall constitute trademark infringement and a material breach of this Agreement.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">6.4</span>
+      <span class="ct"><strong>Partner's Grant to BGXT.</strong> The Partner hereby grants BGXT a non-exclusive, royalty-free, worldwide license to use the Partner's name, logo, and brand identifiers for the purpose of listing the Partner on BGXT's "Our Partners" page, partner directory, marketing materials, and press releases. The Partner may withdraw this consent upon thirty (30) days' written notice to BGXT, following which BGXT shall remove the Partner's branding from its materials within a reasonable time.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">6.5</span>
+      <span class="ct"><strong>Feedback and Improvements.</strong> If the Partner provides BGXT with any feedback, suggestions, or ideas regarding the Retail Nazar platform (collectively, <strong>"Feedback"</strong>), the Partner hereby assigns to BGXT all rights, title, and interest in such Feedback, and BGXT shall be free to use, implement, and commercialize such Feedback without any obligation to the Partner.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">6.6</span>
+      <span class="ct"><strong>No Reverse Engineering.</strong> The Partner shall not, and shall ensure that its employees, contractors, and end customers do not, reverse engineer, decompile, disassemble, or otherwise attempt to derive the source code, algorithms, or underlying technology of the Retail Nazar platform.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">6.7</span>
+      <span class="ct"><strong>Infringement Notification.</strong> The Partner shall promptly notify BGXT in writing upon becoming aware of any actual or suspected infringement of BGXT's intellectual property rights by any third party. BGXT shall have the sole right to take action against such infringement, and the Partner shall provide reasonable assistance to BGXT in connection therewith.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 7 – CONFIDENTIALITY
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">7</span> Confidentiality</div>
+
+    <div class="clause">
+      <span class="cn">7.1</span>
+      <span class="ct"><strong>Confidential Information.</strong> For the purposes of this Agreement, <strong>"Confidential Information"</strong> means any and all non-public information disclosed by one Party (the <strong>"Disclosing Party"</strong>) to the other Party (the <strong>"Receiving Party"</strong>), whether orally, in writing, electronically, or by any other means, that is designated as confidential or that reasonably should be understood to be confidential given the nature of the information and the circumstances of disclosure. Confidential Information includes, without limitation:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">7.1.1</span>
+      <span class="sct">Pricing, commission rates, discount structures, and commercial terms;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">7.1.2</span>
+      <span class="sct">Technology, AI models, algorithms, source code, and technical architecture;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">7.1.3</span>
+      <span class="sct">Customer lists, customer data, and customer contracts;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">7.1.4</span>
+      <span class="sct">Product roadmap, development plans, and unreleased features;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">7.1.5</span>
+      <span class="sct">Business strategies, financial information, and operational data; and</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">7.1.6</span>
+      <span class="sct">The terms and conditions of this Agreement.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">7.2</span>
+      <span class="ct"><strong>Obligations of Confidentiality.</strong> The Receiving Party shall: (a) hold the Disclosing Party's Confidential Information in strict confidence; (b) not disclose the Confidential Information to any third party without the Disclosing Party's prior written consent; (c) use the Confidential Information solely for the purposes of performing its obligations under this Agreement; and (d) protect the Confidential Information using at least the same degree of care it uses to protect its own confidential information, but in no event less than reasonable care.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">7.3</span>
+      <span class="ct"><strong>Permitted Disclosures.</strong> The Receiving Party may disclose Confidential Information to its employees, directors, and professional advisors who have a need to know such information for the purposes of this Agreement, provided that such persons are bound by confidentiality obligations no less restrictive than those set out herein.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">7.4</span>
+      <span class="ct"><strong>Exclusions.</strong> The obligations of confidentiality under this Clause 7 shall not apply to information that:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">7.4.1</span>
+      <span class="sct">Is or becomes publicly available through no fault of the Receiving Party;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">7.4.2</span>
+      <span class="sct">Was rightfully known to the Receiving Party prior to disclosure by the Disclosing Party, without restriction;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">7.4.3</span>
+      <span class="sct">Is independently developed by the Receiving Party without use of or reference to the Confidential Information; or</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">7.4.4</span>
+      <span class="sct">Is required to be disclosed by applicable law, court order, or regulatory authority, provided that the Receiving Party gives the Disclosing Party prompt written notice (to the extent permitted by law) and cooperates with the Disclosing Party in seeking a protective order.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">7.5</span>
+      <span class="ct"><strong>Duration of Confidentiality.</strong> The obligations of confidentiality under this Clause 7 shall survive the termination or expiry of this Agreement for a period of <strong>three (3) years</strong> from the date of termination or expiry.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">7.6</span>
+      <span class="ct"><strong>Return of Confidential Information.</strong> Upon termination or expiry of this Agreement, or upon the Disclosing Party's written request, the Receiving Party shall promptly return or destroy all Confidential Information in its possession or control, and certify in writing that it has done so.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 8 – NON-COMPETE AND NON-SOLICITATION
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">8</span> Non-Compete and Non-Solicitation</div>
+
+    <div class="warning-box">
+      <strong>Important:</strong> The restrictions in this Section are material terms of this Agreement. Breach of any provision of this Section shall constitute a material breach entitling BGXT to immediate termination and injunctive relief without the requirement to prove actual damages.
+    </div>
+
+    <div class="clause mt-8">
+      <span class="cn">8.1</span>
+      <span class="ct"><strong>Non-Compete.</strong> During the term of this Agreement and for a period of <strong>twelve (12) months</strong> following its termination or expiry (the <strong>"Restricted Period"</strong>), the Partner shall not, directly or indirectly, whether on its own account or as a partner, shareholder, director, employee, consultant, or agent of any other person or entity:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">8.1.1</span>
+      <span class="sct">Develop, market, promote, sell, resell, distribute, or provide any AI-powered retail surveillance, video analytics, or retail intelligence SaaS product or service that directly competes with the Retail Nazar platform; or</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">8.1.2</span>
+      <span class="sct">Represent, act as a reseller, distributor, or agent for, or otherwise promote any competing AI retail surveillance product or service.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">8.2</span>
+      <span class="ct"><strong>Non-Solicitation of BGXT Employees.</strong> During the term of this Agreement and for a period of <strong>twenty-four (24) months</strong> following its termination or expiry, the Partner shall not, directly or indirectly, solicit, recruit, hire, or attempt to solicit, recruit, or hire any employee, contractor, or consultant of BGXT who was involved in the performance of this Agreement, without BGXT's prior written consent.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">8.3</span>
+      <span class="ct"><strong>Non-Solicitation of BGXT's Customers.</strong> During the term of this Agreement and for a period of <strong>twenty-four (24) months</strong> following its termination or expiry, the Partner shall not, directly or indirectly, solicit, approach, or attempt to divert any customer of BGXT (including customers introduced by the Partner) to subscribe to any competing product or service, or to deal with the Partner directly in a manner that bypasses BGXT's commercial relationship with such customer.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">8.4</span>
+      <span class="ct"><strong>Reasonableness.</strong> The Parties acknowledge that the restrictions in this Clause 8 are reasonable and necessary to protect BGXT's legitimate business interests, including its confidential information, customer relationships, and goodwill. If any restriction is found to be unenforceable by a court of competent jurisdiction, the Parties agree that such restriction shall be modified to the minimum extent necessary to make it enforceable, and the remaining restrictions shall continue in full force and effect.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">8.5</span>
+      <span class="ct"><strong>Injunctive Relief.</strong> The Partner acknowledges that a breach of this Clause 8 would cause irreparable harm to BGXT for which monetary damages would be an inadequate remedy. Accordingly, BGXT shall be entitled to seek injunctive relief, specific performance, or other equitable remedies from a court of competent jurisdiction without the requirement to post a bond or prove actual damages, in addition to any other remedies available at law or in equity.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 9 – PERFORMANCE TARGETS
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">9</span> Performance Targets</div>
+
+    <div class="clause">
+      <span class="cn">9.1</span>
+      <span class="ct"><strong>Minimum Quarterly Targets.</strong> The Partner shall meet the minimum quarterly subscriber targets as specified in Schedule A (the <strong>"Minimum Targets"</strong>). Minimum Targets shall be reviewed and may be revised by mutual written agreement at the commencement of each Renewal Term. The applicable minimum targets by tier are as set out in Clause 2 and Schedule A.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">9.2</span>
+      <span class="ct"><strong>Consequences of Underperformance.</strong> If the Partner fails to meet the Minimum Targets for any quarter, BGXT shall issue a written performance improvement notice. If the Partner fails to meet the Minimum Targets for <strong>two (2) consecutive quarters</strong>, BGXT shall have the right, at its sole discretion, to:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">9.2.1</span>
+      <span class="sct">Downgrade the Partner's tier to the next lower tier with thirty (30) days' written notice;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">9.2.2</span>
+      <span class="sct">Revoke any exclusive territory rights granted to the Partner; or</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">9.2.3</span>
+      <span class="sct">Terminate this Agreement with sixty (60) days' written notice, subject to Clause 11.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">9.3</span>
+      <span class="ct"><strong>Quarterly Business Review.</strong> The Partner shall participate in a quarterly business review (QBR) meeting with BGXT's designated account manager or partner success team. QBRs shall be conducted within the first fifteen (15) days following the end of each calendar quarter and shall cover: (a) performance against targets; (b) pipeline review; (c) customer satisfaction; (d) upcoming product updates; and (e) joint go-to-market planning for the next quarter.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">9.4</span>
+      <span class="ct"><strong>Performance Measurement.</strong> Performance shall be measured based on the number of active paying subscribers (end customers with a valid, paid subscription to the Retail Nazar platform) attributable to the Partner as recorded in BGXT's CRM and billing system. BGXT's records shall be conclusive in the absence of manifest error.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 10 – MARKETING AND CO-BRANDING
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">10</span> Marketing and Co-Branding</div>
+
+    <div class="clause">
+      <span class="cn">10.1</span>
+      <span class="ct"><strong>Co-Branded Materials.</strong> The Partner may create co-branded marketing materials (bearing both the Partner's brand and the Retail Nazar brand) subject to BGXT's prior written approval of each piece of material. BGXT shall review and respond to approval requests within ten (10) business days. Approved materials must comply with BGXT's brand guidelines at all times.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">10.2</span>
+      <span class="ct"><strong>BGXT's Marketing Support.</strong> BGXT shall provide the Partner with the following marketing support at no additional charge:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">10.2.1</span>
+      <span class="sct">Standard product brochures, one-pagers, and digital marketing assets;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">10.2.2</span>
+      <span class="sct">Access to a demo environment for product demonstrations to prospects;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">10.2.3</span>
+      <span class="sct">Product training materials, FAQs, and sales enablement content; and</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">10.2.4</span>
+      <span class="sct">Listing on BGXT's official partner directory on retailnazar.com.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">10.3</span>
+      <span class="ct"><strong>Partner's Marketing Responsibility.</strong> The Partner shall be solely responsible for funding and executing its own marketing and sales activities within the Territory. BGXT shall not be obligated to reimburse the Partner for any marketing expenditure unless expressly agreed in writing.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">10.4</span>
+      <span class="ct"><strong>Co-op Marketing Support.</strong> BGXT may, at its sole discretion, provide co-operative marketing support to the Partner of up to <strong>five percent (5%) of the Partner's generated MRR</strong> in the preceding quarter, to be applied towards joint marketing activities approved by BGXT. Such support shall be provided as a credit against future commissions or as reimbursement against approved invoices, and shall not be payable in cash.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">10.5</span>
+      <span class="ct"><strong>Press Releases and Public Announcements.</strong> All press releases, public announcements, social media posts, or other communications that mention the partnership between the Partner and BGXT, or reference the Retail Nazar platform, shall require BGXT's prior written approval before publication or distribution. BGXT shall review and respond to such requests within five (5) business days.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">10.6</span>
+      <span class="ct"><strong>Digital Marketing.</strong> The Partner shall not bid on BGXT's trademarked keywords (including "Retail Nazar," "BrainGuardX," and variations thereof) in paid search advertising without BGXT's prior written consent. The Partner may use such keywords in organic search optimization activities in accordance with BGXT's brand guidelines.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 11 – TERMINATION
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">11</span> Termination</div>
+
+    <div class="clause">
+      <span class="cn">11.1</span>
+      <span class="ct"><strong>Termination for Convenience.</strong> Either Party may terminate this Agreement without cause by providing the other Party with not less than <strong>sixty (60) days'</strong> prior written notice. During the notice period, both Parties shall continue to perform their respective obligations under this Agreement.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">11.2</span>
+      <span class="ct"><strong>Termination for Cause.</strong> BGXT may terminate this Agreement with immediate effect by written notice to the Partner upon the occurrence of any of the following events:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">11.2.1</span>
+      <span class="sct">Breach of any intellectual property obligation under Clause 6, including unauthorized use of BGXT's trademarks or reverse engineering of the platform;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">11.2.2</span>
+      <span class="sct">Breach of any confidentiality obligation under Clause 7;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">11.2.3</span>
+      <span class="sct">Breach of any non-compete or non-solicitation obligation under Clause 8;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">11.2.4</span>
+      <span class="sct">Fraud, misrepresentation, or dishonest conduct by the Partner in connection with this Agreement;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">11.2.5</span>
+      <span class="sct">Insolvency, bankruptcy, or the appointment of a liquidator, receiver, or administrator over the Partner's assets;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">11.2.6</span>
+      <span class="sct">Any material breach of this Agreement that is not remedied within thirty (30) days of written notice from BGXT specifying the breach; or</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">11.2.7</span>
+      <span class="sct">Any act or omission by the Partner that causes or is likely to cause material reputational harm to BGXT or the Retail Nazar brand.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">11.3</span>
+      <span class="ct"><strong>Effects of Termination.</strong> Upon termination or expiry of this Agreement for any reason:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">11.3.1</span>
+      <span class="sct"><strong>Cessation of Activities:</strong> The Partner shall immediately cease all use of BGXT's trademarks, marketing materials, platform access, and any other BGXT IP, and shall remove all references to the partnership from its website, marketing materials, and communications;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">11.3.2</span>
+      <span class="sct"><strong>Customer Contracts:</strong> All end customer contracts and subscriptions managed by the Partner shall be transferred to BGXT or BGXT's designated successor partner. The Partner shall cooperate fully with BGXT to ensure a smooth transition and shall not take any action to disrupt or interfere with such customer relationships;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">11.3.3</span>
+      <span class="sct"><strong>Pending Commissions:</strong> BGXT shall pay all undisputed commissions accrued up to the date of termination within sixty (60) days of the termination date, subject to any clawback provisions under Clause 3.5 and any amounts owed by the Partner to BGXT; and</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">11.3.4</span>
+      <span class="sct"><strong>Survival:</strong> Clauses 6 (Intellectual Property), 7 (Confidentiality), 8 (Non-Compete and Non-Solicitation), 12 (Limitation of Liability), 13 (Governing Law), and any other provisions that by their nature should survive, shall survive the termination or expiry of this Agreement.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">11.4</span>
+      <span class="ct"><strong>No Compensation on Termination.</strong> The Partner shall not be entitled to any compensation, goodwill payment, or damages arising from the termination of this Agreement in accordance with its terms, including termination for convenience. The Partner waives any rights it may have under applicable law to claim compensation for loss of goodwill or business upon termination.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 12 – LIMITATION OF LIABILITY
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">12</span> Limitation of Liability</div>
+
+    <div class="clause">
+      <span class="cn">12.1</span>
+      <span class="ct"><strong>Cap on Liability.</strong> To the maximum extent permitted by applicable law, BGXT's total aggregate liability to the Partner under or in connection with this Agreement, whether arising in contract, tort (including negligence), breach of statutory duty, or otherwise, shall not exceed an amount equal to the total commissions actually paid by BGXT to the Partner in the <strong>six (6) calendar months</strong> immediately preceding the event giving rise to the claim.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">12.2</span>
+      <span class="ct"><strong>Exclusion of Consequential Damages.</strong> Neither Party shall be liable to the other for any indirect, incidental, special, consequential, punitive, or exemplary damages, including but not limited to loss of profits, loss of revenue, loss of business, loss of goodwill, loss of data, or loss of anticipated savings, arising out of or in connection with this Agreement, even if such Party has been advised of the possibility of such damages.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">12.3</span>
+      <span class="ct"><strong>Exceptions.</strong> The limitations and exclusions in Clauses 12.1 and 12.2 shall not apply to: (a) death or personal injury caused by a Party's negligence; (b) fraud or fraudulent misrepresentation; (c) any liability that cannot be excluded or limited by applicable law; or (d) the Partner's breach of Clauses 6, 7, or 8 of this Agreement.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">12.4</span>
+      <span class="ct"><strong>Platform Availability.</strong> BGXT does not warrant that the Retail Nazar platform will be available without interruption or error. BGXT's liability for any downtime or service interruption shall be limited to the remedies set out in BGXT's standard Service Level Agreement (SLA), which shall be provided to the Partner separately.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">12.5</span>
+      <span class="ct"><strong>Indemnification by Partner.</strong> The Partner shall indemnify, defend, and hold harmless BGXT and its directors, officers, employees, and agents from and against any claims, damages, losses, liabilities, costs, and expenses (including reasonable legal fees) arising out of or in connection with: (a) the Partner's breach of this Agreement; (b) the Partner's negligence or wilful misconduct; (c) any misrepresentation made by the Partner to end customers; or (d) the Partner's non-compliance with applicable laws.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 13 – GOVERNING LAW AND DISPUTE RESOLUTION
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">13</span> Governing Law and Dispute Resolution</div>
+
+    <div class="clause">
+      <span class="cn">13.1</span>
+      <span class="ct"><strong>Governing Law.</strong> This Agreement and any dispute or claim arising out of or in connection with it or its subject matter or formation (including non-contractual disputes or claims) shall be governed by and construed in accordance with the laws of the <strong>Republic of India</strong>, without regard to its conflict of law principles.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">13.2</span>
+      <span class="ct"><strong>Amicable Resolution.</strong> In the event of any dispute, controversy, or claim arising out of or relating to this Agreement, or the breach, termination, or invalidity thereof (a <strong>"Dispute"</strong>), the Parties shall first attempt to resolve the Dispute amicably through good-faith negotiations between senior representatives of both Parties. Either Party may initiate this process by providing written notice to the other Party specifying the nature of the Dispute. The Parties shall have thirty (30) days from the date of such notice to resolve the Dispute amicably.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">13.3</span>
+      <span class="ct"><strong>Arbitration.</strong> If the Dispute is not resolved amicably within the period specified in Clause 13.2, the Dispute shall be finally settled by binding arbitration in accordance with the <strong>Arbitration and Conciliation Act, 1996</strong> (as amended from time to time). The arbitration shall be conducted as follows:</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">13.3.1</span>
+      <span class="sct"><strong>Seat and Venue:</strong> The seat and venue of arbitration shall be <strong>Noida, Uttar Pradesh, India</strong>;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">13.3.2</span>
+      <span class="sct"><strong>Language:</strong> The arbitration proceedings shall be conducted in the English language;</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">13.3.3</span>
+      <span class="sct"><strong>Arbitrator:</strong> The arbitration shall be conducted by a sole arbitrator mutually appointed by the Parties. If the Parties fail to agree on the appointment of a sole arbitrator within fifteen (15) days of a Party's request for arbitration, the arbitrator shall be appointed in accordance with the Arbitration and Conciliation Act, 1996; and</span>
+    </div>
+    <div class="sub-clause">
+      <span class="scn">13.3.4</span>
+      <span class="sct"><strong>Award:</strong> The arbitral award shall be final and binding on both Parties and may be enforced in any court of competent jurisdiction.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">13.4</span>
+      <span class="ct"><strong>Jurisdiction for Interim Relief.</strong> Notwithstanding Clause 13.3, either Party may seek interim or emergency relief (including injunctive relief) from the courts of <strong>Gautam Buddha Nagar, Uttar Pradesh</strong>, which shall have exclusive jurisdiction for such purposes. The Parties hereby irrevocably submit to the jurisdiction of such courts for this purpose.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">13.5</span>
+      <span class="ct"><strong>Costs.</strong> Each Party shall bear its own costs in connection with any arbitration or legal proceedings, unless the arbitral tribunal or court orders otherwise.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SECTION 14 – GENERAL PROVISIONS
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-heading"><span class="sec-num">14</span> General Provisions</div>
+
+    <div class="clause">
+      <span class="cn">14.1</span>
+      <span class="ct"><strong>Entire Agreement.</strong> This Agreement, together with Schedule A and any executed addenda (including the White-Label Addendum, if applicable), constitutes the entire agreement between the Parties with respect to its subject matter and supersedes all prior agreements, understandings, negotiations, and representations, whether oral or written, relating to such subject matter.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">14.2</span>
+      <span class="ct"><strong>Amendments.</strong> No amendment, modification, or variation of this Agreement shall be effective unless made in writing and signed by duly authorized representatives of both Parties.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">14.3</span>
+      <span class="ct"><strong>Waiver.</strong> No failure or delay by either Party in exercising any right or remedy under this Agreement shall constitute a waiver of that right or remedy. A waiver of any breach shall not be deemed a waiver of any subsequent breach.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">14.4</span>
+      <span class="ct"><strong>Severability.</strong> If any provision of this Agreement is found to be invalid, illegal, or unenforceable by a court or arbitral tribunal of competent jurisdiction, such provision shall be modified to the minimum extent necessary to make it enforceable, and the remaining provisions shall continue in full force and effect.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">14.5</span>
+      <span class="ct"><strong>Assignment.</strong> The Partner shall not assign, transfer, novate, or otherwise deal with any of its rights or obligations under this Agreement without BGXT's prior written consent. BGXT may assign this Agreement to any affiliate, successor, or acquirer without the Partner's consent, provided that BGXT gives the Partner written notice of such assignment.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">14.6</span>
+      <span class="ct"><strong>Force Majeure.</strong> Neither Party shall be liable for any failure or delay in performing its obligations under this Agreement to the extent that such failure or delay is caused by circumstances beyond its reasonable control, including but not limited to acts of God, natural disasters, war, civil unrest, government actions, pandemics, or internet or telecommunications failures. The affected Party shall promptly notify the other Party and shall use reasonable efforts to resume performance as soon as possible.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">14.7</span>
+      <span class="ct"><strong>Notices.</strong> All notices, requests, demands, and other communications under this Agreement shall be in writing and shall be delivered by: (a) hand delivery; (b) registered post with acknowledgement due; or (c) email with read receipt, to the addresses specified in this Agreement or as updated by either Party in writing. Notices shall be deemed received: (i) on delivery, if delivered by hand; (ii) three (3) business days after posting, if sent by registered post; or (iii) on the next business day after sending, if sent by email.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">14.8</span>
+      <span class="ct"><strong>Counterparts.</strong> This Agreement may be executed in counterparts, each of which shall be deemed an original, and all of which together shall constitute one and the same instrument. Electronic signatures shall be deemed valid and binding.</span>
+    </div>
+
+    <div class="clause">
+      <span class="cn">14.9</span>
+      <span class="ct"><strong>Language.</strong> This Agreement is executed in the English language. In the event of any conflict between an English version and any translation, the English version shall prevail.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SCHEDULE A
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="page-break"></div>
+  <div class="schedule-block">
+    <div class="schedule-header">Schedule A — Partner-Specific Terms<br><span style="font-size:9pt; font-weight:400; letter-spacing:0.5px;">(To be completed and executed by both Parties for each Partnership)</span></div>
+    <div class="schedule-body">
+
+      <div style="font-family:'Arial',sans-serif; font-size:8.5pt; color:var(--muted); margin-bottom:14px; font-style:italic;">
+        This Schedule A forms an integral part of the Reseller / System Integrator / OEM Partnership Agreement dated <span class="fill-line" style="min-width:100px;">&nbsp;</span> between BrainGuardX AI Technologies Pvt. Ltd. and the Partner named below. In the event of any conflict between this Schedule A and the main body of the Agreement, this Schedule A shall prevail to the extent of the conflict.
+      </div>
+
+      <div class="schedule-field">
+        <div class="sf-label">Agreement Date</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Agreement Reference No.</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Partner Legal Name</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Partner CIN / PAN / GSTIN</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Partnership Tier</div>
+        <div class="sf-value">[ ] Referral Partner &nbsp;&nbsp; [ ] Authorized Reseller &nbsp;&nbsp; [ ] System Integrator &nbsp;&nbsp; [ ] OEM / White-Label</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Territory</div>
+        <div class="sf-value">[ ] All India (Non-Exclusive) &nbsp;&nbsp; [ ] Specific States/Regions: ___________________________</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Exclusivity</div>
+        <div class="sf-value">[ ] Non-Exclusive (Default) &nbsp;&nbsp; [ ] Exclusive for Territory: ___________________________</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Effective Date</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Initial Term</div>
+        <div class="sf-value">1 Year from Effective Date (Auto-Renewing)</div>
+      </div>
+
+      <div style="font-family:'Arial',sans-serif; font-size:9pt; font-weight:700; color:var(--navy); margin:14px 0 8px; text-transform:uppercase; letter-spacing:0.5px; border-top:1px solid var(--border); padding-top:12px;">
+        Commission and Pricing Terms
+      </div>
+
+      <div class="schedule-field">
+        <div class="sf-label">Commission Rate</div>
+        <div class="sf-value">As per Tier (Clause 2) unless otherwise specified: ___________________________</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">OEM Custom Pricing</div>
+        <div class="sf-value">[ ] N/A &nbsp;&nbsp; [ ] As per White-Label Addendum dated: ___________________________</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">White-Label Setup Fee</div>
+        <div class="sf-value">[ ] N/A &nbsp;&nbsp; [ ] ₹50,000 (Standard) &nbsp;&nbsp; [ ] Negotiated Amount: ₹ ___________________________</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Minimum Resale Price (MRP)</div>
+        <div class="sf-value">As per BGXT's published price list (updated periodically)</div>
+      </div>
+
+      <div style="font-family:'Arial',sans-serif; font-size:9pt; font-weight:700; color:var(--navy); margin:14px 0 8px; text-transform:uppercase; letter-spacing:0.5px; border-top:1px solid var(--border); padding-top:12px;">
+        Performance Targets
+      </div>
+
+      <div class="schedule-field">
+        <div class="sf-label">Q1 Target (Active Subscribers)</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Q2 Target (Active Subscribers)</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Q3 Target (Active Subscribers)</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Q4 Target (Active Subscribers)</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Annual MRR Target</div>
+        <div class="sf-value">₹ &nbsp;</div>
+      </div>
+
+      <div style="font-family:'Arial',sans-serif; font-size:9pt; font-weight:700; color:var(--navy); margin:14px 0 8px; text-transform:uppercase; letter-spacing:0.5px; border-top:1px solid var(--border); padding-top:12px;">
+        Banking and Payment Details (Partner)
+      </div>
+
+      <div class="schedule-field">
+        <div class="sf-label">Bank Name</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Account Holder Name</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">Account Number</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">IFSC Code</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">PAN Number</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+      <div class="schedule-field">
+        <div class="sf-label">GSTIN (if applicable)</div>
+        <div class="sf-value">&nbsp;</div>
+      </div>
+
+      <div style="font-family:'Arial',sans-serif; font-size:9pt; font-weight:700; color:var(--navy); margin:14px 0 8px; text-transform:uppercase; letter-spacing:0.5px; border-top:1px solid var(--border); padding-top:12px;">
+        Special Terms and Conditions
+      </div>
+
+      <div class="schedule-field">
+        <div class="sf-label">Special Terms</div>
+        <div class="sf-value multiline">Any special terms agreed between the Parties (e.g., exclusive territory conditions, custom SLAs, co-marketing commitments, additional obligations):</div>
+      </div>
+
+      <div class="schedule-field" style="margin-top:10px;">
+        <div class="sf-label">Addenda Attached</div>
+        <div class="sf-value">[ ] White-Label Addendum &nbsp;&nbsp; [ ] Data Processing Agreement &nbsp;&nbsp; [ ] Other: ___________________________</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SIGNATURE BLOCKS
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="sig-section">
+    <div class="sig-section-title">Execution — In Witness Whereof</div>
+
+    <p style="font-size:9.5pt; margin-bottom:18px; line-height:1.7;">
+      The Parties have executed this Reseller / System Integrator / OEM Partnership Agreement as of the date first written above, by their duly authorized representatives, intending to be legally bound by its terms.
+    </p>
+
+    <div class="sig-grid">
+
+      <!-- BGXT Signatory -->
+      <div class="sig-block">
+        <div class="sig-block-title">For and on Behalf of Principal<br>BrainGuardX AI Technologies Pvt. Ltd.</div>
+
+        <div class="sig-field">
+          <div class="sf-lbl">Authorized Signatory (Signature)</div>
+          <div class="sf-line sig-area"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sf-lbl">Full Name</div>
+          <div class="sf-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sf-lbl">Designation / Title</div>
+          <div class="sf-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sf-lbl">Date of Signing</div>
+          <div class="sf-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sf-lbl">Place of Signing</div>
+          <div class="sf-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sf-lbl">Contact Email</div>
+          <div class="sf-line" style="font-size:8.5pt; color:var(--muted);">support@retailnazar.com</div>
+        </div>
+        <div class="seal-box">Company<br>Seal</div>
+      </div>
+
+      <!-- Partner Signatory -->
+      <div class="sig-block">
+        <div class="sig-block-title">For and on Behalf of Partner<br><span style="font-weight:400; font-style:italic;">[Partner Entity Name]</span></div>
+
+        <div class="sig-field">
+          <div class="sf-lbl">Authorized Signatory (Signature)</div>
+          <div class="sf-line sig-area"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sf-lbl">Full Name</div>
+          <div class="sf-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sf-lbl">Designation / Title</div>
+          <div class="sf-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sf-lbl">Date of Signing</div>
+          <div class="sf-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sf-lbl">Place of Signing</div>
+          <div class="sf-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sf-lbl">Contact Email</div>
+          <div class="sf-line"></div>
+        </div>
+        <div class="seal-box">Company<br>Seal</div>
+      </div>
+
+    </div>
+
+    <!-- Witness Block -->
+    <div style="margin-top:24px; border-top:1px dashed var(--border); padding-top:16px;">
+      <div style="font-family:'Arial',sans-serif; font-size:8.5pt; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Witnesses (Optional but Recommended)</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
+        <div>
+          <div style="font-family:'Arial',sans-serif; font-size:8pt; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Witness 1</div>
+          <div class="sig-field"><div class="sf-lbl">Name</div><div class="sf-line"></div></div>
+          <div class="sig-field"><div class="sf-lbl">Signature</div><div class="sf-line" style="min-height:30px;"></div></div>
+          <div class="sig-field"><div class="sf-lbl">Address</div><div class="sf-line"></div></div>
+        </div>
+        <div>
+          <div style="font-family:'Arial',sans-serif; font-size:8pt; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">Witness 2</div>
+          <div class="sig-field"><div class="sf-lbl">Name</div><div class="sf-line"></div></div>
+          <div class="sig-field"><div class="sf-lbl">Signature</div><div class="sf-line" style="min-height:30px;"></div></div>
+          <div class="sig-field"><div class="sf-lbl">Address</div><div class="sf-line"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       DISCLAIMER
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="disclaimer">
+    <strong>Legal Disclaimer:</strong> This document has been prepared by BrainGuardX AI Technologies Pvt. Ltd. for internal business use and as a starting framework for partner agreements. It does not constitute legal advice. The terms herein are subject to negotiation and may not be suitable for all partnership arrangements or jurisdictions. <strong>BrainGuardX AI Technologies Pvt. Ltd. strongly recommends that both Parties obtain independent legal advice from qualified legal counsel admitted to practice in India before executing this Agreement.</strong> BGXT accepts no liability for any loss or damage arising from reliance on this document without appropriate legal review and customization.
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       FOOTER
+  ══════════════════════════════════════════════════════════════ -->
+  <div class="doc-footer">
+    <div>
+      <span class="footer-brand">Retail Nazar</span> &nbsp;|&nbsp; A Product of BrainGuardX AI Technologies Pvt. Ltd.
+      &nbsp;|&nbsp; retailnazar.com &nbsp;|&nbsp; support@retailnazar.com
+    </div>
+    <div>BGXT-PARTNER-AGR-v1.0 &nbsp;|&nbsp; Confidential &nbsp;|&nbsp; Page <span style="font-weight:700;">1</span></div>
+  </div>
+
+</div><!-- /.page -->
+</body>
+</html>

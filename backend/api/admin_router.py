@@ -95,11 +95,13 @@ async def get_admin_stats(
     total_revenue_inr = await _revenue_sum("INR")
     total_revenue_sgd = await _revenue_sum("SGD")
     total_revenue_myr = await _revenue_sum("MYR")
+    total_revenue_php = await _revenue_sum("PHP")
 
     # MRR (monthly recurring revenue from active subscriptions)
     mrr_inr = total_revenue_inr
     mrr_sgd = total_revenue_sgd
     mrr_myr = total_revenue_myr
+    mrr_php = total_revenue_php
 
     # Camera count
     try:
@@ -157,9 +159,11 @@ async def get_admin_stats(
         "total_revenue_inr": total_revenue_inr,
         "total_revenue_sgd": total_revenue_sgd,
         "total_revenue_myr": total_revenue_myr,
+        "total_revenue_php": total_revenue_php,
         "mrr_inr": mrr_inr,
         "mrr_sgd": mrr_sgd,
         "mrr_myr": mrr_myr,
+        "mrr_php": mrr_php,
         "total_cameras": total_cameras,
         "total_incidents_today": total_incidents_today,
         "total_incidents_30d": total_incidents_30d,
@@ -178,7 +182,7 @@ async def get_admin_stats(
 async def list_tenants(
     search: str = Query("", description="Search by name or email"),
     status: str = Query("", description="Filter by status"),
-    region: str = Query("", description="Filter by country code (IN/SG/MY)"),
+    region: str = Query("", description="Filter by country code (IN/SG/MY/PH)"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     admin: dict = Depends(require_super_admin),

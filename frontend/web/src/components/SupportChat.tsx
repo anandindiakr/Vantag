@@ -28,7 +28,7 @@ const WELCOME: Msg = {
 export default function SupportChat() {
   const { i18n } = useTranslation();
   const region = useRegion();
-  const supportEmail = region.region === 'IN' ? 'support@retailnazar.com' : 'support@retail-vantag.com';
+  const supportEmail = region.region === 'IN' ? 'support@retailnazar.com' : region.region === 'PH' ? 'support@retailbantay.com' : 'support@retail-vantag.com';
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([WELCOME]);
   const [input, setInput] = useState('');

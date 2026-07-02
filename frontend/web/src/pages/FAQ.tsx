@@ -11,7 +11,7 @@ interface Faq { q: string; a: string; }
 export default function FAQ({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation();
   const region = useRegion();
-  const supportEmail = region.region === 'IN' ? 'support@retailnazar.com' : 'support@retail-vantag.com';
+  const supportEmail = region.region === 'IN' ? 'support@retailnazar.com' : region.region === 'PH' ? 'support@retailbantay.com' : 'support@retail-vantag.com';
   const [faqs, setFaqs] = useState<Faq[]>([]);
 
   useEffect(() => {

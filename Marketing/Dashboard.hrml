@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>#NeverBlink 90-Day Campaign Kit</title>
+<style>
+/* === CORE THEME === */
+:root {
+  --neon-green: #00FF88;
+  --neon-blue: #00CCFF;
+  --bg: #121212;
+  --surface: #1a1a1a;
+  --surface-elevated: #222222;
+  --text: #f0f0f0;
+  --text-secondary: #b0b0b0;
+  --border: #333333;
+  --red-accent: #ff4444;
+  --amber-accent: #ffaa00;
+  --font: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  --radius: 8px;
+  --gap: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  font-size: 16px;
+}
+
+/* === PRINT RESET === */
+@media print {
+  :root {
+    --bg: #ffffff;
+    --surface: #f8f9fa;
+    --surface-elevated: #ffffff;
+    --text: #111111;
+    --text-secondary: #444444;
+    --neon-green: #008855;
+    --neon-blue: #006699;
+    --border: #cccccc;
+    --red-accent: #cc0000;
+    --amber-accent: #cc7700;
+  }
+  body { background: var(--bg) !important; color: var(--text) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .no-break { page-break-inside: avoid; }
+  .page-break { page-break-before: always; }
+  details { page-break-inside: avoid; }
+  summary { list-style: none; cursor: default; }
+}
+
+/* === TYPOGRAPHY === */
+h1, h2, h3, h4 {
+  margin: 0 0 0.6em 0;
+  line-height: 1.2;
+  font-weight: 700;
+}
+h1 { font-size: 2.2rem; letter-spacing: -0.02em; }
+h2 { font-size: 1.5rem; color: var(--neon-green); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+h3 { font-size: 1.15rem; color: var(--neon-blue); margin-top: 1.2em; }
+p { margin: 0 0 1em 0; }
+a { color: var(--neon-blue); text-decoration: underline; text-underline-offset: 3px; }
+
+/* === LAYOUT === */
+.container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+section, details { margin-bottom: 32px; }
+summary {
+  cursor: pointer;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--neon-green);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+summary::after { content: "▸"; font-size: 1.2rem; transition: transform 0.2s; color: var(--neon-blue); }
+details[open] > summary::after { content: "▾"; }
+details > div { padding: 20px; border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); background: var(--surface-elevated); }
+
+/* === HERO === */
+.hero {
+  text-align: center;
+  padding: 60px 20px;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(0,255,136,0.08), transparent 70%);
+  pointer-events: none;
+}
+.hero h1 {
+  font-size: 2.8rem;
+  background: linear-gradient(90deg, var(--neon-green), var(--neon-blue));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 12px;
+}
+.hero p {
+  font-size: 1.15rem;
+  color: var(--text-secondary);
+  max-width: 700px;
+  margin: 0 auto 24px;
+}
+.hero-brands { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin-top: 24px; }
+.brand-pill {
+  border: 1px solid var(--neon-blue);
+  padding: 12px 24px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--neon-blue);
+  background: rgba(0,204,255,0.06);
+}
+
+/* === INFOGRAPHIC UTILITIES === */
+.infographic-container { display: flex; flex-direction: column; gap: 24px; }
+.slide {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--neon-green);
+  border-radius: var(--radius);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.slide-alt { border-left-color: var(--neon-blue); }
+.slide-amber { border-left-color: var(--amber-accent); }
+.slide-red { border-left-color: var(--red-accent); }
+
+.slide-header { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+.slide-icon {
+  width: 48px; height: 48px;
+  display: grid; place-items: center;
+  border-radius: var(--radius);
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.slide h3 { margin: 0; }
+
+/* Specific slide visual treatments */
+.glow-chip {
+  display: inline-block; width: 80px; height: 80px; background: #0f2e1f;
+  border: 2px solid var(--neon-green); border-radius: 8px; position: relative;
+  box-shadow: 0 0 24px rgba(0,255,136,0.25);
+}
+.glow-chip::before {
+  content: "◉"; color: var(--neon-green); font-size: 2rem;
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+}
+
+.split-bg {
+  background: linear-gradient(90deg, #1f1f1f 50%, #112211 50%);
+}
+.cloud-box {
+  background: linear-gradient(135deg, #2a1f1f, #1f1f2a);
+  border: 1px dashed var(--red-accent);
+}
+
+/* ROI Panels */
+.roi-panels { display: grid; gap: 16px; }
+.roi-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.roi-big { font-size: 2.4rem; font-weight: 800; display: block; margin-bottom: 4px; }
+.roi-green { color: var(--neon-green); }
+.roi-blue { color: var(--neon-blue); }
+.roi-equation {
+  display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap;
+  font-size: 1.2rem; padding: 16px; background: #0f1f1f; border-radius: var(--radius);
+}
+
+/* Cloud vs Edge */
+.pipeline-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 700px) { .pipeline-wrap { grid-template-columns: 1fr; } }
+
+.pipeline-col { display: flex; flex-direction: column; gap: 12px; }
+.flow-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  text-align: center;
+}
+.flow-box strong { display: block; margin-bottom: 4px; }
+.flow-arrow { text-align: center; font-size: 1.4rem; color: var(--text-secondary); }
+.cloud-path .flow-box { border-left: 3px solid var(--red-accent); }
+.edge-path .flow-box { border-left: 3px solid var(--neon-green); }
+.cloud-path .flow-box:last-child { background: rgba(255,68,68,0.08); }
+.edge-path .flow-box:last-child { background: rgba(0,255,136,0.08); }
+
+/* === TABLE === */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  margin-top: 8px;
+}
+thead th {
+  text-align: left;
+  padding: 12px;
+  background: var(--surface);
+  border-bottom: 2px solid var(--neon-green);
+  color: var(--neon-green);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.85rem;
+}
+tbody td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+tbody tr:hover { background: rgba(0,255,136,0.04); }
+@media print {
+  tbody tr { page-break-inside: avoid; }
+}
+
+.phase-agitate td:first-child { border-left: 4px solid var(--neon-green); }
+.phase-educate td:first-child { border-left: 4px solid var(--neon-blue); }
+.phase-convert td:first-child { border-left: 4px solid var(--amber-accent); }
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.tag-agitate { background: rgba(0,255,136,0.12); color: var(--neon-green); border: 1px solid rgba(0,255,136,0.25); }
+.tag-educate { background: rgba(0,204,255,0.12); color: var(--neon-blue); border: 1px solid rgba(0,204,255,0.25); }
+.tag-convert { background: rgba(255,170,0,0.12); color: var(--amber-accent); border: 1px solid rgba(255,170,0,0.25); }
+
+/* === CONTENT HUBS === */
+.hub-post {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.hub-post h4 { color: var(--neon-blue); margin: 0 0 8px 0; font-size: 1.05rem; }
+.hub-post-body { color: var(--text-secondary); font-size: 0.95rem; white-space: pre-line; }
+.hub-cta { color: var(--neon-green); font-weight: 700; margin-top: 8px; display: block; }
+.reel-hook { color: var(--neon-green); font-weight: 700; display: block; margin-bottom: 6px; }
+.reel-hashtags { color: var(--text-secondary); font-size: 0.85rem; margin-top: 8px; display: block; }
+.tweet { margin-bottom: 12px; padding-left: 16px; border-left: 2px solid var(--neon-blue); }
+.tweet b { color: var(--text); }
+
+/* === VIDEO STORYBOARD === */
+.storyboard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.shot {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.shot:last-child { border-bottom: none; }
+.shot-time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  color: var(--neon-green);
+  font-weight: 700;
+}
+
+/* === DESIGNER BRIEF === */
+.brief-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.bilingual {
+  background: #1a1f1a;
+  border: 1px solid rgba(0,255,136,0.2);
+  padding: 20px;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+}
+.bilingual .hindi {
+  color: var(--neon-green);
+  font-style: italic;
+  margin-bottom: 8px;
+  display: block;
+}
+
+/* === UTILITY === */
+.mt-2 { margin-top: 8px; }
+.mt-4 { margin-top: 16px; }
+
+/* === PRINT BUTTON === */
+.print-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(18,18,18,0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+@media print { .print-bar { display: none; } }
+.btn {
+  background: transparent;
+  color: var(--neon-green);
+  border: 1px solid var(--neon-green);
+  padding: 8px 18px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: var(--font);
+  font-weight: 600;
+}
+.btn:hover { background: rgba(0,255,136,0.1); }
+
+/* === FOOTER === */
+.footer {
+  text-align: center;
+  padding: 40px 20px;
+  border-top: 2px solid var(--neon-green);
+  margin-top: 40px;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+.footer strong { color: var(--neon-green); }
+</style>
+</head>
+<body>
+
+<div class="print-bar">
+  <span style="font-weight:700; color:var(--neon-green);">#NeverBlink</span>
+  <button class="btn" onclick="document.querySelectorAll('details').forEach(d=>d.open=true); window.print();">Expand All & Print to PDF</button>
+</div>
+
+<div class="container">
+
+  <!-- HERO -->
+  <section class="hero no-break">
+    <h1>#NeverBlink</h1>
+    <p>90-Day Marketing Campaign Kit</p>
+    <p>Turning passive CCTV into active AI-powered security.<br>
+    From evidence lockers to real-time guardians — edge AI that alerts in 0.4 seconds.</p>
+    <div class="hero-brands">
+      <div class="brand-pill">Retail-Vantag · S$39/mo · SG/MY</div>
+      <div class="brand-pill" style="border-color:var(--neon-green); color:var(--neon-green);">Retail Nazar · ₹1,999/mo · India</div>
+    </div>
+  </section>
+
+  <!-- INFOGRAPHIC 1 -->
+  <details open>
+    <summary>Infographic 1: 5 Blind Spots Costing Retailers Thousands</summary>
+    <div>
+      <div class="infographic-container">
+        <!-- Slide 1 -->
+        <div class="slide split-bg no-break">
+          <div style="text-align:center; padding: 24px 0;">
+            <div style="font-size:1.6rem; font-weight:800; margin-bottom:8px;">Your CCTV Helps You File an Insurance Claim.</div>
+            <div style="font-size:1.3rem; color:var(--neon-green); font-weight:700;">Vantag Helps You Prevent the Theft.</div>
+          </div>
+        </div>
+
+        <!-- Slide 2 -->
+        <div class="slide no-break">
+          <div class="slide-header">
+            <div class="slide-icon">😴</div>
+            <h3>Blind Spot 1: Nobody Is Watching Live</h3>
+          </div>
+          <p>Less than 1% of CCTV footage is ever reviewed. By the time you look, the thief is gone.</p>
+        </div>
+
+        <!-- Slide 3 -->
+        <div class="slide no-break">
+          <div class="slide-header">
+            <div class="slide-icon">⏱</div>
+            <h3>Blind Spot 2: Theft Is Faster Than Human Reaction</h3>
+          </div>
+          <p>The average shoplifter needs <strong>13 seconds</strong> to conceal an item. A guard glancing at 8 monitors will miss it.</p>
+        </div>
+
+        <!-- Slide 4 -->
+        <div class="slide no-break">
+          <div class="slide-header">
+            <div class="slide-icon">🚪</div>
+            <h3>Blind Spot 3: After-Hours Is a Free-for-All</h3>
+          </div>
+          <p>Without real-time alerts, you discover break-ins when you turn the key at 9 AM.</p>
+        </div>
+
+        <!-- Slide 5 -->
+        <div class="slide no-break">
+          <div class="slide-header">
+            <div class="slide-icon">🐈</div>
+            <h3>Blind Spot 4: "Smart" Motion Detection Isn't Smart</h3>
+          </div>
+          <p>A stray cat and a crowbar both trigger "motion detected." One wakes you at 2 AM. The other robs you.</p>
+        </div>
+
+        <!-- Slide 6 -->
+        <div class="slide cloud-box no-break">
+          <div class="slide-header">
+            <div class="slide-icon">☁️</div>
+            <h3>Blind Spot 5: Cloud Analysis = Latency + Privacy Risk</h3>
+          </div>
+          <p>Uploading video to analyse it adds 5–15 seconds. And your footage lives on someone else's server.</p>
+        </div>
+
+        <!-- Slide 7 -->
+        <div class="slide no-break">
+          <div class="slide-header">
+            <div class="glow-chip" style="margin-right:8px;"></div>
+            <h3>The Fix: Edge AI Runs Locally</h3>
+          </div>
+          <p><strong>11 models</strong> analysing simultaneously. <strong>0.4-second</strong> alerts. No upload. No leak. No latency.</p>
+        </div>
+
+        <!-- Slide 8 -->
+        <div class="slide slide-alt no-break" style="text-align:center;">
+          <h3 style="color:var(--neon-green); margin-bottom:16px;">Start Your 14-Day Free Trial</h3>
+          <div style="display:flex; justify-content:center; gap:16px; flex-wrap:wrap;">
+            <div style="border:1px solid var(--neon-blue); padding:14px 24px; border-radius:8px; min-width:200px;">
+              <div style="font-size:0.85rem; color:var(--text-secondary);">Singapore / Malaysia</div>
+              <div style="font-size:1.2rem; font-weight:700; color:var(--neon-blue);">Retail-Vantag · S$39/mo</div>
+            </div>
+            <div style="border:1px solid var(--neon-green); padding:14px 24px; border-radius:8px; min-width:200px;">
+              <div style="font-size:0.85rem; color:var(--text-secondary);">India</div>
+              <div style="font-size:1.2rem; font-weight:700; color:var(--neon-green);">Retail Nazar · ₹1,999/mo</div>
+            </div>
+          </div>
+          <p style="margin-top:12px; font-size:0.9rem; color:var(--text-secondary);">No credit card required.</p>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- INFOGRAPHIC 2 -->
+  <details open>
+    <summary>Infographic 2: The ROI of Seeing — A Math Problem</summary>
+    <div>
+      <div class="roi-panels">
+        <div class="roi-panel no-break">
+          <span class="roi-big roi-green">S$1,200 / ₹70,000</span>
+          <p style="margin:0; color:var(--text-secondary);">Average value of one high-ticket shoplifting incident (electronics, designer goods, pharma).</p>
+        </div>
+        <div class="roi-panel no-break">
+          <span class="roi-big roi-blue">S$39 / ₹1,999</span>
+          <p style="margin:0; color:var(--text-secondary);">One month of Vantag Starter. All 11 AI models included.</p>
+        </div>
+        <div class="roi-panel roi-equation no-break">
+          <span>1 Theft Prevented</span>
+          <span style="font-size:1.4rem;">÷</span>
+          <span>30 Months</span>
+          <span style="font-size:1.4rem;">=</span>
+          <span style="color:var(--neon-green); font-weight:700;">System Pays for Itself</span>
+        </div>
+        <div class="roi-panel no-break">
+          <strong style="color:var(--neon-green);">Secondary Savings</strong>
+          <ul style="margin:8px 0 0 18px; padding:0; color:var(--text-secondary);">
+            <li>Reduced guard overtime from false alarms</li>
+            <li>Less out-of-stock shrinkage via Empty Shelf alerts</li>
+            <li>Lower insurance premiums with active monitoring proof</li>
+          </ul>
+        </div>
+        <div class="roi-panel no-break" style="text-align:center; background:rgba(0,255,136,0.06);">
+          <p style="margin:0; font-size:1.05rem; font-weight:700;">The only thing more expensive than security is replacing stolen inventory.</p>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- INFOGRAPHIC 3 -->
+  <details open>
+    <summary>Infographic 3: Cloud vs Edge — The Pipeline Difference</summary>
+    <div>
+      <div class="pipeline-wrap">
+        <!-- Cloud Path -->
+        <div class="pipeline-col cloud-path">
+          <h3 style="text-align:center; color:var(--red-accent);">Cloud AI Pipeline</h3>
+          <div class="flow-box no-break"><strong>Camera</strong><span style="color:var(--text-secondary);">Records event</span></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-box no-break"><strong>Upload</strong><span style="color:var(--text-secondary);">Internet transfer</span></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-box no-break"><strong>Cloud Server</strong><span style="color:var(--text-secondary);">Remote analysis</span></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-box no-break"><strong>Analyse</strong><span style="color:var(--text-secondary);">Queued processing</span></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-box no-break"><strong>Alert</strong><span style="color:var(--red-accent);">7–15 Seconds Delay</span></div>
+        </div>
+
+        <!-- Edge Path -->
+        <div class="pipeline-col edge-path">
+          <h3 style="text-align:center; color:var(--neon-green);">Edge AI Pipeline</h3>
+          <div class="flow-box no-break"><strong>Camera</strong><span style="color:var(--text-secondary);">Records event</span></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-box no-break"><strong>Local Edge Chip</strong><span style="color:var(--text-secondary);">On-site processing</span></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-box no-break"><strong>Instant Alert</strong><span style="color:var(--neon-green);">0.4 Seconds</span></div>
+          <div style="margin-top:8px; text-align:center; color:var(--text-secondary); font-size:0.9rem;">
+            No upload. No bandwidth cost. No privacy leak.
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- CONTENT CALENDAR -->
+  <details open>
+    <summary>90-Day Content Calendar</summary>
+    <div>
+      <table>
+        <thead>
+          <tr>
+            <th>Week</th>
+            <th>Phase</th>
+            <th>Theme</th>
+            <th>Key Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="phase-agitate">
+            <td>W1</td>
+            <td><span class="tag tag-agitate">Agitate</span></td>
+            <td>Cameras Are Sleeping</td>
+            <td>Problem carousels; Polls; "Old CCTV" reels</td>
+          </tr>
+          <tr class="phase-agitate">
+            <td>W2</td>
+            <td><span class="tag tag-agitate">Agitate</span></td>
+            <td>13-Second Rule</td>
+            <td>Theft speed stat posts; Before/After splits</td>
+          </tr>
+          <tr class="phase-agitate">
+            <td>W3</td>
+            <td><span class="tag tag-agitate">Agitate</span></td>
+            <td>Insurance vs Prevention</td>
+            <td>ROI calculators; Cost-of-loss carousels</td>
+          </tr>
+          <tr class="phase-agitate">
+            <td>W4</td>
+            <td><span class="tag tag-agitate">Agitate</span></td>
+            <td>The Myth of Smart Cameras</td>
+            <td>Motion detection myth-busters; Cat memes</td>
+          </tr>
+          <tr class="phase-educate">
+            <td>W5</td>
+            <td><span class="tag tag-educate">Educate</span></td>
+            <td>DIY Setup Truth</td>
+            <td>30-min timelapse; Compatibility lists</td>
+          </tr>
+          <tr class="phase-educate">
+            <td>W6</td>
+            <td><span class="tag tag-educate">Educate</span></td>
+            <td>One Dashboard, 11 Brains</td>
+            <td>Model explainer carousels; Alert replays</td>
+          </tr>
+          <tr class="phase-educate">
+            <td>W7</td>
+            <td><span class="tag tag-educate">Educate</span></td>
+            <td>Customer Spotlight (Tampines/Mumbai)</td>
+            <td>Case study PDF; UGC requests</td>
+          </tr>
+          <tr class="phase-educate">
+            <td>W8</td>
+            <td><span class="tag tag-educate">Educate</span></td>
+            <td>Queue & Safety Alerts</td>
+            <td>Operational demos; Compliance one-pagers</td>
+          </tr>
+          <tr class="phase-convert">
+            <td>W9</td>
+            <td><span class="tag tag-convert">Convert</span></td>
+            <td>The Annual Trap (Offer)</td>
+            <td>Annual pricing threads; Countdown stickers</td>
+          </tr>
+          <tr class="phase-convert">
+            <td>W10</td>
+            <td><span class="tag tag-convert">Convert</span></td>
+            <td>Myth vs Reality</td>
+            <td>Document posts; Comparative battle cards</td>
+          </tr>
+          <tr class="phase-convert">
+            <td>W11</td>
+            <td><span class="tag tag-convert">Convert</span></td>
+            <td>UGC & Social Proof</td>
+            <td>Testimonial reels; Review screenshots</td>
+          </tr>
+          <tr class="phase-convert">
+            <td>W12</td>
+            <td><span class="tag tag-convert">Convert</span></td>
+            <td>NeverBlink Community</td>
+            <td>Free trial push; Referral loop launch</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <!-- PLATFORM CONTENT HUBS -->
+  <details open>
+    <summary>Platform Content Hubs</summary>
+    <div>
+
+      <!-- LinkedIn -->
+      <h3>LinkedIn — 12 Posts</h3>
+
+      <div class="hub-post no-break">
+        <h4>Post 1: The Witness Problem</h4>
+        <div class="hub-post-body">I walked past 8 retail stores this morning. Every window had a CCTV sticker. Not a single one had a guard watching the feed.
+We call them "security cameras," but most are just witnesses that arrive too late. They record the crime so you can file the report. They do not stop the loss.
+Real security is not storage. It is speed. 0.4-second alert speed. Edge-AI speed. The kind that pings your phone before the shoplifter reaches the exit.
+If your system cannot tell you what is happening while it is happening, you own an evidence locker, not a security system.
+<span class="hub-cta">14-day free trial. No card. Comment "GUARD" and we'll send the setup checklist.</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Post 2: The 13-Second Rule</h4>
+        <div class="hub-post-body">The average shoplifter needs 13 seconds to conceal an item. The average store manager reviews CCTV footage the next morning.
+By the time you sit down with your coffee and scrub through last night's recordings, the inventory is already on a resale site. Your camera saw it. You didn't.
+This is not a staffing problem. It is a systems problem. Human attention fluctuates. Guard shifts end. But edge AI runs at 3 AM, 3 PM, and every second in between.
+<span class="hub-cta">How many seconds is your current response time? If it is measured in minutes or hours, we should talk.</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Post 3: Insurance vs Prevention</h4>
+        <div class="hub-post-body">Business insurance pays you back after the loss. Prevention pays you by stopping the loss. Which budget feels smarter to you?
+One high-ticket shoplifting event in a premium store can exceed S$1,200 (₹70,000). One month of Vantag Starter is S$39 (₹1,999).
+If preventing a single theft every 30 months already pays for the entire system, everything after that is pure profit protection.
+We equipped a 3-location pharmacy chain with Vantag last quarter. Shrinkage dropped 34% in 60 days. The "cost" of the platform was recovered in Week 2.
+<span class="hub-cta">Stop filing claims. Start firing alerts. DM "PHARMACY" for the full case study.</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Post 4: Your Data Doesn't Need a Passport</h4>
+        <div class="hub-post-body">If your CCTV sends video to the cloud to "analyse" it, your data just crossed a border you never approved.
+Upload. Analyse. Wait. Alert. That pipeline adds 7–15 seconds of latency. It also adds legal complexity, bandwidth costs, and a very real privacy risk.
+Vantag runs 11 AI models on a chip inside your store. Your video never leaves the premises. The alert reaches your phone in 0.4 seconds. Not because the cloud is fast, but because the cloud is not involved at all.
+That is what "edge" actually means. Not a buzzword. A physical chip, inside your building, doing the work.
+<span class="hub-cta">Privacy-conscious operators: let us show you how zero-upload security works.</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Post 5: The Myth of the Smart Camera</h4>
+        <div class="hub-post-body">Your Hikvision or Dahua system is not "smart" just because the box says AI. If it cannot distinguish between a stray cat and a crowbar on its own, it is motion detection with marketing.
+True AI security distinguishes between:
+— Shoplifting behaviour vs. normal browsing
+— A fall vs. someone tying a shoelace
+— A queue growing vs. a crowd waiting for a bus
+It runs 11 distinct models simultaneously and routes alerts to WhatsApp, Slack, or Teams without waking your IT department.
+<span class="hub-cta">Tired of false alarms at 2 AM? Try a system built for accuracy, not hype. S$39 / ₹1,999 Starter.</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Post 6: The DIY Lie</h4>
+        <div class="hub-post-body">Enterprise security vendors love the phrase "We'll send a technician." Translation: your store closes for half a day, and you pay for the privilege.
+Retailers in Singapore and India are not IT departments. You need a platform that connects to the cameras you already own, auto-discovers the feed, and puts AI bounding boxes on moving objects in under 30 minutes.
+One person. One phone. One edge box. That is the entire installation.
+<span class="hub-cta">We filmed the entire setup. Comment "TIMELAPSE" and we'll share the uncut video.</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Post 7: One Dashboard, 11 Brains</h4>
+        <div class="hub-post-body">I built a single-page cheat sheet explaining what 11 AI models actually do in human language. Here is the summary:
+Shoplifting detection. Product sweeps. Queue management. Watchlist matching. Anomalous dwell time. Empty shelf alerts. Fall detection. Crowd surge. Restricted zone breach. Unattended object. Gender / age analytics.
+All running locally. All alerting in 0.4 seconds. All for S$39 / ₹1,999.
+<span class="hub-cta">Swipe the carousel for the full breakdown. Save this post for your next security review.</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Post 8: The Tampines / Andheri Test</h4>
+        <div class="hub-post-body">A mid-size electronics retailer in Tampines (SG) / Andheri (IN) installed Vantag on a Tuesday. By Thursday, they had prevented two concealment events before the items reached the exit.
+They did not hire new security. They did not replace their cameras. They plugged in one edge box, connected their existing IP feeds, and let the models run.
+The ROI was not theoretical. It was Tuesday.
+<span class="hub-cta">Book a 15-minute demo. We'll show you a live dashboard on real feeds.</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Post 9: The Crowd Surge Story</h4>
+        <div class="hub-post-body">A sudden crowd density spike is not always a sale. Sometimes it is a safety event waiting to happen.
+Crowd surge detection is not about surveillance. It is about duty of care. Malls, clinics, and post offices use Vantag's density model to trigger staff response before a situation escalates.
+The same camera that prevents theft at midnight keeps your customers safe at noon.
+<span class="hub-cta">Safety officers and mall operators — DM "SURGE" for the compliance one-pager.</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Post 10: The Annual Trap (Conversion)</h4>
+        <div class="hub-post-body">Monthly SaaS bills quietly murder cash flow. That is why we built an annual plan that rewards commitment.
+Pay for 10 months, get 12. That is the Vantag annual deal. It drops your effective monthly rate to S$32.50 (₹1,666) and locks you out of price increases for a full year.
+Plus, annual users get priority access to our new Loss Prevention Analytics dashboard, shipping next quarter.
+<span class="hub-cta">This offer runs for 14 days. Link below for annual checkout.</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Post 11: Myth vs Reality</h4>
+        <div class="hub-post-body">I asked 50 retail owners what they believed about AI security. These 6 myths came up in almost every conversation.
+Myth 1: Too expensive. Myth 2: Need new cameras. Myth 3: Cloud only. Myth 4: Takes weeks. Myth 5: IT team required. Myth 6: Privacy risk. Each one busted with data.
+<span class="hub-cta">Download the full document above. Share it with your operations manager.</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Post 12: The NeverBlink Community</h4>
+        <div class="hub-post-body">1,000+ stores across Singapore, Malaysia, and India no longer review footage the next morning. They respond in 0.4 seconds.
+#NeverBlink is not a slogan. It is a standard. If your cameras blink — if they record but do not alert, if they store but do not guard — they are liabilities.
+<span class="hub-cta">Join the community. Start your free trial. S$39. ₹1,999. No card required.</span></div>
+      </div>
+
+      <!-- Instagram / TikTok -->
+      <h3>Instagram / TikTok — 12 Reel Caption Sets</h3>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 1: The 30-Minute Challenge</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"They said AI needs an IT team."
+POV: You just outfitted your entire store with active AI security before your tea went cold. ☕️🔒
+No technician. No drilling. No 3-day onboarding. Just your existing cameras + Vantag in 30 mins.
+If your security system requires more setup time than your WiFi router, it is too complicated.
+<span class="hub-cta">Link in bio for 14-day free trial.</span>
+<span class="reel-hashtags">#RetailSecurity #AICCTV #LossPrevention #RetailTech #Shoplifting #NeverBlink #SmallBusiness #DIYSecurity</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 2: 13 Seconds</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"He needed 13 seconds. We needed 0.4."
+The average concealment takes 13 seconds. Average cloud alert? 8 seconds.
+By the time your email arrives, he is already at the bus stop.
+Edge AI doesn't wait for the internet. It alerts your WhatsApp while the item is still in his hand.
+<span class="hub-cta">Tap link in bio to see the live demo.</span>
+<span class="reel-hashtags">#Shoplifting #RetailSecurity #EdgeAI #LossPrevention #SmallBusiness #RetailIndia #RetailSingapore</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 3: Cloud vs Edge</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"Why send your video on holiday?"
+Your CCTV footage does not need a passport.
+Most AI security uploads your video to a distant server, waits for analysis, then sends an alert. That journey takes 7–15 seconds.
+Vantag / Retail Nazar processes everything on a chip inside your store. Zero upload. Zero delay. Zero privacy leak.
+<span class="hub-cta">14-day free trial. Link in bio.</span>
+<span class="reel-hashtags">#PrivacyFirst #EdgeComputing #DataSecurity #RetailIndia #RetailSingapore #CyberSecurity</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 4: Which Alert Is Real?</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"Motion detected... by a cat. Again."
+A plastic bag and a shoplifter should not trigger the same alert.
+If your "smart" camera wakes you up at 3 AM because a lizard crossed the lens, it is not smart. It is motion detection in a tuxedo.
+Vantag's 11 models know the difference between a stray cat and a product sweep.
+<span class="hub-cta">Sleep through the night. Guard through the day.</span>
+<span class="reel-hashtags">#FalseAlarm #AICCTV #RetailHumor #SmartSecurity #NeverBlink #TechTok</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 5: Setup Timelapse</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"00:00 → Unbox. 00:22 → Guarding."
+Timelapse of a real Vantag install. One person. One phone. One edge box.
+Your security upgrade shouldn't feel like a construction project.
+Works with Hikvision, Dahua, Reolink, and any ONVIF IP camera you already own.
+<span class="hub-cta">Free trial. No card. Link in bio.</span>
+<span class="reel-hashtags">#DIYSecurity #RetailSetup #TechTok #SmallBusinessTips #Entrepreneur</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 6: Alert Replay — Shoplifting</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"SHOPLIFTING DETECTED — Track #09"
+Real (redacted) alert replay. Bounding box locks the moment concealment behaviour begins.
+Not after the exit. Not after the sale. During.
+This is what prevention looks like in 0.4 seconds.
+<span class="hub-cta">Watch the full demo. Link in bio.</span>
+<span class="reel-hashtags">#ShopliftingPrevention #RetailSecurity #AI #LossPrevention #SecurityCamera</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 7: Queue Alert</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"Queue overflow. Open register 2."
+Vantag isn't just theft prevention. It is operational intelligence.
+Queue too long? The AI texts your floor manager before the fourth customer starts tapping their foot.
+Fewer walkouts. Happier customers. More conversions at checkout.
+<span class="hub-cta">Try it free. Link in bio.</span>
+<span class="reel-hashtags">#QueueManagement #RetailOps #CustomerExperience #AIForRetail #RetailTech</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 8: Empty Shelf</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"Shelf 4 is empty. Restock now."
+You cannot sell what is not on the shelf.
+Vantag's empty shelf alert pings your restock team the moment a high-velocity SKU goes bare.
+Shrinkage prevention + sales preservation. One alert, two wins.
+<span class="hub-cta">Link in bio.</span>
+<span class="reel-hashtags">#InventoryManagement #RetailOps #OutOfStock #SmartRetail #RetailTips</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 9: Fall Detection</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"Fall detected. Zone C. 0.4s."
+In elder care clinics and high-traffic pharmacies, seconds equal safety.
+Pose-estimation AI detects a person-down event instantly. No wearable required. No privacy intrusion.
+Because dignity and response time should never be compromises.
+<span class="hub-cta">Learn more at the link in bio.</span>
+<span class="reel-hashtags">#HealthcareSecurity #FallDetection #ElderCare #SafetyFirst #RetailNazar #Vantag</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 10: Watchlist Match</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"Known shoplifter entered via Gate 3."
+Your memory is human. Your database shouldn't be.
+Watchlist matching compares faces against known incident reports the moment they enter the frame.
+Not facial recognition for the masses. Face recognition for your specific watchlist.
+<span class="hub-cta">Link in bio for a privacy-first demo.</span>
+<span class="reel-hashtags">#Watchlist #SecurityAwareness #RetailCrime #LossPrevention #FacialRecognition</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 11: Annual Offer Countdown</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"Pay 10 months. Get 12. Offer ends in 48 hours."
+Flash upgrade for annual members.
+Drop your effective rate to S$32.50 (₹1,666/mo) and lock in priority access to our new Loss Prevention Analytics dashboard.
+Less than 2 days left. Don't let your cameras blink while you wait.
+<span class="hub-cta">Link in bio.</span>
+<span class="reel-hashtags">#LimitedOffer #RetailSecurity #AnnualPlan #NeverBlink #Sale</span></div>
+      </div>
+
+      <div class="hub-post no-break">
+        <span class="reel-hook">Reel 12: UGC Customer Victory</span>
+        <span class="reel-hook">On-screen:</span>
+        <div class="hub-post-body">"3 thefts stopped. Month 1. Cost: ₹1,999."
+Real message from a Retail Nazar user in Pune. 🙏
+"I used to check cameras every morning. Now my phone tells me before I even unlock the shop."
+Your move, thief.
+<span class="hub-cta">Start free. Link in bio.</span>
+<span class="reel-hashtags">#CustomerWin #RetailIndia #Testimonial #SecurityThatWorks #NeverBlink #UGC</span></div>
+      </div>
+
+      <!-- Twitter / X -->
+      <h3>Twitter/X — 3 Viral Threads</h3>
+
+      <div class="hub-post no-break">
+        <h4>Thread A: The Retail Audit</h4>
+        <div class="tweet"><b>Tweet 1/5:</b> I visited 12 retail stores yesterday with a hidden question: do you guard, or do you merely record? Only 2 had active monitoring. Thread 👇</div>
+        <div class="tweet"><b>Tweet 2/5:</b> The average concealment takes 13 seconds. Cloud-analysed alerts take 7-15 seconds. By the time your phone buzzes, the inventory is gone.</div>
+        <div class="tweet"><b>Tweet 3/5:</b> Edge AI runs on a local chip. Alerts fire in 0.4 seconds. Not because of faster internet. Because the video never leaves the building.</div>
+        <div class="tweet"><b>Tweet 4/5:</b> We built Vantag / Retail Nazar to run 11 models simultaneously on any camera you already own. No upload fees. No latency. No cloud ransom.</div>
+        <div class="tweet"><b>Tweet 5/5:</b> One theft prevented pays for months of service. The rest is pure profit protection. 14-day free trial. No card. Link: [insert]</div>
+      </div>
+
+      <div class="hub-post no-break">
+        <h4>Thread B: Cloud vs Edge</h4>
+        <div class="tweet"><b>Tweet 1/4:</b> Stop sending your security footage on holiday. ☁️🚫</div>
+        <div class="

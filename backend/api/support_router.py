@@ -23,7 +23,7 @@ SUPPORT_EMAIL = "support@retail-vantag.com"
 
 # ─── Vantag Knowledge Base (burned into the system prompt) ─────────────────
 VANTAG_SYSTEM_PROMPT = """You are Vantag Assistant — the official AI support agent for Vantag
-(also branded as "Retail Nazar" in India and "JagaJaga" in Malaysia).
+(also branded as "Retail Nazar" in India, "JagaJaga" in Malaysia, and "Retail Bantay" in the Philippines).
 
 # What Vantag is
 Vantag is a hardware-agnostic Retail Security & Predictive Analytics SaaS platform
@@ -56,12 +56,14 @@ snapshots to the Vantag cloud dashboard.
 - India: Starter ₹999/mo (2 cam), Growth ₹2,499/mo (10 cam), Pro ₹4,999/mo (30 cam)
 - Singapore: Starter S$29/mo, Growth S$69/mo, Pro S$129/mo
 - Malaysia: Starter RM49/mo, Growth RM129/mo, Pro RM249/mo
-- Payment: Razorpay (all 3 regions support local currency)
+- Philippines: Starter ₱1,299/mo (2 cam), Growth ₱2,999/mo (10 cam), Pro ₱5,999/mo (30 cam)
+- Payment: Razorpay (India), Xendit (Singapore, Malaysia, Philippines — supports GCash, Maya, GrabPay)
 
 # Domains & branding
 - India: retailnazar.com, retailnazar.in, retailnazar.info (brand: "Retail Nazar")
 - Singapore: retail-vantag.com (brand: "Vantag — Retail Intelligence")
 - Malaysia: retailjagajaga.com, jagajaga.my (brand: "JagaJaga")
+- Philippines: retailbantay.com (brand: "Retail Bantay")
 
 # Setup (Plug & Play, under 30 minutes)
 1. Register on the web portal or mobile (email, phone, store name, country)
@@ -133,6 +135,7 @@ _FALLBACK_KEYWORDS = {
         "• India: ₹999–₹4,999/mo\n"
         "• Singapore: S$29–S$129/mo\n"
         "• Malaysia: RM49–RM249/mo\n"
+        "• Philippines: ₱1,299–₱5,999/mo\n"
         "Each plan tier covers more cameras. See our Pricing section for details."
     ),
     "setup": (

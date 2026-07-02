@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retail Nazar — Field Sales Playbook</title>
+<style>
+  :root {
+    --navy: #0d1b3e;
+    --navy-light: #1a2d5a;
+    --gold: #ffd200;
+    --gold-dark: #e6bc00;
+    --white: #ffffff;
+    --gray: #f4f6fb;
+    --text: #1a1a2e;
+    --green: #16a34a;
+    --red: #dc2626;
+    --orange: #ea580c;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray); color: var(--text); font-size: 15px; }
+
+  /* TOP NAV */
+  .topnav {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--navy); padding: 0 16px;
+    display: flex; align-items: center; gap: 6px;
+    overflow-x: auto; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .topnav-brand { color: var(--gold); font-weight: 800; font-size: 16px; padding: 14px 12px 14px 0; border-right: 1px solid #ffffff30; margin-right: 6px; flex-shrink: 0; }
+  .topnav a { color: #ccd6f6; text-decoration: none; padding: 14px 10px; font-size: 13px; font-weight: 500; border-bottom: 3px solid transparent; transition: all .2s; flex-shrink: 0; }
+  .topnav a:hover, .topnav a.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+  /* QUICK REF CARD */
+  .quickref { background: var(--navy); color: white; padding: 24px 20px; }
+  .quickref h1 { color: var(--gold); font-size: 22px; margin-bottom: 4px; }
+  .quickref p { color: #aab; font-size: 13px; margin-bottom: 18px; }
+  .qr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .qr-card { background: var(--navy-light); border: 1px solid #ffffff20; border-radius: 10px; padding: 14px; }
+  .qr-card h3 { color: var(--gold); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .qr-card ul { list-style: none; }
+  .qr-card li { color: #ccd6f6; font-size: 13px; padding: 3px 0; border-bottom: 1px solid #ffffff10; }
+  .qr-card li:last-child { border: none; }
+  .qr-card li span { color: var(--gold); margin-right: 6px; }
+
+  /* MAIN */
+  .main { max-width: 900px; margin: 0 auto; padding: 20px 16px 60px; }
+  .section { background: white; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); overflow: hidden; }
+  .section-header { background: var(--navy); color: white; padding: 16px 20px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .section-header h2 { font-size: 17px; flex: 1; }
+  .section-header .tag { background: var(--gold); color: var(--navy); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+  .section-body { padding: 20px; }
+
+  /* PROCESS STEPS */
+  .steps { display: flex; gap: 0; overflow-x: auto; margin-bottom: 20px; }
+  .step { flex: 1; min-width: 120px; text-align: center; padding: 14px 8px; background: var(--gray); border-right: 3px solid white; position: relative; }
+  .step:last-child { border-right: none; }
+  .step.active { background: var(--navy); color: white; }
+  .step-num { width: 32px; height: 32px; border-radius: 50%; background: var(--gold); color: var(--navy); font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; }
+  .step p { font-size: 12px; font-weight: 600; color: var(--navy); }
+  .step.active p { color: white; }
+
+  /* ACCORDION */
+  .accordion { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+  .acc-header { background: var(--gray); padding: 14px 16px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 14px; transition: background .2s; }
+  .acc-header:hover { background: #e8edf5; }
+  .acc-header.open { background: var(--navy); color: white; }
+  .acc-type { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 12px; margin-right: 8px; }
+  .type-price { background: #fef9c3; color: #92400e; }
+  .type-trust { background: #dbeafe; color: #1e40af; }
+  .type-tech { background: #dcfce7; color: #166534; }
+  .type-comp { background: #fce7f3; color: #9d174d; }
+  .type-stall { background: #ede9fe; color: #5b21b6; }
+  .type-internal { background: #ffedd5; color: #9a3412; }
+  .acc-header.open .acc-type { background: rgba(255,255,255,.2); color: white; }
+  .acc-arrow { transition: transform .3s; font-size: 12px; }
+  .acc-header.open .acc-arrow { transform: rotate(180deg); }
+  .acc-body { display: none; padding: 16px; border-top: 1px solid var(--border); }
+  .acc-body.open { display: block; }
+  .hindi { background: #fefce8; border-left: 3px solid var(--gold); padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 14px; }
+  .english { background: #eff6ff; border-left: 3px solid #3b82f6; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 14px; }
+  .do-tag { display: inline-block; background: #dcfce7; color: #166534; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 10px; margin-right: 6px; }
+  .dont-tag { display: inline-block; background: #fee2e2; color: #991b1b; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 10px; margin-right: 6px; }
+  .tip-tag { display: inline-block; background: #fef9c3; color: #92400e; font-weight: 700; font-size: 11px; padding: 2px 7px; border-radius: 10px; margin-right: 6px; }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+  th { background: var(--navy); color: white; padding: 10px 12px; text-align: left; font-size: 12px; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border: none; }
+  tr:nth-child(even) td { background: #f9fafb; }
+  .priority-1 { color: var(--green); font-weight: 700; }
+  .priority-2 { color: #0284c7; font-weight: 600; }
+  .priority-3 { color: var(--orange); font-weight: 600; }
+
+  /* CLOSING TECHNIQUES */
+  .closing-card { border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 12px; position: relative; }
+  .closing-card .num { position: absolute; top: -12px; left: 16px; background: var(--gold); color: var(--navy); font-weight: 800; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .closing-card h4 { font-size: 14px; margin-bottom: 8px; margin-top: 4px; color: var(--navy); }
+  .closing-rate { float: right; font-size: 11px; background: var(--green); color: white; padding: 2px 8px; border-radius: 10px; }
+
+  /* WHATSAPP TEMPLATES */
+  .wa-msg { background: #dcf8c6; border-radius: 0 12px 12px 12px; padding: 12px 16px; margin: 10px 0; position: relative; font-size: 14px; max-width: 85%; }
+  .wa-msg::before { content: ''; position: absolute; top: 0; left: -8px; width: 0; height: 0; border-right: 8px solid #dcf8c6; border-bottom: 8px solid transparent; }
+  .wa-label { font-size: 11px; color: #888; margin-top: 4px; display: block; }
+  .copy-btn { background: var(--navy); color: white; border: none; padding: 5px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; margin-top: 6px; float: right; }
+  .copy-btn:hover { background: var(--navy-light); }
+
+  /* TERRITORY TABLE */
+  .territory-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .t-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .t-card h4 { color: var(--navy); font-size: 14px; margin-bottom: 6px; }
+  .t-card .time { background: var(--gold); color: var(--navy); font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; display: inline-block; margin-bottom: 8px; }
+  .t-card p { font-size: 13px; color: #555; }
+
+  /* DAILY TARGETS */
+  .targets { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+  .target-box { flex: 1; min-width: 120px; background: var(--navy); color: white; border-radius: 10px; padding: 14px; text-align: center; }
+  .target-box .num { font-size: 28px; font-weight: 800; color: var(--gold); }
+  .target-box p { font-size: 12px; color: #aab; margin-top: 4px; }
+
+  /* DO/DONT */
+  .dodont { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .do-list, .dont-list { border-radius: 8px; padding: 14px; }
+  .do-list { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .dont-list { background: #fff1f2; border: 1px solid #fecdd3; }
+  .do-list h3 { color: var(--green); font-size: 13px; margin-bottom: 10px; }
+  .dont-list h3 { color: var(--red); font-size: 13px; margin-bottom: 10px; }
+  .do-list li, .dont-list li { font-size: 13px; padding: 4px 0; list-style: none; }
+  .do-list li::before { content: '✅ '; }
+  .dont-list li::before { content: '❌ '; }
+
+  /* SEARCH BOX */
+  .search-box { position: relative; margin-bottom: 20px; }
+  .search-box input { width: 100%; padding: 12px 16px 12px 40px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; transition: border-color .2s; }
+  .search-box input:focus { border-color: var(--navy); }
+  .search-box::before { content: '🔍'; position: absolute; left: 12px; top: 12px; font-size: 15px; }
+
+  @media (max-width: 600px) {
+    .qr-grid { grid-template-columns: 1fr 1fr; }
+    .dodont { grid-template-columns: 1fr; }
+    .steps { gap: 4px; }
+    .step { min-width: 80px; }
+  }
+  @media print {
+    .topnav { display: none; }
+    .section-body { display: block !important; }
+    body { background: white; }
+    .section { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <div class="topnav-brand">Retail Nazar</div>
+  <a href="#quickref" class="active">Quick Ref</a>
+  <a href="#icp">ICP</a>
+  <a href="#process">5-Stage Process</a>
+  <a href="#objections">Objections (20)</a>
+  <a href="#closing">Closing</a>
+  <a href="#followup">Follow-Up</a>
+  <a href="#territory">Noida Map</a>
+  <a href="#dodont">Do's & Don'ts</a>
+</nav>
+
+<!-- QUICK REF CARD -->
+<div class="quickref" id="quickref">
+  <h1>Field Sales Playbook</h1>
+  <p>BrainGuardX AI Technologies Pvt. Ltd. &nbsp;|&nbsp; retailnazar.com &nbsp;|&nbsp; support@retailnazar.com &nbsp;|&nbsp; Noida Launch Edition</p>
+  <div class="qr-grid">
+    <div class="qr-card">
+      <h3>5-Step Process</h3>
+      <ul>
+        <li><span>1</span> Approach & Open</li>
+        <li><span>2</span> Discovery</li>
+        <li><span>3</span> Demo (7 min)</li>
+        <li><span>4</span> Handle Objections</li>
+        <li><span>5</span> Close + Handoff</li>
+      </ul>
+    </div>
+    <div class="qr-card">
+      <h3>Plans & Prices</h3>
+      <ul>
+        <li><span>S</span> Starter — ₹999/mo</li>
+        <li><span>G</span> Growth — ₹1,999/mo</li>
+        <li><span>P</span> Pro — ₹3,499/mo</li>
+        <li><span>P+</span> Pro+ — ₹5,999/mo</li>
+      </ul>
+    </div>
+    <div class="qr-card">
+      <h3>Top Opening Lines</h3>
+      <ul>
+        <li>"Kya main 2 minute le sakta hoon?"</li>
+        <li>"Aapka existing CCTV smart ban sakta hai"</li>
+        <li>"Theft ka WhatsApp alert milega 3 second mein"</li>
+      </ul>
+    </div>
+    <div class="qr-card">
+      <h3>3 Best Closes</h3>
+      <ul>
+        <li>Trial Close — "3 din free try karo"</li>
+        <li>ROI Close — Calculate loss vs cost</li>
+        <li>Urgency Close — "100 slots, X left"</li>
+      </ul>
+    </div>
+    <div class="qr-card">
+      <h3>Daily Targets</h3>
+      <ul>
+        <li>15–20 store visits</li>
+        <li>10+ real conversations</li>
+        <li>3+ trial signups/day</li>
+        <li>All previous-day follow-ups</li>
+      </ul>
+    </div>
+    <div class="qr-card">
+      <h3>Escalation</h3>
+      <ul>
+        <li>Tech issues → support@retailnazar.com</li>
+        <li>Discount approval → Manager</li>
+        <li>Large account → Founder call</li>
+        <li>Trial extension → CS team</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ICP SECTION -->
+<div class="section" id="icp">
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>Ideal Customer Profile (ICP)</h2>
+    <span class="tag">Who to Target</span>
+    <span class="acc-arrow">▼</span>
+  </div>
+  <div class="section-body">
+    <table>
+      <thead>
+        <tr><th>Priority</th><th>Store Type</th><th>Why Target</th><th>Typical Size</th><th>Approach Language</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="priority-1">🥇 1st</td><td>Electronics / Mobile</td><td>High-value items, highest theft risk</td><td>200–2,000 sq ft</td><td>Hindi or English</td></tr>
+        <tr><td class="priority-1">🥇 1st</td><td>Jewellery Store</td><td>Extremely high value per item</td><td>100–500 sq ft</td><td>Hindi preferred</td></tr>
+        <tr><td class="priority-2">🥈 2nd</td><td>Pharmacy / Medical</td><td>Prescription fraud, internal theft</td><td>200–800 sq ft</td><td>Hindi</td></tr>
+        <tr><td class="priority-2">🥈 2nd</td><td>Fashion / Clothing</td><td>Fitting room blind spots, shrinkage</td><td>500–3,000 sq ft</td><td>Hindi / English</td></tr>
+        <tr><td class="priority-2">🥈 2nd</td><td>Supermarket / Grocery</td><td>Volume theft, multiple entry points</td><td>1,000–5,000 sq ft</td><td>Hindi</td></tr>
+        <tr><td class="priority-3">🥉 3rd</td><td>General Kirana</td><td>Real pain, high price sensitivity</td><td>100–500 sq ft</td><td>Hindi only, ROI focus</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="margin: 16px 0 10px; color: var(--red);">Who NOT to Target (Save Your Time)</h3>
+    <ul style="font-size: 14px; padding-left: 18px; line-height: 2;">
+      <li>Stores with no internet (minimum 2 Mbps needed)</li>
+      <li>Temporary/seasonal stalls</li>
+      <li>Person you're talking to is NOT the decision-maker — get the owner</li>
+      <li>Store recently robbed with active police case — they want hardware, not software right now</li>
+    </ul>
+
+    <h3 style="margin: 20px 0 10px;">MEDDIC Qualification Questions</h3>
+    <div class="accordion">
+      <div class="acc-header" onclick="toggleAcc(this)"><span>M — Metric: Quantify the Pain</span><span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Pichle 6 mahine mein stock audit mein kitna difference aaya?"</div>
+        <div class="english">"How much stock loss have you seen in the last 6 months?"</div>
+        <p style="font-size:13px;">👉 If they say "nothing" — they're not tracking. That's also a problem you can solve.</p>
+      </div>
+    </div>
+    <div class="accordion">
+      <div class="acc-header" onclick="toggleAcc(this)"><span>E — Economic Buyer: Right Person?</span><span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Security ya surveillance ke liye aap hi decide karte hain?"</div>
+        <div class="english">"Are you the one who decides on security spending here?"</div>
+        <p style="font-size:13px;">👉 If no — ask for the owner. Never pitch to a manager without owner present.</p>
+      </div>
+    </div>
+    <div class="accordion">
+      <div class="acc-header" onclick="toggleAcc(this)"><span>I — Identify Pain: The Silent Moment</span><span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Abhi, agar aapki dukaan mein kuch galat ho raha ho, toh aapko kaise pata chalega?"</div>
+        <div class="english">"Right now, if something wrong was happening in your store, how would you know?"</div>
+        <p style="font-size:13px;">👉 <strong>Stay silent after this question.</strong> Let them feel the gap. That silence is your best selling tool.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5-STAGE PROCESS -->
+<div class="section" id="process">
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>The 5-Stage Sales Process</h2>
+    <span class="tag">Core Process</span>
+    <span class="acc-arrow">▼</span>
+  </div>
+  <div class="section-body">
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><p>Approach<br>& Open</p></div>
+      <div class="step"><div class="step-num">2</div><p>Discovery<br>Questions</p></div>
+      <div class="step"><div class="step-num">3</div><p>Demo<br>7 Mins</p></div>
+      <div class="step"><div class="step-num">4</div><p>Objection<br>Handling</p></div>
+      <div class="step"><div class="step-num">5</div><p>Close<br>& Handoff</p></div>
+    </div>
+
+    <div class="accordion">
+      <div class="acc-header" onclick="toggleAcc(this)"><strong>Stage 1: Approach & Opening (First 60 Seconds)</strong><span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <p style="font-size:13px; margin-bottom:10px;"><strong>You have 60 seconds before they ask you to leave. Lead with curiosity, not a pitch.</strong></p>
+        <h4 style="font-size:13px; margin-bottom:6px;">The Permission Opener (Best for cold visits):</h4>
+        <div class="hindi">"Namaste [Name] ji, main Retail Nazar se hoon. Ek AI product hai jo aapke existing CCTV cameras ko smart bana deta hai — theft ka WhatsApp alert aata hai 3 second mein. Kya aap 2 minute de sakte hain?"</div>
+        <div class="english">"Good morning — I'm from Retail Nazar. We help store owners catch theft in real-time using their existing CCTV. AI sends a WhatsApp alert in 3 seconds. Can I show you something in 2 minutes?"</div>
+        <br>
+        <span class="dont-tag">NEVER SAY</span>
+        <ul style="font-size:13px; padding-left:18px; margin-top:8px; line-height:2;">
+          <li>"Mujhe aapko kuch bechna hai" — sounds pushy immediately</li>
+          <li>"Kya aap security mein interested hain?" — too generic</li>
+          <li>Start with price before showing value</li>
+          <li>Stand awkwardly while owner serves another customer — come back</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="accordion">
+      <div class="acc-header" onclick="toggleAcc(this)"><strong>Stage 2: Discovery Questions</strong><span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <p style="font-size:13px; margin-bottom:10px;">Ask conversationally — not like a checklist:</p>
+        <ol style="font-size:14px; padding-left:18px; line-height:2.2;">
+          <li>"Aapki dukaan mein CCTV hai?" — If yes: great. If no: ask why not.</li>
+          <li>"Kabhi stock audit mein difference aaya ho?" — Opens pain conversation.</li>
+          <li>"Aap khud kitne ghante dukaan par rehte hain?" — Reveals monitoring gap.</li>
+          <li>"Jab aap nahi hote, koi chinta hoti hai?" — Emotional trigger.</li>
+          <li>"Kya koi incident hua jisme shak tha lekin proof nahi mila?" — The golden question.</li>
+          <li style="background:#fef9c3; padding:6px 10px; border-radius:6px;">"Abhi agar kuch galat ho raha ho, aapko kaise pata chalega?" — <strong>THEN STAY SILENT.</strong></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="accordion">
+      <div class="acc-header" onclick="toggleAcc(this)"><strong>Stage 3: Demo Script (7 Minutes)</strong><span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <table>
+          <thead><tr><th>Minute</th><th>What to Show</th><th>What to Say</th></tr></thead>
+          <tbody>
+            <tr><td><strong>1</strong></td><td>Real alert screenshot</td><td>"Yeh dekho — ek banda 40 second ruka, system ne WhatsApp pe alert bheja."</td></tr>
+            <tr><td><strong>2</strong></td><td>Live dashboard</td><td>"Yeh hai live view — cameras, alerts, footfall sab ek jagah."</td></tr>
+            <tr><td><strong>3</strong></td><td>Camera compatibility</td><td>"Aur sab kuch aapke existing cameras se hoga — nayi camera kharidne ki zaroorat nahi."</td></tr>
+            <tr><td><strong>4</strong></td><td>Mobile app</td><td>"Aap ghar se bhi dekh sakte ho, real-time, kisi bhi phone pe."</td></tr>
+            <tr><td><strong>5</strong></td><td>Pricing page</td><td>"Shuruaat ₹999 se. Ek chori bhi rok di toh pehle din hi recover."</td></tr>
+            <tr><td><strong>6</strong></td><td>Free trial screen</td><td>"3 din bilkul free — koi card nahi chahiye, koi commitment nahi."</td></tr>
+            <tr><td><strong>7</strong></td><td>Registration form</td><td>"Abhi register kar lete hain — 5 minute. Agar kaam nahi aaya, chhod dena."</td></tr>
+          </tbody>
+        </table>
+        <br>
+        <span class="do-tag">DO</span> Let them hold your phone and tap around.<br>
+        <span class="dont-tag">DON'T</span> Show more than 3 features — overwhelms them.<br>
+        <span class="dont-tag">DON'T</span> Read from a script while demo-ing — kills trust.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OBJECTIONS -->
+<div class="section" id="objections">
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>Objection Handling Matrix (20 Objections)</h2>
+    <span class="tag">Most Critical</span>
+    <span class="acc-arrow">▼</span>
+  </div>
+  <div class="section-body">
+    <div class="search-box">
+      <input type="text" id="objSearch" placeholder="Search objections... (e.g. 'price', 'trust', 'CCTV')" onkeyup="filterObj()">
+    </div>
+    <div id="obj-list">
+
+    <!-- PRICE -->
+    <div class="accordion obj-item" data-tags="price budget expensive">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-price">💰 Price</span> "₹999 bhi bahut zyada hai" / "Too expensive"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <span class="dont-tag">NEVER</span> discount immediately.<br><br>
+        <div class="hindi">"Bilkul samajh mein aata hai. Ek cheez bataiye — pichle mahine stock mein kitna farak aaya? [Pause] Agar sirf ₹1,000 ka bhi hua, toh Retail Nazar ne pehle din hi apna paisa wapas kar diya. Aur zyada chance hai ki ₹5,000–10,000 ka hua hoga."</div>
+        <p style="font-size:13px; margin-top:10px;">Then bridge to trial: <em>"Isiliye 3 din free dete hain. Kuch invest mat karo — sirf try karo."</em></p>
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="price budget">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-price">💰 Price</span> "Abhi budget nahi hai"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Bilkul. Budget kab aata hai? [Listen]. Tab tak ke liye — abhi 3 din free try karo. Paisa kuch nahi lagta. Tab decide karna."</div>
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="price cheaper competitor market">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-price">💰 Price</span> "Market mein sasta option milega"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Ho sakta hai. Lekin woh options AI-based hain ya manual monitoring? Koi baith ke camera dekh raha hai, toh ₹999 mein bhi unka kharcha hai. Hamara AI 24/7 kaam karta hai — koi nahi thakta, koi nahi sohta. Functionality ka comparison zaroor karo."</div>
+      </div>
+    </div>
+
+    <!-- TIMING/TRUST -->
+    <div class="accordion obj-item" data-tags="trust new company proof">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-trust">🔒 Trust</span> "Naya product hai, kya pata kaam kare ya nahi"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Sahi sawaal hai — exactly isliye 3-din free trial deta hoon. Koi agar aise kehta toh main kehta: try karo pehle. 3 din mein agar ek bhi useful alert nahi aaya, toh chhod do. Zero investment. Par agar kaam kiya toh aapko khud samajh aa jayega."</div>
+        <br><span class="tip-tag">ADD</span> "Hum BrainGuardX AI Technologies ke product hain — registered Indian company. 23+ stores already Noida mein hain."
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="timing later busy">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-trust">🔒 Trust</span> "Abhi time nahi hai — kal aana"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Zaroor. Kab best time hoga? [Get specific date+time]"</div>
+        <p style="font-size:13px; margin-top:8px;"><strong>Always leave with WhatsApp contact. Never leave empty-handed.</strong></p>
+        <div class="hindi">"Tab tak ke liye — kya main ek WhatsApp message bhej sakta hoon with our website link? Kabhi free mein dekh lena."</div>
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="trust partner ca consult">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-trust">🔒 Trust</span> "Partner/CA se poochhna hai pehle"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Bilkul sahi approach hai. Kya unhe abhi call kar sakte hain? Main wait karta hoon. Ya best — kya hum ek 15-minute call set kar sakte hain jab aap dono available ho?"</div>
+        <p style="font-size:13px; margin-top:8px;">Offer: "Unka number dete hain toh main directly explain kar deta hoon."</p>
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="trust payment online razorpay">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-trust">🔒 Trust</span> "Online payment par trust nahi"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Bilkul samjhaa. Isliye hum Razorpay use karte hain — same jo Zomato, Swiggy, Amazon use karta hai. Aur trial ke liye toh payment hi nahi hota — sirf email se register karo. Try karo pehle, paisa baad mein."</div>
+      </div>
+    </div>
+
+    <!-- TECHNICAL -->
+    <div class="accordion obj-item" data-tags="internet slow speed wifi">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-tech">🔧 Tech</span> "Mera internet slow hai"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Minimum 2 Mbps upload chahiye per camera. Kya hum abhi check kar sakte hain? [speedtest.net]. Agar speed kam bhi hai, 2–3 cameras connect karo — woh easily kaam karega."</div>
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="camera hikvision dahua compatible">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-tech">🔧 Tech</span> "Meri Hikvision/Dahua camera hai — kaam karega?"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Haan bilkul — Hikvision aur Dahua dono supported hain. India ke 80% IP cameras ke saath kaam karta hai. Model number bataiye — main 30 second mein confirm kar deta hoon."</div>
+        <span class="tip-tag">TIP</span> Always carry a camera compatibility list.
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="data privacy security cloud storage">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-tech">🔧 Tech</span> "Data kahan store hota hai? Safe hai?"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Aapka data India ke cloud servers pe store hota hai — encrypted. Koi bhi dekh nahi sakta — na hum, na koi third party. DPDP Act 2023 ke compliance mein hain — India ka new data protection law."</div>
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="technical setup complicated difficult">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-tech">🔧 Tech</span> "Bahut complicated lagta hai / Technical nahi hoon"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Main samjhaa — exactly isliye humne isko simple banaya hai. Setup mein sirf ek kaam hai — apna camera ka IP address dena. Main khud aapke saath baith ke 30 minute mein set up kar dunga — pehle din free on-site support milta hai."</div>
+      </div>
+    </div>
+
+    <!-- COMPETITION -->
+    <div class="accordion obj-item" data-tags="guard security watchman competitor">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-comp">🏆 Comp</span> "Already ek security guard hai"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Bahut accha — guard physical deterrence ke liye important hai. Lekin guard soh bhi sakta hai, distracted bhi ho sakta hai. Retail Nazar guard ki aankhon ko AI ka support deta hai — dono milke zyada effective hain. Aur ek cheez — agar guard khud andar ka banda hai?"</div>
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="brother manual watching remote monitoring">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-comp">🏆 Comp</span> "Mera bhai manually camera dekh leta hai"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Accha setup hai! Lekin aapka bhai poora din 100% time dekh sakta hai? AI ek second bhi nahi chukta. Aur agar kuch ho toh bhai ko automatically alert jaata hai — manually dekhne ki zaroorat hi nahi."</div>
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="cctv vendor dealer company">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-comp">🏆 Comp</span> "Pehle CCTV company se baat karunga"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Bilkul sahi karte hain. Lekin yeh dono alag cheezein hain — CCTV company hardware deti hai, hum usse intelligent banaate hain. Bahut CCTV dealers humare saath partner hain — agar dealer ka number dete hain toh main unse baat kar sakta hoon."</div>
+      </div>
+    </div>
+
+    <!-- INTERNAL/EMOTIONAL -->
+    <div class="accordion obj-item" data-tags="trust staff employee internal honest">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-internal">💛 Internal</span> "Mujhe apne staff pe trust hai"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Bahut achchi baat hai — trust important hai. Main yeh nahi keh raha ki aapka staff bura hai. Main keh raha hoon ki 70% internal theft wahan hoti hai jahan owner ko poora bharosa tha. Retail Nazar trust ki jagah nahi leta — woh proof deta hai jab kuch galat ho. Agar staff honest hai, toh aapko kabhi alert hi nahi aayega."</div>
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="unknown new never heard brand">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-internal">💛 Internal</span> "Pehle koi iske baare mein nahi suna"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Bilkul sahi — hum Noida mein abhi launch ho rahe hain. Isiliye founding members ko 50% discount de rahe hain — sirf pehle 100 stores ko. Agar aap 6 mahine wait karoge, yeh offer nahi rahega. Early adopters ko hamesha faayda hota hai."</div>
+      </div>
+    </div>
+
+    <!-- STALLING -->
+    <div class="accordion obj-item" data-tags="think sochna later time stalling">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-stall">⏰ Stall</span> "Sochna hai" / "Let me think about it"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <span class="dont-tag">NEVER SAY</span> "Sure, take your time" and walk away.<br><br>
+        <div class="hindi">"Bilkul. Kya main pooch sakta hoon — kya specifically soch rahe hain? Price ke baare mein, ya product ke baare mein? [Listen]. Accha, toh yeh karte hain — abhi sirf free trial ke liye register karo. Sochna baad mein bhi karte rehna — trial mein kuch kharcha nahi."</div>
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="tomorrow kal come back stalling">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-stall">⏰ Stall</span> "Kal aana" / "Come back tomorrow"<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Zaroor. Lekin ek cheez — kya hum abhi bas email se register kar lete hain free trial ke liye? Kal jab aayunga tab saath mein setup bhi kar denge. Sirf email chahiye — 30 second ka kaam hai."</div>
+      </div>
+    </div>
+
+    <div class="accordion obj-item" data-tags="no flat rejection hard no">
+      <div class="acc-header" onclick="toggleAcc(this)"><span class="acc-type type-stall">⏰ Stall</span> "Nahin chahiye" (Flat No)<span class="acc-arrow">▼</span></div>
+      <div class="acc-body">
+        <div class="hindi">"Bilkul theek hai — main force nahi karunga. Ek kaam karein — kya main ek WhatsApp message bhej sakta hoon? Kabhi bhi zaroorat pade, link pe click karna. 3 din ke liye free hai — jab bhi mann kare try karna."</div>
+        <p style="font-size:13px; margin-top:8px; color: var(--green);"><strong>The "no" today is "maybe" in 3 months. Always leave the door open.</strong></p>
+      </div>
+    </div>
+
+    </div><!-- end obj-list -->
+  </div>
+</div>
+
+<!-- CLOSING TECHNIQUES -->
+<div class="section" id="closing">
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>Closing Techniques</h2>
+    <span class="tag">Close the Deal</span>
+    <span class="acc-arrow">▼</span>
+  </div>
+  <div class="section-body">
+
+    <div class="closing-card">
+      <div class="num">1</div>
+      <span class="closing-rate">~55% conversion</span>
+      <h4>TRIAL CLOSE — Best for Undecided Customers</h4>
+      <div class="hindi">"Chaliye yeh karte hain — abhi sirf 3-din ka trial start karte hain. Koi paisa nahi, koi commitment nahi. Agar kaam kiya toh baaat karte hain. Deal?"</div>
+      <p style="font-size:13px; margin-top:8px;">Use when: Customer is interested but hesitating to commit.</p>
+    </div>
+
+    <div class="closing-card">
+      <div class="num">2</div>
+      <h4>ROI CLOSE — For Price Objectors</h4>
+      <div class="hindi">"Ek simple calculation karte hain. Aapka monthly turnover roughly kitna hai? [₹X]. Retail industry average 1.5–2% shrinkage hoti hai. Toh aap roughly ₹[X×0.015] per month kho rahe hain. Retail Nazar ₹999 mein aata hai — yeh toh ek investment hai."</div>
+      <span class="tip-tag">TIP</span> Write this on paper — visual impact multiplies conviction.
+    </div>
+
+    <div class="closing-card">
+      <div class="num">3</div>
+      <h4>URGENCY CLOSE — For Stalling Customers</h4>
+      <div class="hindi">"Noida mein pehle 100 founding stores ko 50% off milta hai — abhi sirf [X] jagah bacha hai. Aaj register karoge toh yeh rate lock ho jaata hai aapke liye."</div>
+      <span class="dont-tag">ONLY USE</span> when the offer is genuinely limited — never fake urgency.
+    </div>
+
+    <div class="closing-card">
+      <div class="num">4</div>
+      <h4>SOCIAL PROOF CLOSE — For Trust Objectors</h4>
+      <div class="hindi">"Ek kaam karo — main aapko [nearby store] ka number deta hoon. Unhe directly call karo aur poochho unka experience kaisa raha. Uske baad decide karo."</div>
+      <span class="tip-tag">PREP</span> Have 2–3 willing reference customers ready per area.
+    </div>
+
+    <div class="closing-card">
+      <div class="num">5</div>
+      <h4>ASSUMPTIVE CLOSE — For Warm Leads</h4>
+      <div class="hindi">"Aapke paas [X] cameras hain — Growth plan perfect rahega. Chalo main abhi registration form bhar deta hoon — bas aapka email chahiye."</div>
+      <span class="tip-tag">ONLY USE</span> when you sense strong positive buying signals.
+    </div>
+
+    <div class="closing-card">
+      <div class="num">6</div>
+      <h4>QUESTION CLOSE — Flushes Out Final Objection</h4>
+      <div class="hindi">"Mujhe ek baat bataiye — agar pricing aur technical sab theek ho, toh kya koi reason hai jo aapko rokta hai aaj start karne se?"</div>
+      <p style="font-size:13px; margin-top:8px;">Forces commitment or reveals the REAL objection you haven't addressed yet.</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- FOLLOW-UP -->
+<div class="section" id="followup">
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>WhatsApp Follow-Up Sequence</h2>
+    <span class="tag">After Every Visit</span>
+    <span class="acc-arrow">▼</span>
+  </div>
+  <div class="section-body">
+
+    <h3 style="margin-bottom:14px; font-size:15px;">Message Sequence (All 4 Messages)</h3>
+
+    <p style="font-size:13px; font-weight:600; margin-bottom:6px;">Day 0 — Same Evening:</p>
+    <div class="wa-msg">
+      Namaste [Name] ji 🙏 Main Retail Nazar se tha jo aaj aapki dukaan mein aaya tha. Bahut accha laga aapse milke.<br><br>
+      Website link: retailnazar.com — free trial ke liye sirf email chahiye. Koi bhi sawaal ho toh directly message karein 🙂
+      <button class="copy-btn" onclick="copyMsg(this)">Copy</button>
+      <span class="wa-label">Day 0 message</span>
+    </div>
+
+    <p style="font-size:13px; font-weight:600; margin: 16px 0 6px;">Day 2 — If No Response:</p>
+    <div class="wa-msg">
+      [Name] ji, ek interesting cheez share karni thi — Sector [X] ke ek store ne is hafte 2 suspicious incidents catch kiye Retail Nazar se 👁<br><br>
+      Aapka bhi 3-din ka trial abhi bhi available hai 🙂 retailnazar.com
+      <button class="copy-btn" onclick="copyMsg(this)">Copy</button>
+      <span class="wa-label">Day 2 message</span>
+    </div>
+
+    <p style="font-size:13px; font-weight:600; margin: 16px 0 6px;">Day 5 — Final Push:</p>
+    <div class="wa-msg">
+      [Name] ji, last message — Noida founding 100 mein sirf [X] spots bache hain. 50% off ka offer sirf unke liye hai 🎯<br><br>
+      Aaj try karna chahein toh bata dein, main setup mein personally help kar dunga. Otherwise bilkul no pressure 🙏
+      <button class="copy-btn" onclick="copyMsg(this)">Copy</button>
+      <span class="wa-label">Day 5 message</span>
+    </div>
+
+    <p style="font-size:13px; font-weight:600; margin: 16px 0 6px;">Day 14 — Cold Check-In:</p>
+    <div class="wa-msg">
+      [Name] ji, main Retail Nazar se hoon. Bas yeh check karna tha — kya aapki dukaan ki security ke baare mein koi naya socha? Hum abhi bhi free trial ke liye available hain 🙂
+      <button class="copy-btn" onclick="copyMsg(this)">Copy</button>
+      <span class="wa-label">Day 14 message</span>
+    </div>
+
+    <h3 style="margin: 24px 0 10px; font-size:15px;">CRM Tracking (Google Sheets Template)</h3>
+    <table>
+      <thead><tr><th>Column</th><th>Values</th></tr></thead>
+      <tbody>
+        <tr><td>Name + Store</td><td>Free text</td></tr>
+        <tr><td>Phone</td><td>WhatsApp number</td></tr>
+        <tr><td>Date Visited</td><td>DD/MM/YYYY</td></tr>
+        <tr><td>Status</td><td>Cold → Interested → Trial → Paid → Churned</td></tr>
+        <tr><td>Plan Interest</td><td>Starter / Growth / Pro / Pro+</td></tr>
+        <tr><td>Follow-up Date</td><td>Set on same day as visit</td></tr>
+        <tr><td>Notes</td><td>Key objection, store type, specific pain mentioned</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- TERRITORY GUIDE -->
+<div class="section" id="territory">
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>Noida Territory Guide</h2>
+    <span class="tag">Market Map</span>
+    <span class="acc-arrow">▼</span>
+  </div>
+  <div class="section-body">
+
+    <div class="targets">
+      <div class="target-box"><div class="num">15–20</div><p>Store Visits/Day</p></div>
+      <div class="target-box"><div class="num">10+</div><p>Real Conversations</p></div>
+      <div class="target-box"><div class="num">3+</div><p>Trial Signups/Day</p></div>
+      <div class="target-box"><div class="num">100%</div><p>Follow-Ups Done</p></div>
+    </div>
+
+    <div class="territory-grid">
+      <div class="t-card">
+        <h4>Sector 18 Market</h4>
+        <span class="time">Best: 10 AM–12 PM, 3–5 PM</span>
+        <p>Electronics, Fashion, Food. High footfall market. Owners move fast — be direct and demo quickly.</p>
+      </div>
+      <div class="t-card">
+        <h4>Atta Market</h4>
+        <span class="time">Best: 11 AM–1 PM</span>
+        <p>General retail, Grocery. Hindi dominant. ROI argument works best here.</p>
+      </div>
+      <div class="t-card">
+        <h4>Sector 62 / 63</h4>
+        <span class="time">Best: 9:30–11 AM</span>
+        <p>Tech offices, SME shops. English comfortable, quick decisions.</p>
+      </div>
+      <div class="t-card">
+        <h4>Brahmaputra Market</h4>
+        <span class="time">Best: 10 AM–12 PM</span>
+        <p>Kirana, Pharmacy. Hindi essential, referral-driven market.</p>
+      </div>
+      <div class="t-card">
+        <h4>GIP Mall Area</h4>
+        <span class="time">Best: 2–5 PM</span>
+        <p>Fashion, F&amp;B. Premium segment. English preferred. Higher plan conversions.</p>
+      </div>
+      <div class="t-card">
+        <h4>Sector 2 / 3 Market</h4>
+        <span class="time">Best: 9–11 AM</span>
+        <p>Grocery, hardware. Budget-conscious — lead hard with 3-day trial angle.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DO'S AND DON'TS -->
+<div class="section" id="dodont">
+  <div class="section-header" onclick="toggleSection(this)">
+    <h2>Do's &amp; Don'ts</h2>
+    <span class="tag">Golden Rules</span>
+    <span class="acc-arrow">▼</span>
+  </div>
+  <div class="section-body">
+    <div class="dodont">
+      <div class="do-list">
+        <h3>ALWAYS DO</h3>
+        <ul>
+          <li>Lead with a question, not a pitch</li>
+          <li>Get WhatsApp number even if they say no</li>
+          <li>Leave a physical handout with QR code</li>
+          <li>Follow up exactly when you said you would</li>
+          <li>Know the nearest reference customer in that area</li>
+          <li>Speak their language (Hindi in most Noida markets)</li>
+          <li>Offer to do setup WITH them, not for them</li>
+          <li>Know your product specs cold (camera models, speed req)</li>
+          <li>Always ask "why" when they say no — there's a real objection</li>
+          <li>Celebrate when they get their first alert</li>
+        </ul>
+      </div>
+      <div class="dont-list">
+        <h3>NEVER DO</h3>
+        <ul>
+          <li>Badmouth competitors — ever</li>
+          <li>Promise features Retail Nazar doesn't have</li>
+          <li>Discount without manager approval</li>
+          <li>Pressure someone after a hard no twice</li>
+          <li>Leave without getting contact info</li>
+          <li>Exaggerate detection accuracy</li>
+          <li>Make legal claims (e.g., "FIR-proof evidence")</li>
+          <li>Show more than 3 features in a first demo</li>
+          <li>Ignore an objection and keep pitching</li>
+          <li>Arrive during peak rush hours without an appointment</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="background: var(--navy); color: white; border-radius: 10px; padding: 20px; margin-top: 20px;">
+      <h3 style="color: var(--gold); margin-bottom: 12px;">Product Quick Reference</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 13px;">
+        <div><strong style="color:#aab">Supported Cameras:</strong><br>Hikvision, Dahua, CP Plus, Axis, ONVIF-compatible</div>
+        <div><strong style="color:#aab">Internet Required:</strong><br>2 Mbps upload minimum per camera</div>
+        <div><strong style="color:#aab">Setup Time:</strong><br>15–30 minutes</div>
+        <div><strong style="color:#aab">Alert Delivery:</strong><br>WhatsApp + App Push + Email</div>
+        <div><strong style="color:#aab">Data Retention:</strong><br>30 days (Starter/Growth), 90 days (Pro+)</div>
+        <div><strong style="color:#aab">Support Hours:</strong><br>Mon–Sat 9 AM–7 PM</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div style="text-align:center; color:#999; font-size:12px; padding: 20px 0;">
+  Retail Nazar Sales Playbook v1.0 &nbsp;|&nbsp; BrainGuardX AI Technologies Pvt. Ltd. &nbsp;|&nbsp; Noida Launch Edition<br>
+  support@retailnazar.com &nbsp;|&nbsp; retailnazar.com &nbsp;|&nbsp; Confidential — Internal Use Only
+</div>
+
+</div><!-- end main -->
+
+<script>
+function toggleSection(header) {
+  const body = header.nextElementSibling;
+  const arrow = header.querySelector('.acc-arrow');
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    arrow.style.transform = 'rotate(180deg)';
+  } else {
+    body.style.display = 'none';
+    arrow.style.transform = 'rotate(0deg)';
+  }
+}
+function toggleAcc(header) {
+  const body = header.nextElementSibling;
+  const arrow = header.querySelector('.acc-arrow');
+  const isOpen = header.classList.contains('open');
+  header.classList.toggle('open', !isOpen);
+  body.classList.toggle('open', !isOpen);
+  if (arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+function filterObj() {
+  const q = document.getElementById('objSearch').value.toLowerCase();
+  document.querySelectorAll('.obj-item').forEach(item => {
+    const tags = item.dataset.tags || '';
+    const text = item.textContent.toLowerCase();
+    item.style.display = (tags.includes(q) || text.includes(q)) ? 'block' : 'none';
+  });
+}
+function copyMsg(btn) {
+  const msg = btn.parentElement.textContent.replace('Copy', '').replace(btn.nextElementSibling.textContent, '').trim();
+  navigator.clipboard.writeText(msg).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
+// Smooth scroll for nav
+document.querySelectorAll('.topnav a').forEach(a => {
+  a.addEventListener('click', function(e) {
+    e.preventDefault();
+    document.querySelectorAll('.topnav a').forEach(x => x.classList.remove('active'));
+    this.classList.add('active');
+    const target = document.querySelector(this.getAttribute('href'));
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+</script>
+</body>
+</html>

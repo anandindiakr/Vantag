@@ -93,7 +93,7 @@ async def step1_shop_details(
             address=body.address,
             city=body.city,
             country=body.country.upper(),
-            region={"IN": "india", "SG": "singapore", "MY": "malaysia"}.get(body.country.upper(), "india"),
+            region={"IN": "india", "SG": "singapore", "MY": "malaysia", "PH": "philippines"}.get(body.country.upper(), "india"),
             language=body.language,
             phone=body.phone,
             onboarding_step=2,
@@ -276,7 +276,7 @@ async def step5_install_agent(
     tenant_result = await session.execute(select(Tenant).where(Tenant.id == user["tenant_id"]))
     tenant = tenant_result.scalar_one_or_none()
 
-    region_url_map = {"india": "https://retailnazar.com", "singapore": "https://retail-vantag.com", "malaysia": "https://jagajaga.my"}
+    region_url_map = {"india": "https://retailnazar.com", "singapore": "https://retail-vantag.com", "malaysia": "https://jagajaga.my", "philippines": "https://retailbantay.com"}
     api_url = region_url_map.get(tenant.region if tenant else "india", "https://retail-vantag.com")
 
     qr_payload = {

@@ -68,7 +68,8 @@ async def _fire_signup_notifications(tenant_name: str, region: str) -> None:
         subject = f"New Vantag signup: {tenant_name} ({region})"
         body_text = f"New tenant signed up:\n  Name: {tenant_name}\n  Region: {region}"
         body_html = f"<p><strong>New tenant signed up:</strong><br>Name: {tenant_name}<br>Region: {region}</p>"
-        await send_email("support@retail-vantag.com", subject, body_html, body_text)
+        _to = {"india": "support@retailnazar.com", "philippines": "support@retailbantay.com"}.get(region, "support@retail-vantag.com")
+        await send_email(_to, subject, body_html, body_text)
     except Exception:  # noqa: BLE001
         pass
 

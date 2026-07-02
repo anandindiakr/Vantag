@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Patent Application Brief — BrainGuardX AI Technologies Pvt. Ltd.</title>
+<style>
+  :root{
+    --navy:#0d1b3e; --gold:#ffd200; --gold2:#e6b800;
+    --red:#c0392b; --green:#1a7a4a; --blue:#1a4fa0;
+    --light:#f4f6fb; --border:#d0d8e8; --text:#1a2340; --sub:#5a6a8a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#eef1f7;color:var(--text);font-size:15px}
+
+  /* NAV */
+  nav{background:var(--navy);padding:18px 40px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(0,0,0,.35)}
+  nav .brand{color:var(--gold);font-size:1.15rem;font-weight:700;letter-spacing:.5px}
+  nav .tag{color:rgba(255,255,255,.6);font-size:.78rem;margin-top:2px}
+  nav .badge{background:var(--gold);color:var(--navy);font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
+
+  /* HERO */
+  .hero{background:linear-gradient(135deg,var(--navy) 0%,#1a3070 100%);color:#fff;padding:60px 40px 50px;text-align:center}
+  .hero h1{font-size:2rem;color:var(--gold);margin-bottom:10px}
+  .hero .subtitle{font-size:1.05rem;opacity:.8;max-width:700px;margin:0 auto 20px}
+  .hero .meta{display:flex;gap:24px;justify-content:center;flex-wrap:wrap;margin-top:24px}
+  .hero .meta span{background:rgba(255,255,255,.1);padding:8px 18px;border-radius:20px;font-size:.82rem;color:rgba(255,255,255,.85)}
+  .hero .meta strong{color:var(--gold)}
+
+  /* LAYOUT */
+  .container{max-width:960px;margin:0 auto;padding:40px 20px}
+
+  /* WARNING BOX */
+  .warning{background:#fff8e1;border-left:5px solid var(--gold);padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:32px}
+  .warning h3{color:#b8860b;margin-bottom:6px;font-size:.95rem}
+  .warning p{color:#6d5800;font-size:.88rem;line-height:1.7}
+
+  /* SECTION HEADERS */
+  .section-hdr{display:flex;align-items:center;gap:12px;margin:40px 0 20px}
+  .section-hdr .num{background:var(--navy);color:var(--gold);width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1rem;flex-shrink:0}
+  .section-hdr h2{font-size:1.3rem;color:var(--navy)}
+
+  /* PATENT CARD */
+  .patent-card{background:#fff;border-radius:12px;box-shadow:0 2px 16px rgba(13,27,62,.1);margin-bottom:36px;overflow:hidden}
+  .patent-card .card-hdr{background:var(--navy);padding:22px 28px;color:#fff}
+  .patent-card .card-hdr .patent-num{color:var(--gold);font-size:.8rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+  .patent-card .card-hdr h3{font-size:1.1rem;line-height:1.4}
+  .patent-card .card-body{padding:28px}
+
+  /* FIELD GROUPS */
+  .field{margin-bottom:24px}
+  .field-label{font-size:.72rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+  .field-val{line-height:1.75;color:var(--text)}
+
+  /* CLAIMS */
+  .claims{counter-reset:claim}
+  .claim-item{border:1px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden}
+  .claim-item summary{padding:14px 18px;cursor:pointer;font-weight:600;font-size:.92rem;display:flex;align-items:center;gap:10px;list-style:none;background:#f8faff}
+  .claim-item summary::-webkit-details-marker{display:none}
+  .claim-item summary .claim-badge{background:var(--navy);color:var(--gold);font-size:.7rem;padding:3px 10px;border-radius:12px;font-weight:700}
+  .claim-item summary .arrow{margin-left:auto;color:var(--sub);transition:transform .25s}
+  .claim-item[open] summary .arrow{transform:rotate(90deg)}
+  .claim-item[open] summary{background:var(--navy);color:#fff}
+  .claim-item[open] summary .claim-badge{background:var(--gold);color:var(--navy)}
+  .claim-text{padding:16px 20px;font-size:.9rem;line-height:1.8;background:#fefefe;border-top:1px solid var(--border)}
+  .claim-text ol{padding-left:24px}
+  .claim-text li{margin-bottom:6px}
+
+  /* PRIOR ART TABLE */
+  table{width:100%;border-collapse:collapse;font-size:.88rem;margin-top:12px}
+  thead{background:var(--navy);color:#fff}
+  thead th{padding:12px 14px;text-align:left;font-weight:600}
+  tbody tr:nth-child(even){background:#f4f6fb}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+  .risk-high{color:#c0392b;font-weight:700}
+  .risk-med{color:#d68910;font-weight:700}
+  .risk-low{color:#1a7a4a;font-weight:700}
+
+  /* STRATEGY GRID */
+  .strat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:12px}
+  .strat-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:20px}
+  .strat-card .strat-icon{font-size:1.6rem;margin-bottom:10px}
+  .strat-card h4{font-size:.9rem;font-weight:700;color:var(--navy);margin-bottom:8px}
+  .strat-card p{font-size:.84rem;line-height:1.6;color:var(--sub)}
+
+  /* TIMELINE */
+  .timeline{position:relative;padding-left:30px;margin-top:14px}
+  .timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:linear-gradient(var(--gold),var(--navy))}
+  .tl-item{position:relative;margin-bottom:22px}
+  .tl-item::before{content:'';position:absolute;left:-26px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--gold);border:2px solid var(--navy)}
+  .tl-item h4{font-size:.9rem;font-weight:700;color:var(--navy);margin-bottom:4px}
+  .tl-item p{font-size:.84rem;color:var(--sub);line-height:1.6}
+  .tl-item .cost{display:inline-block;background:#e8f5e9;color:#1a7a4a;font-size:.75rem;font-weight:700;padding:2px 10px;border-radius:12px;margin-top:4px}
+
+  /* CHECKLIST */
+  .checklist{list-style:none}
+  .checklist li{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:.9rem;line-height:1.6}
+  .checklist li:last-child{border-bottom:none}
+  .checklist li::before{content:'☐';font-size:1.1rem;color:var(--navy);flex-shrink:0;margin-top:1px}
+
+  /* NOTE BOX */
+  .note{background:#e8f5e9;border-left:4px solid var(--green);padding:16px 20px;border-radius:0 8px 8px 0;margin-top:20px}
+  .note h4{color:var(--green);font-size:.88rem;font-weight:700;margin-bottom:6px}
+  .note p{font-size:.85rem;color:#1a5c35;line-height:1.7}
+
+  /* FOOTER */
+  footer{background:var(--navy);color:rgba(255,255,255,.5);text-align:center;padding:28px;font-size:.78rem;margin-top:48px}
+  footer strong{color:var(--gold)}
+
+  @media(max-width:600px){
+    .hero h1{font-size:1.4rem}
+    nav{padding:14px 18px}
+    .container{padding:24px 14px}
+    .patent-card .card-body{padding:18px}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div>
+    <div class="brand">BrainGuardX AI Technologies Pvt. Ltd.</div>
+    <div class="tag">CONFIDENTIAL — Intellectual Property Document</div>
+  </div>
+  <div class="badge">DRAFT — Attorney Review Required</div>
+</nav>
+
+<div class="hero">
+  <h1>Patent Application Brief</h1>
+  <p class="subtitle">Technical Claims for 2 Narrow Patent Filings — Retail Nazar AI Surveillance Platform</p>
+  <div class="meta">
+    <span><strong>Applicant:</strong> BrainGuardX AI Technologies Pvt. Ltd.</span>
+    <span><strong>Date:</strong> June 2026</span>
+    <span><strong>Jurisdiction:</strong> India (IN) — First Filing</span>
+    <span><strong>Status:</strong> Pre-Filing Draft</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="warning">
+    <h3>IMPORTANT LEGAL NOTICE</h3>
+    <p>This document is a <strong>pre-filing technical brief</strong> prepared to support engagement with a qualified Indian patent attorney. It does NOT constitute a formal patent application. The claims herein must be reviewed, amended, and filed by a registered Patent Agent under the Indian Patents Act, 1970 (as amended). Do not distribute outside the company without legal counsel review. The priority date is established only upon formal filing at the Indian Patent Office (IPO).</p>
+  </div>
+
+  <!-- ====== PATENT 1 ====== -->
+  <div class="section-hdr">
+    <div class="num">1</div>
+    <h2>Patent 1 — Indian Retail Concealment Detection</h2>
+  </div>
+
+  <div class="patent-card">
+    <div class="card-hdr">
+      <div class="patent-num">Application Reference: BGX-PAT-001 | Category: Computer Vision / AI</div>
+      <h3>Method and System for Detecting Retail Theft Concealment Behaviors in Indian Retail Environments Using Context-Specific Computer Vision Models</h3>
+    </div>
+    <div class="card-body">
+
+      <div class="field">
+        <div class="field-label">Field of Invention</div>
+        <div class="field-val">The present invention relates to computer vision-based behavioral detection systems, and more particularly to a method and system for detecting concealment-type shoplifting behaviors that are contextually specific to Indian retail environments, including concealment using Indian clothing items such as dupattas, sarees, kurtas, and Indian-style shopping bags, within retail stores.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Background of the Invention</div>
+        <div class="field-val">
+          Existing retail theft detection systems rely primarily on datasets and trained models developed in Western retail contexts. These systems fail to adequately detect concealment behaviors common in Indian retail environments where shoppers commonly wear draped garments (sarees, dupattas) and carry culturally specific bags (jhola bags, cloth bags) that create unique occlusion patterns different from Western concealment behaviors. Furthermore, Indian retail stores — particularly kirana stores, pharmacy stores, and jewellery shops — have unique spatial layouts including narrow aisles, floor-level shelving, and counter-based service that existing detection systems do not account for.
+          <br/><br/>
+          There is therefore a need for a method and system specifically trained and optimized for Indian retail concealment detection that accounts for: (a) Indian clothing concealment patterns, (b) Indian store spatial layouts, and (c) low-resolution camera feeds common in Indian retail (720p and below) with variable lighting conditions.
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Summary of the Invention</div>
+        <div class="field-val">
+          The present invention provides a method and system for detecting retail theft concealment behaviors in Indian retail environments, comprising: (i) a computer vision model trained on an India-specific dataset of concealment behaviors, (ii) a preprocessing pipeline for normalizing low-resolution Indian CCTV camera feeds from Hikvision, Dahua, and CP Plus camera brands, (iii) a behavioral classification module that identifies concealment events specific to Indian retail contexts, and (iv) an alert generation module that transmits real-time notifications via the WhatsApp Business API within a predefined latency threshold.
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Independent Claims</div>
+        <div class="claims">
+
+          <details class="claim-item">
+            <summary><span class="claim-badge">Claim 1</span> — Independent Method Claim <span class="arrow">›</span></summary>
+            <div class="claim-text">
+              <strong>Claim 1:</strong> A computer-implemented method for detecting retail theft concealment behaviors in Indian retail environments, the method comprising:
+              <ol>
+                <li>receiving, by a computing system, a live video stream from at least one surveillance camera installed at a retail premises in India, wherein the video stream is transmitted via Real-Time Streaming Protocol (RTSP) from a camera selected from a group consisting of Hikvision, Dahua, CP Plus, and ONVIF-compatible cameras;</li>
+                <li>preprocessing, by the computing system, the video stream frames through a normalization pipeline configured to compensate for low-resolution video artifacts, variable ambient lighting conditions, and camera distortions characteristic of sub-megapixel surveillance cameras commonly deployed in Indian retail stores;</li>
+                <li>applying, by the computing system, a trained machine learning model to the preprocessed frames to detect one or more concealment behaviors from a set comprising: (a) placement of merchandise under or within draped Indian garments including sarees and dupattas, (b) insertion of merchandise into cloth carry bags of the type jhola, (c) sweeping of merchandise off shelving using body contact while maintaining visual obstruction using the body or garments, and (d) pocket-insertion gestures using deep-front pockets characteristic of kurta-style garments;</li>
+                <li>generating, by the computing system, a concealment event record upon detection of any of the concealment behaviors, the event record including: a timestamp, a video clip of a predefined duration preceding and following the detected event, a confidence score, and a camera identifier;</li>
+                <li>transmitting, by the computing system, the concealment event record as a real-time alert notification via the WhatsApp Business API to a pre-registered mobile device of the retail store owner or manager within a predefined latency threshold of not more than five seconds from the time of detection.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="claim-item">
+            <summary><span class="claim-badge">Claim 2</span> — Independent System Claim <span class="arrow">›</span></summary>
+            <div class="claim-text">
+              <strong>Claim 2:</strong> A system for detecting retail theft concealment behaviors in Indian retail environments, the system comprising:
+              <ol>
+                <li>a camera interface module configured to receive live video streams via RTSP protocol from Indian retail surveillance cameras;</li>
+                <li>a preprocessing module configured to normalize video frames from cameras operating in resolution ranges from 480p to 1080p with frame rates between 10fps and 30fps;</li>
+                <li>a machine learning inference engine comprising a convolutional neural network trained exclusively on an India-specific training dataset of concealment behaviors annotated in Indian retail store environments;</li>
+                <li>an alert dispatch module configured to compose and transmit structured alerts including video evidence clips via the WhatsApp Business API; and</li>
+                <li>a multi-tenant data isolation layer configured to logically separate detection data, alert histories, and model configurations across multiple retail store tenants.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="claim-item">
+            <summary><span class="claim-badge">Claim 3</span> — Dependent: Training Dataset <span class="arrow">›</span></summary>
+            <div class="claim-text">
+              <strong>Claim 3 (dependent on Claim 2):</strong> The system of Claim 2, wherein the India-specific training dataset comprises annotated video sequences collected from Indian retail environments depicting concealment using Indian clothing types, Indian retail spatial configurations, and Indian ambient lighting conditions, wherein said training dataset is distinct from any publicly available shoplifting detection dataset in that it contains annotation categories for garment-type concealment specific to Indian subcontinental clothing conventions.
+            </div>
+          </details>
+
+          <details class="claim-item">
+            <summary><span class="claim-badge">Claim 4</span> — Dependent: Low-Bandwidth Alert <span class="arrow">›</span></summary>
+            <div class="claim-text">
+              <strong>Claim 4 (dependent on Claim 1):</strong> The method of Claim 1, wherein the step of transmitting the concealment event record further comprises: compressing the video clip to a file size not exceeding 5 megabytes using adaptive bitrate compression, and transmitting the compressed clip as a WhatsApp media message attachment alongside a structured text message comprising the concealment type classification, confidence score, store identifier, and timestamp, such that the total transmitted alert is deliverable over mobile internet connections with available bandwidth as low as 256 kilobits per second.
+            </div>
+          </details>
+
+          <details class="claim-item">
+            <summary><span class="claim-badge">Claim 5</span> — Dependent: Repeat Offender <span class="arrow">›</span></summary>
+            <div class="claim-text">
+              <strong>Claim 5 (dependent on Claim 1):</strong> The method of Claim 1, further comprising: maintaining a behavioral fingerprint database of persons detected performing concealment behaviors, wherein each fingerprint comprises extracted visual features of the person's appearance, and wherein upon detection of a subsequent concealment event by a person whose visual features substantially match an existing fingerprint, the alert notification transmitted via WhatsApp is supplemented with an indication that the detected person is a suspected repeat offender.
+            </div>
+          </details>
+
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Novelty Statement</div>
+        <div class="field-val">The novelty of the present invention lies in the combination of: (a) machine learning models trained on India-specific concealment behavior datasets covering Indian clothing types not addressed in prior art, (b) a preprocessing pipeline specifically designed for the image quality characteristics of Indian surveillance cameras (CP Plus, Hikvision India variants, Dahua India variants), and (c) an alert delivery mechanism via WhatsApp Business API with video evidence optimized for low-bandwidth Indian mobile internet conditions. No prior art has been identified that discloses this specific combination.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Prior Art Risk Assessment</div>
+        <table>
+          <thead><tr><th>Prior Art</th><th>Risk</th><th>Distinguishing Factor</th></tr></thead>
+          <tbody>
+            <tr><td>ResearchGate 2025 — "Intelligent Surveillance using WhatsApp alerts"</td><td class="risk-high">HIGH</td><td>Their system does not claim India-specific clothing types or Indian camera brand normalization</td></tr>
+            <tr><td>Veesion (FR) — gesture detection on existing cameras</td><td class="risk-med">MED</td><td>Veesion's gestures are Western-context; no Indian clothing categories; no WhatsApp delivery</td></tr>
+            <tr><td>Coram AI US Patent (2025) — edge-cloud CCTV notification</td><td class="risk-med">MED</td><td>Coram claims general event notification, not India-context behavioral categories</td></tr>
+            <tr><td>Anavid (UK) — concealment + mobile alert</td><td class="risk-med">MED</td><td>No India-specific training, no WhatsApp, no CP Plus compatibility</td></tr>
+            <tr><td>MDPI 2023 CNN-BiLSTM shoplifting paper</td><td class="risk-high">HIGH</td><td>Published in Western context; no Indian clothing categories; claims must not overlap with general CNN shoplifting detection</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ====== PATENT 2 ====== -->
+  <div class="section-hdr">
+    <div class="num">2</div>
+    <h2>Patent 2 — Sub-3-Second Alert Pipeline</h2>
+  </div>
+
+  <div class="patent-card">
+    <div class="card-hdr">
+      <div class="patent-num">Application Reference: BGX-PAT-002 | Category: Distributed Systems / SaaS Architecture</div>
+      <h3>Method and System for Guaranteed Sub-3-Second Retail Security Alert Delivery via Messaging APIs Over Low-Bandwidth Networks in Emerging Market Conditions</h3>
+    </div>
+    <div class="card-body">
+
+      <div class="field">
+        <div class="field-label">Field of Invention</div>
+        <div class="field-val">The present invention relates to real-time alert delivery systems for retail security applications, and more particularly to a method and system that guarantees delivery of AI-detected security event alerts to retail store owners via consumer messaging APIs within a maximum latency of three seconds, even under the intermittent and low-bandwidth internet connectivity conditions characteristic of retail premises in Indian urban and semi-urban markets.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Background of the Invention</div>
+        <div class="field-val">
+          Retail security alert systems in developed markets typically assume reliable high-bandwidth internet connectivity (5+ Mbps upload). Indian retail premises, including small kirana stores, jewellery shops, and electronics outlets, commonly operate on internet connections with upload bandwidth between 1–5 Mbps, variable latency, and intermittent packet loss, due to their reliance on consumer-grade broadband or mobile hotspot connections.
+          <br/><br/>
+          Existing retail AI surveillance platforms fail to deliver actionable alerts within an operationally useful time window under such network conditions, as they require transmission of high-resolution video streams or rely on proprietary mobile applications that require persistent background connections. The present invention solves this problem through a novel pipeline that separates inference computation (edge or cloud) from alert payload construction and delivery, and uses the WhatsApp Business API as a delivery channel due to its widespread adoption (500M+ users) and delivery guarantee mechanisms in Indian networks.
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Summary of the Invention</div>
+        <div class="field-val">
+          The present invention provides a method and system for delivering retail security event alerts in under three seconds comprising: (i) a distributed inference pipeline with adaptive edge-cloud workload partitioning based on real-time network bandwidth measurement, (ii) an alert payload minimization module that dynamically adjusts video clip resolution and duration based on available upload bandwidth, (iii) a multi-channel delivery failover mechanism using WhatsApp Business API as primary channel with SMS and push notification as fallback channels, and (iv) a delivery confirmation tracking module that escalates undelivered alerts within a predefined timeout.
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Independent Claims</div>
+        <div class="claims">
+
+          <details class="claim-item">
+            <summary><span class="claim-badge">Claim 1</span> — Independent Method Claim <span class="arrow">›</span></summary>
+            <div class="claim-text">
+              <strong>Claim 1:</strong> A computer-implemented method for delivering retail security event alerts within a guaranteed maximum latency, the method comprising:
+              <ol>
+                <li>continuously measuring, by a network monitoring module, the available upload bandwidth of the internet connection at the retail premises;</li>
+                <li>upon detection of a security event by an AI inference engine, constructing, by an alert payload construction module, an alert payload comprising a text description, a confidence score, a camera identifier, and optionally a video evidence clip, wherein the resolution and duration of the optional video evidence clip is dynamically selected from a predefined set of configurations based on the measured available upload bandwidth;</li>
+                <li>transmitting, by an alert dispatch module, the constructed alert payload as a message via the WhatsApp Business API to a pre-registered mobile device, wherein the transmission is initiated within one second of security event detection;</li>
+                <li>monitoring, by a delivery confirmation module, the delivery status of the transmitted WhatsApp message using WhatsApp Business API delivery receipts, wherein if a delivery confirmation is not received within a first timeout period of three seconds, the alert dispatch module retransmits the alert payload via an SMS gateway, and if delivery confirmation is not received within a second timeout period of seven seconds, the alert dispatch module further transmits the alert payload via a push notification service;</li>
+                <li>logging, by a persistence module, the security event record, alert payload, delivery timestamp, delivery channel used, and delivery confirmation status in a multi-tenant database.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="claim-item">
+            <summary><span class="claim-badge">Claim 2</span> — Independent System Claim <span class="arrow">›</span></summary>
+            <div class="claim-text">
+              <strong>Claim 2:</strong> A system for delivering retail security event alerts with a maximum end-to-end latency of three seconds, the system comprising:
+              <ol>
+                <li>a network monitoring module configured to continuously measure upload bandwidth availability at a retail premises;</li>
+                <li>an adaptive payload constructor configured to dynamically adjust video evidence clip parameters based on measured bandwidth;</li>
+                <li>a primary alert dispatcher configured to transmit alerts via the WhatsApp Business API;</li>
+                <li>a delivery confirmation monitor configured to receive and process WhatsApp delivery receipts; and</li>
+                <li>a failover dispatcher configured to retransmit undelivered alerts via SMS and push notification channels based on escalating timeout thresholds.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="claim-item">
+            <summary><span class="claim-badge">Claim 3</span> — Dependent: Edge-Cloud Partitioning <span class="arrow">›</span></summary>
+            <div class="claim-text">
+              <strong>Claim 3 (dependent on Claim 1):</strong> The method of Claim 1, wherein the AI inference engine operates in a hybrid edge-cloud architecture, wherein: (a) when the measured available upload bandwidth exceeds a first threshold, video frames are transmitted to a cloud inference server for AI analysis; (b) when the measured available upload bandwidth is below the first threshold, AI inference is performed locally on an edge computing device co-located with the retail premises surveillance system; and (c) the switching between edge and cloud inference is performed dynamically without interruption of security event detection.
+            </div>
+          </details>
+
+          <details class="claim-item">
+            <summary><span class="claim-badge">Claim 4</span> — Dependent: Bandwidth Tiers <span class="arrow">›</span></summary>
+            <div class="claim-text">
+              <strong>Claim 4 (dependent on Claim 1):</strong> The method of Claim 1, wherein the predefined set of alert payload configurations comprises at least three tiers: (a) a high-bandwidth tier transmitting a video clip of 10–15 seconds duration at 720p resolution when bandwidth exceeds 2 Mbps; (b) a medium-bandwidth tier transmitting a video clip of 5–8 seconds duration at 480p resolution when bandwidth is between 512 Kbps and 2 Mbps; and (c) a low-bandwidth tier transmitting a static image frame and text description only when bandwidth is below 512 Kbps.
+            </div>
+          </details>
+
+          <details class="claim-item">
+            <summary><span class="claim-badge">Claim 5</span> — Dependent: Multi-tenant Isolation <span class="arrow">›</span></summary>
+            <div class="claim-text">
+              <strong>Claim 5 (dependent on Claim 2):</strong> The system of Claim 2, wherein the persistence module implements a multi-tenant data architecture in which security event records, alert delivery logs, and configuration parameters of each retail store tenant are stored in logically isolated data partitions, and wherein a tenant administrator interface provides each retail store operator access exclusively to their own tenant's data without access to data of other tenants.
+            </div>
+          </details>
+
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Novelty Statement</div>
+        <div class="field-val">The novelty lies in the specific combination of: (a) dynamic alert payload construction tied to real-time bandwidth measurement, (b) use of WhatsApp Business API as the primary delivery channel with delivery receipt-based escalation, (c) the specific three-tier bandwidth adaptation model with defined thresholds suited for Indian retail network conditions, and (d) the multi-channel failover sequence (WhatsApp → SMS → Push) with specific timeout thresholds. No prior art discloses this specific combination for retail security applications in emerging market network conditions.</div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Prior Art Risk Assessment</div>
+        <table>
+          <thead><tr><th>Prior Art</th><th>Risk</th><th>Distinguishing Factor</th></tr></thead>
+          <tbody>
+            <tr><td>Coram AI US Patent 2025 — edge-cloud CCTV notification</td><td class="risk-med">MED</td><td>Coram does not claim WhatsApp delivery, bandwidth-adaptive payloads, or Indian network conditions</td></tr>
+            <tr><td>General IoT alert delivery patents (Honeywell, Bosch)</td><td class="risk-med">MED</td><td>General IoT alerts do not claim WhatsApp Business API, retail-specific context, or bandwidth-adaptive video clips</td></tr>
+            <tr><td>ResearchGate 2025 — WhatsApp surveillance alerts</td><td class="risk-high">HIGH</td><td>Claims must NOT overlap on basic "surveillance + WhatsApp alert" — must be limited to the bandwidth-adaptive pipeline and delivery confirmation mechanism</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ====== SECTION 3: FILING STRATEGY ====== -->
+  <div class="section-hdr">
+    <div class="num">3</div>
+    <h2>Filing Strategy &amp; Timeline</h2>
+  </div>
+
+  <div class="patent-card">
+    <div class="card-body">
+
+      <div class="field">
+        <div class="field-label">Recommended Filing Sequence</div>
+        <div class="timeline">
+          <div class="tl-item">
+            <h4>Month 1 — Engage Patent Attorney</h4>
+            <p>Engage a registered Indian Patent Agent (look for firms: Anand and Anand, K&S Partners, LexOrbis, Remfry &amp; Sagar — all in Delhi/Noida). Share this brief. Commission formal claims drafting and Freedom-to-Operate analysis against Tyco, Honeywell, Sensormatic patent families.</p>
+            <span class="cost">Cost: ₹50,000–₹1,20,000 attorney fees</span>
+          </div>
+          <div class="tl-item">
+            <h4>Month 2 — Provisional Application Filing (BGX-PAT-001)</h4>
+            <p>File Patent 1 (Indian Retail Concealment Detection) as a Provisional Application at Indian Patent Office, New Delhi. Provisional filing establishes priority date while allowing 12 months to finalize complete specification.</p>
+            <span class="cost">Cost: ₹1,750 govt fee (small entity) + attorney charges</span>
+          </div>
+          <div class="tl-item">
+            <h4>Month 3 — Provisional Application Filing (BGX-PAT-002)</h4>
+            <p>File Patent 2 (Sub-3-Second Alert Pipeline) as Provisional Application. Separately file Trademark application for "Retail Nazar" mark simultaneously.</p>
+            <span class="cost">Cost: ₹1,750 govt fee + attorney charges</span>
+          </div>
+          <div class="tl-item">
+            <h4>Months 4–12 — Complete Specification</h4>
+            <p>Prepare complete patent specifications with detailed description, drawings, and finalized claims for both patents. File complete specifications before provisional deadline (12 months from provisional filing date).</p>
+            <span class="cost">Cost: ₹4,000 govt fee per patent (small entity) + attorney charges</span>
+          </div>
+          <div class="tl-item">
+            <h4>Month 13–18 — Request for Examination</h4>
+            <p>File Request for Examination (RFE) for both patents. Indian Patent Office examination typically takes 3–5 years. Use "Expedited Examination" option if eligible (startup recognition under DPIIT Startup India).</p>
+            <span class="cost">Cost: ₹4,000 each (small entity) + reduced via Startup India recognition</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">DPIIT Startup India Advantage</div>
+        <div class="field-val">
+          BrainGuardX AI Technologies Pvt. Ltd. should register under DPIIT's Startup India scheme if not already done. Benefits include:
+        </div>
+        <ul class="checklist" style="margin-top:10px">
+          <li>80% rebate on patent filing fees</li>
+          <li>Expedited examination within 30 days (vs. years for standard)</li>
+          <li>Free IP facilitation through DIPP-empanelled facilitators</li>
+          <li>Access to National IPR Policy benefits</li>
+        </ul>
+      </div>
+
+      <div class="strat-grid" style="margin-top:16px">
+        <div class="strat-card">
+          <div class="strat-icon">🛡️</div>
+          <h4>File in India First (IN)</h4>
+          <p>Establish priority date in India immediately. PCT filing for international protection can follow within 12 months if business scales globally — not required at launch stage.</p>
+        </div>
+        <div class="strat-card">
+          <div class="strat-icon">🔒</div>
+          <h4>Trade Secrets Parallel</h4>
+          <p>Keep model weights, training dataset structure, and proprietary detection algorithms as trade secrets. Document creation dates internally. Do NOT disclose in patent more than the minimum required.</p>
+        </div>
+        <div class="strat-card">
+          <div class="strat-icon">⚡</div>
+          <h4>Narrow Claims Only</h4>
+          <p>Broad claims (AI + CCTV + alerts) will be rejected. Narrow, specific claims have better grant probability and are harder for competitors to design around.</p>
+        </div>
+        <div class="strat-card">
+          <div class="strat-icon">📋</div>
+          <h4>Document Everything Now</h4>
+          <p>Keep dated internal records of invention: code commits, design documents, training data logs. This establishes your inventorship timeline for any future dispute.</p>
+        </div>
+      </div>
+
+      <div class="note">
+        <h4>Total Estimated Cost for Both Patents (India)</h4>
+        <p>Government fees: ₹15,000–₹20,000 total across both patents (both provisional + complete + examination) at small entity rates, further reducible with DPIIT Startup India registration. Attorney fees: ₹1,50,000–₹3,00,000 for both patents. <strong>Total: ₹1,65,000–₹3,20,000 for both Indian patent applications through examination filing stage.</strong> This is a one-time investment that protects core IP for 20 years from filing date.</p>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <strong>BrainGuardX AI Technologies Pvt. Ltd.</strong> — CONFIDENTIAL — Pre-Filing Technical Brief — BGX-PAT-001 &amp; BGX-PAT-002<br/>
+  This document requires review by a registered Indian Patent Agent before filing. Not for external distribution.
+</footer>
+
+</body>
+</html>

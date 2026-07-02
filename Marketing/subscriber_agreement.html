@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Subscriber Service Agreement — Retail Nazar | BrainGuardX AI Technologies Pvt. Ltd.</title>
+  <style>
+    /* ============================================================
+       RESET & BASE
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:      #1a2e4a;
+      --blue:      #1e4d8c;
+      --blue-lt:   #2563a8;
+      --accent:    #c8a84b;
+      --shade:     #f0f4f9;
+      --shade2:    #fdf8ec;
+      --border:    #c5cdd8;
+      --text:      #1a1a1a;
+      --muted:     #555;
+      --red-note:  #7a1a1a;
+      --red-bg:    #fff5f5;
+    }
+
+    html { font-size: 10.5pt; }
+
+    body {
+      font-family: Georgia, "Times New Roman", Times, serif;
+      color: var(--text);
+      background: #e8ecf0;
+      line-height: 1.75;
+    }
+
+    /* ============================================================
+       PAGE WRAPPER — A4 simulation on screen
+    ============================================================ */
+    .page-wrapper {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 20px auto;
+      background: #fff;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.18);
+      padding: 18mm 20mm 22mm 20mm;
+      position: relative;
+    }
+
+    /* ============================================================
+       LETTERHEAD
+    ============================================================ */
+    .letterhead {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      border-bottom: 3px solid var(--navy);
+      padding-bottom: 10px;
+      margin-bottom: 6px;
+    }
+
+    .letterhead-left .company-name {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 15pt;
+      font-weight: 700;
+      color: var(--navy);
+      letter-spacing: 0.02em;
+      line-height: 1.2;
+    }
+
+    .letterhead-left .company-sub {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8pt;
+      color: var(--muted);
+      margin-top: 2px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .letterhead-right {
+      text-align: right;
+    }
+
+    .letterhead-right .product-badge {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13pt;
+      font-weight: 700;
+      color: var(--blue);
+      letter-spacing: 0.04em;
+    }
+
+    .letterhead-right .product-tagline {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 7.5pt;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .letterhead-right .product-url {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8pt;
+      color: var(--blue-lt);
+      text-decoration: none;
+    }
+
+    .gold-rule {
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+      margin-bottom: 14px;
+    }
+
+    /* ============================================================
+       DISCLAIMER BANNER
+    ============================================================ */
+    .disclaimer-banner {
+      background: var(--red-bg);
+      border: 1px solid #e8b4b4;
+      border-left: 4px solid #c0392b;
+      border-radius: 3px;
+      padding: 8px 12px;
+      margin-bottom: 18px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8pt;
+      color: var(--red-note);
+      line-height: 1.5;
+    }
+
+    .disclaimer-banner strong { font-weight: 700; }
+
+    /* ============================================================
+       DOCUMENT TITLE BLOCK
+    ============================================================ */
+    .doc-title-block {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .doc-title-block .doc-title {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14pt;
+      font-weight: 700;
+      color: var(--navy);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      display: inline-block;
+      padding-bottom: 4px;
+    }
+
+    .doc-title-block .doc-subtitle {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9pt;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+
+    .doc-ref-row {
+      display: flex;
+      justify-content: space-between;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8pt;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 5px 0;
+      margin-bottom: 22px;
+    }
+
+    /* ============================================================
+       SECTION HEADINGS
+    ============================================================ */
+    .section {
+      margin-bottom: 22px;
+    }
+
+    .section-heading {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: var(--navy);
+      background: var(--shade);
+      border-left: 4px solid var(--blue);
+      padding: 5px 10px;
+      margin-bottom: 10px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    /* ============================================================
+       CLAUSE NUMBERING
+    ============================================================ */
+    .clause {
+      margin-bottom: 8px;
+      padding-left: 0;
+    }
+
+    .clause-num {
+      font-weight: 700;
+      color: var(--blue);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9.5pt;
+      min-width: 2.8em;
+      display: inline-block;
+    }
+
+    .clause-text {
+      display: inline;
+    }
+
+    /* Sub-clauses */
+    .sub-clauses {
+      margin-top: 6px;
+      margin-left: 1.8em;
+    }
+
+    .sub-clause {
+      margin-bottom: 6px;
+      display: flex;
+      gap: 0.5em;
+    }
+
+    .sub-clause-num {
+      font-weight: 700;
+      color: var(--blue-lt);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9pt;
+      min-width: 3.2em;
+      flex-shrink: 0;
+    }
+
+    /* Sub-sub-clauses */
+    .subsub-clauses {
+      margin-top: 5px;
+      margin-left: 1.8em;
+    }
+
+    .subsub-clause {
+      margin-bottom: 5px;
+      display: flex;
+      gap: 0.5em;
+    }
+
+    .subsub-clause-num {
+      font-weight: 600;
+      color: var(--muted);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8.5pt;
+      min-width: 3.8em;
+      flex-shrink: 0;
+    }
+
+    /* ============================================================
+       SPECIAL BOXES
+    ============================================================ */
+    .highlight-box {
+      background: var(--shade);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 10px 14px;
+      margin: 10px 0;
+      font-size: 9.5pt;
+    }
+
+    .highlight-box.important {
+      background: var(--shade2);
+      border-color: var(--accent);
+      border-left: 4px solid var(--accent);
+    }
+
+    .highlight-box.warning {
+      background: var(--red-bg);
+      border-color: #e8b4b4;
+      border-left: 4px solid #c0392b;
+    }
+
+    /* ============================================================
+       PARTIES TABLE
+    ============================================================ */
+    .parties-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 9.5pt;
+    }
+
+    .parties-table th {
+      background: var(--navy);
+      color: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9pt;
+      padding: 7px 10px;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    .parties-table td {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .parties-table tr:nth-child(even) td { background: var(--shade); }
+
+    .parties-table .label {
+      font-weight: 600;
+      color: var(--navy);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8.5pt;
+      width: 38%;
+    }
+
+    .parties-table .value {
+      color: var(--text);
+    }
+
+    .placeholder {
+      color: #888;
+      font-style: italic;
+      border-bottom: 1px dashed #aaa;
+      display: inline-block;
+      min-width: 120px;
+    }
+
+    /* ============================================================
+       PLANS TABLE
+    ============================================================ */
+    .plans-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 9pt;
+    }
+
+    .plans-table th {
+      background: var(--blue);
+      color: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8.5pt;
+      padding: 7px 8px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .plans-table td {
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .plans-table tr:nth-child(even) td { background: var(--shade); }
+
+    .plans-table .plan-name {
+      font-weight: 700;
+      color: var(--navy);
+      font-family: Arial, Helvetica, sans-serif;
+      text-align: left;
+    }
+
+    .plans-table .price {
+      font-weight: 700;
+      color: var(--blue);
+    }
+
+    /* ============================================================
+       DEFINITIONS LIST
+    ============================================================ */
+    .def-list {
+      margin: 8px 0 8px 1em;
+    }
+
+    .def-item {
+      margin-bottom: 7px;
+      display: flex;
+      gap: 0.6em;
+    }
+
+    .def-term {
+      font-weight: 700;
+      color: var(--navy);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9pt;
+      min-width: 9em;
+      flex-shrink: 0;
+    }
+
+    /* ============================================================
+       BULLET LISTS
+    ============================================================ */
+    .legal-list {
+      margin: 6px 0 6px 2em;
+      list-style: none;
+    }
+
+    .legal-list li {
+      margin-bottom: 5px;
+      position: relative;
+      padding-left: 1.2em;
+    }
+
+    .legal-list li::before {
+      content: "(i)";
+      position: absolute;
+      left: -1.8em;
+      color: var(--blue-lt);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8.5pt;
+      font-weight: 600;
+      counter-increment: list-counter;
+    }
+
+    .legal-list li:nth-child(1)::before  { content: "(i)"; }
+    .legal-list li:nth-child(2)::before  { content: "(ii)"; }
+    .legal-list li:nth-child(3)::before  { content: "(iii)"; }
+    .legal-list li:nth-child(4)::before  { content: "(iv)"; }
+    .legal-list li:nth-child(5)::before  { content: "(v)"; }
+    .legal-list li:nth-child(6)::before  { content: "(vi)"; }
+    .legal-list li:nth-child(7)::before  { content: "(vii)"; }
+    .legal-list li:nth-child(8)::before  { content: "(viii)"; }
+    .legal-list li:nth-child(9)::before  { content: "(ix)"; }
+    .legal-list li:nth-child(10)::before { content: "(x)"; }
+    .legal-list li:nth-child(11)::before { content: "(xi)"; }
+    .legal-list li:nth-child(12)::before { content: "(xii)"; }
+
+    /* ============================================================
+       SIGNATURE BLOCK
+    ============================================================ */
+    .sig-section {
+      margin-top: 30px;
+      page-break-inside: avoid;
+    }
+
+    .sig-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 16px;
+    }
+
+    .sig-block {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 14px 16px;
+      background: var(--shade);
+    }
+
+    .sig-block .sig-party {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9pt;
+      font-weight: 700;
+      color: var(--navy);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 5px;
+    }
+
+    .sig-field {
+      margin-bottom: 10px;
+    }
+
+    .sig-field .sig-label {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 7.5pt;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 2px;
+    }
+
+    .sig-field .sig-line {
+      border-bottom: 1px solid #999;
+      min-height: 22px;
+      width: 100%;
+    }
+
+    .sig-field .sig-value {
+      font-size: 9pt;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .witness-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 16px;
+    }
+
+    .witness-block {
+      border: 1px dashed var(--border);
+      border-radius: 4px;
+      padding: 12px 14px;
+    }
+
+    .witness-block .witness-label {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+
+    /* ============================================================
+       FOOTER
+    ============================================================ */
+    .doc-footer {
+      margin-top: 30px;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 7.5pt;
+      color: var(--muted);
+    }
+
+    .doc-footer .footer-brand {
+      font-weight: 700;
+      color: var(--navy);
+    }
+
+    /* ============================================================
+       UTILITY
+    ============================================================ */
+    .text-center { text-align: center; }
+    .mt-8  { margin-top: 8px; }
+    .mt-12 { margin-top: 12px; }
+    .mt-16 { margin-top: 16px; }
+    .mb-4  { margin-bottom: 4px; }
+    .bold  { font-weight: 700; }
+    .italic { font-style: italic; }
+    .small { font-size: 8.5pt; }
+    .navy  { color: var(--navy); }
+    .blue  { color: var(--blue); }
+
+    hr.section-rule {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 18px 0;
+    }
+
+    /* ============================================================
+       PRINT STYLES
+    ============================================================ */
+    @media print {
+      body {
+        background: #fff;
+        font-size: 10pt;
+      }
+
+      .page-wrapper {
+        width: 100%;
+        margin: 0;
+        padding: 15mm 18mm 20mm 18mm;
+        box-shadow: none;
+      }
+
+      .section { page-break-inside: avoid; }
+
+      .sig-section { page-break-before: always; }
+
+      .doc-footer {
+        position: fixed;
+        bottom: 10mm;
+        left: 18mm;
+        right: 18mm;
+      }
+
+      @page {
+        size: A4;
+        margin: 15mm 18mm 22mm 18mm;
+      }
+
+      a { color: inherit; text-decoration: none; }
+    }
+
+    @media screen and (max-width: 230mm) {
+      .page-wrapper {
+        width: 100%;
+        margin: 0;
+        padding: 6mm 5mm 10mm 5mm;
+        box-shadow: none;
+      }
+      .sig-grid, .witness-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- ============================================================
+       LETTERHEAD
+  ============================================================ -->
+  <div class="letterhead">
+    <div class="letterhead-left">
+      <div class="company-name">BrainGuardX AI Technologies Pvt. Ltd.</div>
+      <div class="company-sub">CIN: &nbsp;<span class="placeholder">[To be filled]</span> &nbsp;|&nbsp; GSTIN: &nbsp;<span class="placeholder">[To be filled]</span></div>
+      <div class="company-sub" style="margin-top:3px;">Regd. Office: <span class="placeholder">[Registered Office Address — To be filled]</span></div>
+    </div>
+    <div class="letterhead-right">
+      <div class="product-badge">RETAIL NAZAR</div>
+      <div class="product-tagline">AI-Powered Retail Surveillance SaaS</div>
+      <div><a class="product-url" href="https://retailnazar.com">retailnazar.com</a></div>
+      <div class="product-tagline">support@retailnazar.com</div>
+    </div>
+  </div>
+  <div class="gold-rule"></div>
+
+  <!-- ============================================================
+       DISCLAIMER BANNER
+  ============================================================ -->
+  <div class="disclaimer-banner">
+    <strong>IMPORTANT NOTICE:</strong> This agreement is a standard form contract prepared by BrainGuardX AI Technologies Pvt. Ltd. It should be reviewed by a qualified legal counsel before execution. BrainGuardX AI Technologies Pvt. Ltd. reserves the right to update these terms with <strong>30 (thirty) days' prior written notice</strong> to the Subscriber. Continued use of the Service after the notice period constitutes acceptance of the revised terms.
+  </div>
+
+  <!-- ============================================================
+       DOCUMENT TITLE
+  ============================================================ -->
+  <div class="doc-title-block">
+    <div class="doc-title">Subscriber Service Agreement</div>
+    <div class="doc-subtitle">For the Use of Retail Nazar Platform &amp; Services</div>
+  </div>
+
+  <div class="doc-ref-row">
+    <span>Agreement Ref. No.: <span class="placeholder">[RN-AGR-______]</span></span>
+    <span>Version: 1.0 &nbsp;|&nbsp; Effective Date: <span class="placeholder">[DD / MM / YYYY]</span></span>
+    <span>Jurisdiction: Gautam Buddha Nagar, Uttar Pradesh, India</span>
+  </div>
+
+  <!-- ============================================================
+       SECTION 1 — PARTIES AND RECITALS
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">1. &nbsp;Parties and Recitals</div>
+
+    <div class="clause">
+      <span class="clause-num">1.1</span>
+      <span class="clause-text">This Subscriber Service Agreement (hereinafter referred to as the <strong>"Agreement"</strong>) is entered into as of the Effective Date set forth above, by and between the following parties:</span>
+    </div>
+
+    <div class="mt-12">
+      <strong class="navy" style="font-family:Arial,sans-serif;font-size:9pt;">PARTY A — SERVICE PROVIDER</strong>
+      <table class="parties-table" style="margin-top:6px;">
+        <tr>
+          <td class="label">Legal Name</td>
+          <td class="value"><strong>BrainGuardX AI Technologies Private Limited</strong></td>
+        </tr>
+        <tr>
+          <td class="label">Also referred to as</td>
+          <td class="value">"Company" or "BGXT" or "Service Provider"</td>
+        </tr>
+        <tr>
+          <td class="label">CIN</td>
+          <td class="value"><span class="placeholder">[To be filled]</span></td>
+        </tr>
+        <tr>
+          <td class="label">GSTIN</td>
+          <td class="value"><span class="placeholder">[To be filled]</span></td>
+        </tr>
+        <tr>
+          <td class="label">Registered Office</td>
+          <td class="value"><span class="placeholder">[Registered Office Address — To be filled]</span></td>
+        </tr>
+        <tr>
+          <td class="label">Product / Platform</td>
+          <td class="value">Retail Nazar (retailnazar.com)</td>
+        </tr>
+        <tr>
+          <td class="label">Support Email</td>
+          <td class="value">support@retailnazar.com</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="mt-12">
+      <strong class="navy" style="font-family:Arial,sans-serif;font-size:9pt;">PARTY B — SUBSCRIBER / CUSTOMER</strong>
+      <table class="parties-table" style="margin-top:6px;">
+        <tr>
+          <td class="label">Full Legal Name</td>
+          <td class="value"><span class="placeholder">[Subscriber Full Name]</span></td>
+        </tr>
+        <tr>
+          <td class="label">Also referred to as</td>
+          <td class="value">"Subscriber" or "Customer"</td>
+        </tr>
+        <tr>
+          <td class="label">Store / Business Name</td>
+          <td class="value"><span class="placeholder">[Store / Business Name]</span></td>
+        </tr>
+        <tr>
+          <td class="label">Business Address</td>
+          <td class="value"><span class="placeholder">[Complete Business Address including PIN Code]</span></td>
+        </tr>
+        <tr>
+          <td class="label">GSTIN (if applicable)</td>
+          <td class="value"><span class="placeholder">[GSTIN / N.A.]</span></td>
+        </tr>
+        <tr>
+          <td class="label">Contact Email</td>
+          <td class="value"><span class="placeholder">[Subscriber Email Address]</span></td>
+        </tr>
+        <tr>
+          <td class="label">Contact Mobile</td>
+          <td class="value"><span class="placeholder">[Subscriber Mobile Number]</span></td>
+        </tr>
+        <tr>
+          <td class="label">Subscription Plan</td>
+          <td class="value"><span class="placeholder">[Starter / Growth / Pro / Pro+]</span></td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="clause mt-12">
+      <span class="clause-num">1.2</span>
+      <span class="clause-text"><strong>Recitals.</strong> WHEREAS:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">1.2.1</span>
+        <span>The Company is engaged in the business of developing and providing artificial intelligence-powered retail surveillance software-as-a-service solutions under the brand name <strong>Retail Nazar</strong>, accessible via the Platform at <strong>retailnazar.com</strong>;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">1.2.2</span>
+        <span>The Subscriber is a retailer, shopkeeper, or business owner desirous of availing the Services offered by the Company for the purpose of monitoring and securing their retail premises through AI-assisted video surveillance;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">1.2.3</span>
+        <span>The Company has agreed to provide, and the Subscriber has agreed to subscribe to, the Services on the terms and conditions set forth in this Agreement;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">1.2.4</span>
+        <span>Both parties intend this Agreement to be legally binding and enforceable under the laws of India.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">1.3</span>
+      <span class="clause-text">NOW, THEREFORE, in consideration of the mutual covenants, representations, warranties, and agreements contained herein, and for other good and valuable consideration, the receipt and sufficiency of which are hereby acknowledged, the parties agree as follows:</span>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 2 — DEFINITIONS
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">2. &nbsp;Definitions</div>
+
+    <div class="clause">
+      <span class="clause-num">2.1</span>
+      <span class="clause-text">In this Agreement, unless the context otherwise requires, the following terms shall have the meanings ascribed to them below:</span>
+    </div>
+
+    <div class="def-list mt-8">
+      <div class="def-item">
+        <span class="def-term">"Agreement"</span>
+        <span>means this Subscriber Service Agreement, including all Schedules, Annexures, and any amendments made in writing and signed by both parties.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Service" / "Services"</span>
+        <span>means the AI-powered retail surveillance software-as-a-service platform known as <strong>Retail Nazar</strong>, including all features, modules, APIs, dashboards, alert systems, cloud storage, and ancillary services provided by the Company under this Agreement.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Platform"</span>
+        <span>means the web-based and/or mobile application interface accessible at <strong>retailnazar.com</strong> and any associated applications through which the Services are delivered.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Subscriber"</span>
+        <span>means the individual, proprietorship, partnership, company, or other legal entity that has subscribed to the Services and is identified as Party B in this Agreement.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Authorized User"</span>
+        <span>means any employee, agent, or contractor of the Subscriber who is authorized by the Subscriber to access and use the Platform on the Subscriber's behalf, subject to the user limits of the applicable Subscription Plan.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Data" / "Subscriber Data"</span>
+        <span>means all video footage, images, metadata, event logs, and other information generated by or on behalf of the Subscriber through the use of the Services, including CCTV footage captured by the Subscriber's cameras.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Alert"</span>
+        <span>means an automated notification generated by the AI engine of the Platform upon detection of a predefined event or anomaly (such as suspected shoplifting, unauthorized access, or unusual activity) within the Subscriber's camera feed.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Subscription Fee"</span>
+        <span>means the recurring fee payable by the Subscriber to the Company for access to the Services, as specified in Clause 4 of this Agreement, exclusive of applicable taxes.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Subscription Plan"</span>
+        <span>means the specific tier of service (Starter, Growth, Pro, or Pro+) selected by the Subscriber, which determines the features, camera limits, data retention, and pricing applicable to the Subscriber.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Trial Period"</span>
+        <span>means the initial 3 (three) calendar day period commencing from the date of account activation, during which the Subscriber may access the Services at no charge, subject to the terms of Clause 4.4.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Intellectual Property"</span>
+        <span>means all patents, copyrights, trademarks, trade secrets, algorithms, source code, object code, AI models, machine learning models, databases, designs, and any other proprietary rights, whether registered or unregistered.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Confidential Information"</span>
+        <span>means any non-public information disclosed by one party to the other in connection with this Agreement that is designated as confidential or that reasonably should be understood to be confidential given the nature of the information and circumstances of disclosure.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Force Majeure Event"</span>
+        <span>means any event beyond the reasonable control of a party, including but not limited to acts of God, natural disasters, war, terrorism, government actions, internet outages, power failures, or pandemic.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"GST"</span>
+        <span>means Goods and Services Tax as applicable under the Central Goods and Services Tax Act, 2017, and the Integrated Goods and Services Tax Act, 2017, and any rules or regulations made thereunder.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Effective Date"</span>
+        <span>means the date on which this Agreement is executed by both parties, or the date on which the Subscriber activates their account on the Platform, whichever is earlier.</span>
+      </div>
+      <div class="def-item">
+        <span class="def-term">"Uptime"</span>
+        <span>means the percentage of time in a calendar month during which the Platform is accessible and operational, excluding scheduled maintenance windows and Force Majeure Events.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">2.2</span>
+      <span class="clause-text">References to any statute or statutory provision include references to that statute or provision as amended, extended, or re-enacted from time to time. Words importing the singular include the plural and vice versa. Headings are for convenience only and shall not affect interpretation.</span>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 3 — SCOPE OF SERVICES
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">3. &nbsp;Scope of Services</div>
+
+    <div class="clause">
+      <span class="clause-num">3.1</span>
+      <span class="clause-text"><strong>Services Provided.</strong> Subject to the terms of this Agreement and payment of applicable Subscription Fees, the Company shall provide the Subscriber with access to the following Services through the Platform:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.1.1</span>
+        <span><strong>AI-Powered Detection:</strong> Real-time and near-real-time AI analysis of video feeds from the Subscriber's connected cameras for detection of predefined events including, but not limited to, suspected shoplifting behavior, loitering, unauthorized zone entry, crowd density anomalies, and other configurable retail security events;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.1.2</span>
+        <span><strong>Automated Alerts:</strong> Generation and delivery of Alerts via the Platform dashboard, email, and/or mobile push notifications upon detection of flagged events;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.1.3</span>
+        <span><strong>Cloud Storage:</strong> Encrypted cloud storage of video footage and event data for the retention period applicable to the Subscriber's plan (30 days for Starter and Growth plans; 90 days for Pro and Pro+ plans);</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.1.4</span>
+        <span><strong>Dashboard Access:</strong> Access to a web-based management dashboard for viewing live feeds (where technically supported), reviewing recorded footage, managing camera configurations, viewing analytics reports, and managing account settings;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.1.5</span>
+        <span><strong>Customer Support:</strong> Technical support as described in Clause 10 of this Agreement.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">3.2</span>
+      <span class="clause-text"><strong>Services Not Provided / Limitations.</strong> The Subscriber expressly acknowledges and agrees that:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.2.1</span>
+        <span>The Company does <strong>not</strong> provide physical security personnel, on-site monitoring, or any form of physical intervention;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.2.2</span>
+        <span>The Company does <strong>not</strong> guarantee a 100% (one hundred percent) detection rate. The AI system is a probabilistic tool and may produce false positives (incorrect alerts) or false negatives (missed detections). The Subscriber shall not rely solely on the Service as the exclusive means of security for their premises;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.2.3</span>
+        <span>The accuracy of AI detections is dependent on factors including, but not limited to, camera placement, image quality, lighting conditions, network bandwidth, and camera resolution. The Company shall not be liable for reduced accuracy arising from suboptimal camera conditions;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.2.4</span>
+        <span>The Service is not a substitute for legal evidence collection systems, and the Company makes no representation that footage or Alerts generated by the Platform will be admissible as evidence in any legal proceeding.</span>
+      </div>
+    </div>
+
+    <div class="highlight-box important mt-12">
+      <strong>AI DISCLAIMER:</strong> Retail Nazar is an AI-assisted surveillance tool designed to augment — not replace — human judgment and conventional security measures. Detection accuracy varies based on environmental conditions. The Company expressly disclaims any warranty of 100% detection accuracy or completeness.
+    </div>
+
+    <div class="clause mt-12">
+      <span class="clause-num">3.3</span>
+      <span class="clause-text"><strong>Compatible Camera Requirements.</strong> The Subscriber is responsible for ensuring that their cameras meet the minimum technical requirements for compatibility with the Platform. Recommended specifications include:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.3.1</span>
+        <span>IP cameras (ONVIF-compatible preferred) with a minimum resolution of 1080p (Full HD);</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.3.2</span>
+        <span>Cameras capable of RTSP (Real Time Streaming Protocol) stream output;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.3.3</span>
+        <span>Stable internet connectivity with a minimum upload speed of <strong>2 (two) Mbps per connected camera</strong>;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">3.3.4</span>
+        <span>Adequate lighting at the monitored premises to enable effective AI analysis.</span>
+      </div>
+    </div>
+    <div class="clause mt-8">
+      <span class="clause-num">3.4</span>
+      <span class="clause-text">The Company may, from time to time, update the list of compatible camera models and technical requirements. Such updates shall be communicated to the Subscriber via the Platform or email with reasonable notice.</span>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 4 — SUBSCRIPTION PLANS AND COMMERCIAL TERMS
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">4. &nbsp;Subscription Plans and Commercial Terms</div>
+
+    <div class="clause">
+      <span class="clause-num">4.1</span>
+      <span class="clause-text"><strong>Subscription Plans.</strong> The Company offers the following Subscription Plans. All prices are in Indian Rupees (INR) and are exclusive of applicable GST:</span>
+    </div>
+
+    <table class="plans-table mt-8">
+      <thead>
+        <tr>
+          <th style="text-align:left;">Plan</th>
+          <th>Monthly Fee (excl. GST)</th>
+          <th>Annual Fee (excl. GST)</th>
+          <th>Camera Limit</th>
+          <th>Data Retention</th>
+          <th>Key Features</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="plan-name">Starter</td>
+          <td class="price">₹999 / month</td>
+          <td class="price">₹9,990 / year</td>
+          <td>1–2 cameras</td>
+          <td>30 days</td>
+          <td style="text-align:left;font-size:8pt;">AI detection, alerts, dashboard, email support</td>
+        </tr>
+        <tr>
+          <td class="plan-name">Growth</td>
+          <td class="price">₹1,999 / month</td>
+          <td class="price">₹19,990 / year</td>
+          <td>Up to 5 cameras</td>
+          <td>30 days</td>
+          <td style="text-align:left;font-size:8pt;">All Starter features + analytics reports, WhatsApp alerts</td>
+        </tr>
+        <tr>
+          <td class="plan-name">Pro</td>
+          <td class="price">₹3,499 / month</td>
+          <td class="price">₹34,990 / year</td>
+          <td>Up to 10 cameras</td>
+          <td>90 days</td>
+          <td style="text-align:left;font-size:8pt;">All Growth features + priority support, advanced analytics</td>
+        </tr>
+        <tr>
+          <td class="plan-name">Pro+</td>
+          <td class="price">₹5,999 / month</td>
+          <td class="price">₹59,990 / year</td>
+          <td>Unlimited cameras</td>
+          <td>90 days</td>
+          <td style="text-align:left;font-size:8pt;">All Pro features + dedicated support, custom integrations</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="highlight-box mt-8 small">
+      <strong>Annual Plan Benefit:</strong> Annual Subscription Fees are equivalent to 10 (ten) months' billing, providing a saving equivalent to 2 (two) months of the applicable monthly Subscription Fee. Annual fees are payable upfront in full at the commencement of the annual subscription term.
+    </div>
+
+    <div class="clause mt-12">
+      <span class="clause-num">4.2</span>
+      <span class="clause-text"><strong>Plan Changes.</strong> The Subscriber may upgrade their Subscription Plan at any time with immediate effect. Downgrades shall take effect at the commencement of the next billing cycle. The Company reserves the right to modify plan features and pricing with 30 (thirty) days' prior written notice to the Subscriber.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">4.3</span>
+      <span class="clause-text"><strong>Camera Limits.</strong> The Subscriber shall not connect more cameras than permitted under their Subscription Plan. Exceeding the camera limit may result in automatic suspension of excess camera feeds or a prompt to upgrade the plan. The Company shall not be liable for any loss arising from the suspension of excess camera feeds.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">4.4</span>
+      <span class="clause-text"><strong>Free Trial.</strong> New Subscribers are entitled to a 3 (three) calendar day free trial commencing from the date of account activation, subject to the following conditions:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">4.4.1</span>
+        <span>The free trial is available only once per Subscriber (identified by email address, mobile number, GSTIN, or payment instrument). Any attempt to avail multiple trials through different accounts shall be deemed a breach of this Agreement;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">4.4.2</span>
+        <span>The Subscriber must provide valid payment details at the time of trial activation. If the Subscriber does not cancel before the expiry of the Trial Period, the applicable Subscription Fee shall be automatically charged;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">4.4.3</span>
+        <span>The Company reserves the right to modify or discontinue the free trial offer at any time without notice.</span>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 5 — PAYMENT TERMS
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">5. &nbsp;Payment Terms</div>
+
+    <div class="clause">
+      <span class="clause-num">5.1</span>
+      <span class="clause-text"><strong>Billing and Payment Gateway.</strong> All Subscription Fees shall be collected through <strong>Razorpay</strong> (or such other payment gateway as the Company may designate from time to time). The Subscriber authorizes the Company to charge the Subscription Fee to the payment instrument registered by the Subscriber on the Platform.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">5.2</span>
+      <span class="clause-text"><strong>Billing Cycle.</strong> For monthly subscriptions, the Subscription Fee shall be billed on the same calendar date each month as the date of initial subscription (or the next business day if such date does not exist in a given month). For annual subscriptions, the full annual fee is billed upfront at the commencement of the subscription year.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">5.3</span>
+      <span class="clause-text"><strong>Auto-Renewal.</strong> Subscriptions shall automatically renew at the end of each billing cycle (monthly or annual, as applicable) at the then-current Subscription Fee, unless the Subscriber cancels the subscription at least 24 (twenty-four) hours before the renewal date through the Platform dashboard or by written notice to the Company. The Company shall send a renewal reminder to the Subscriber's registered email address at least 7 (seven) days before the renewal date.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">5.4</span>
+      <span class="clause-text"><strong>Taxes.</strong> All Subscription Fees are exclusive of GST. GST at the rate of <strong>18% (eighteen percent)</strong> (or such other rate as may be applicable under law from time to time) shall be charged in addition to the Subscription Fee and shall be payable by the Subscriber. The Company shall issue a valid GST invoice for each payment received.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">5.5</span>
+      <span class="clause-text"><strong>Late Payment.</strong> In the event of a failed payment or non-payment of the Subscription Fee on the due date, the Company shall:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">5.5.1</span>
+        <span>Provide a grace period of <strong>7 (seven) calendar days</strong> from the due date, during which the Subscriber may make payment without penalty;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">5.5.2</span>
+        <span>Suspend access to the Services upon expiry of the 7-day grace period if payment remains outstanding;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">5.5.3</span>
+        <span>Charge interest on overdue amounts at the rate of <strong>2% (two percent) per month</strong> (or part thereof), compounded monthly, from the date the payment was due until the date of actual payment.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">5.6</span>
+      <span class="clause-text"><strong>Refund Policy.</strong> All Subscription Fees paid are <strong>non-refundable</strong>, except as follows:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">5.6.1</span>
+        <span>During the Trial Period, no charges are levied, and no refund is applicable;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">5.6.2</span>
+        <span>After the Trial Period has expired and the first Subscription Fee has been charged, <strong>no refunds shall be issued</strong> for any unused portion of the subscription period, whether upon cancellation, termination, or downgrade;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">5.6.3</span>
+        <span>In the event of a verified billing error attributable solely to the Company, the Company shall issue a credit note or refund for the erroneously charged amount within 15 (fifteen) business days of the Subscriber raising a written dispute.</span>
+      </div>
+    </div>
+
+    <div class="highlight-box warning mt-12">
+      <strong>NO REFUND POLICY:</strong> Subscription Fees paid after the expiry of the 3-day free trial are strictly non-refundable. The Subscriber is advised to fully evaluate the Service during the Trial Period before committing to a paid subscription.
+    </div>
+
+    <div class="clause mt-12">
+      <span class="clause-num">5.7</span>
+      <span class="clause-text"><strong>Disputed Charges.</strong> The Subscriber must raise any billing dispute in writing to support@retailnazar.com within 30 (thirty) days of the disputed charge. Failure to raise a dispute within this period shall constitute acceptance of the charge.</span>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 6 — SUBSCRIBER OBLIGATIONS (DO's)
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">6. &nbsp;Subscriber Obligations</div>
+
+    <div class="clause">
+      <span class="clause-num">6.1</span>
+      <span class="clause-text">The Subscriber shall, at all times during the Term of this Agreement:</span>
+    </div>
+
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">6.1.1</span>
+        <span><strong>Internet Connectivity:</strong> Maintain a stable, uninterrupted internet connection at the monitored premises with a minimum upload speed of <strong>2 (two) Mbps per connected camera</strong>. The Subscriber acknowledges that inadequate bandwidth will adversely affect Service quality and that the Company shall not be liable for any degradation in Service resulting from the Subscriber's network conditions;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">6.1.2</span>
+        <span><strong>Compatible Equipment:</strong> Use only IP cameras that meet the minimum technical specifications prescribed by the Company (as updated from time to time on the Platform), and ensure that cameras are properly installed, positioned, and maintained;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">6.1.3</span>
+        <span><strong>Credential Security:</strong> Keep all login credentials (username, password, API keys, and OTPs) strictly confidential and secure. The Subscriber shall be solely responsible for all activities conducted under their account, whether or not authorized by the Subscriber;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">6.1.4</span>
+        <span><strong>Notification of Changes:</strong> Promptly inform the Company of any material changes to the camera setup, including addition, removal, or relocation of cameras, changes in network configuration, or changes in the monitored premises, to enable the Company to maintain optimal Service delivery;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">6.1.5</span>
+        <span><strong>Authorized Use:</strong> Use the Service exclusively for monitoring the Subscriber's own retail premises as disclosed to the Company at the time of subscription. Any use of the Service to monitor premises not disclosed to the Company is strictly prohibited;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">6.1.6</span>
+        <span><strong>Legal Compliance:</strong> Comply with all applicable laws, rules, and regulations governing the use of CCTV and AI-based surveillance systems, including but not limited to the Information Technology Act, 2000, the Digital Personal Data Protection Act, 2023, and any applicable state or local laws regarding employee monitoring and privacy;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">6.1.7</span>
+        <span><strong>Surveillance Signage:</strong> Display clearly visible and legible signage at all entry points and within the monitored premises stating that <strong>"CCTV / AI Surveillance is Active"</strong> (or equivalent wording as required by applicable law), in compliance with applicable privacy and surveillance regulations. The Subscriber shall be solely responsible for obtaining any consents required from employees, customers, or visitors under applicable law;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">6.1.8</span>
+        <span><strong>Account Information:</strong> Provide accurate, complete, and up-to-date information during registration and throughout the Term, and promptly update such information upon any change;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">6.1.9</span>
+        <span><strong>Timely Payment:</strong> Pay all Subscription Fees and applicable taxes on or before the due date as specified in Clause 5.</span>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 7 — SUBSCRIBER RESTRICTIONS (DON'Ts)
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">7. &nbsp;Subscriber Restrictions</div>
+
+    <div class="clause">
+      <span class="clause-num">7.1</span>
+      <span class="clause-text">The Subscriber shall NOT, directly or indirectly, and shall ensure that no Authorized User:</span>
+    </div>
+
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">7.1.1</span>
+        <span><strong>Unauthorized Credential Sharing:</strong> Share, transfer, or disclose login credentials, access tokens, or any means of accessing the Platform to any person who is not an Authorized User of the Subscriber's account;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">7.1.2</span>
+        <span><strong>Illegal Surveillance:</strong> Use the Service for any purpose that violates applicable law, including but not limited to covert surveillance of individuals without their knowledge or consent where such consent is required by law, surveillance of minors in violation of applicable child protection laws, or any form of stalking, harassment, or discriminatory monitoring;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">7.1.3</span>
+        <span><strong>Reverse Engineering:</strong> Attempt to reverse engineer, decompile, disassemble, decode, or otherwise derive the source code, algorithms, AI models, or underlying technology of the Platform or any component thereof;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">7.1.4</span>
+        <span><strong>Resale or Sublicensing:</strong> Resell, sublicense, lease, rent, transfer, or otherwise make the Service available to any third party without the prior written consent of the Company. Any such consent, if granted, shall be subject to a separate written agreement;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">7.1.5</span>
+        <span><strong>Undisclosed Premises:</strong> Use the Service to monitor any property, premises, or location that has not been disclosed to the Company at the time of subscription or subsequently in writing;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">7.1.6</span>
+        <span><strong>Defamatory Statements:</strong> Make any false, misleading, or defamatory statements, reviews, or representations about the Company, the Platform, the Retail Nazar brand, or the accuracy of the AI system in any public forum, social media, or communication channel;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">7.1.7</span>
+        <span><strong>Billing Circumvention:</strong> Attempt to circumvent, bypass, or manipulate the billing system, access premium features without payment, use unauthorized discount codes, or exploit any technical vulnerability to obtain Services without paying the applicable Subscription Fee;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">7.1.8</span>
+        <span><strong>System Interference:</strong> Introduce any virus, malware, ransomware, Trojan horse, worm, or other malicious code into the Platform; conduct any denial-of-service attack; or attempt to gain unauthorized access to any part of the Platform or the Company's systems;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">7.1.9</span>
+        <span><strong>Intellectual Property Infringement:</strong> Remove, alter, or obscure any copyright notice, trademark, or other proprietary rights notice on or within the Platform;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">7.1.10</span>
+        <span><strong>Competitive Use:</strong> Use the Service or any information derived therefrom to develop, market, or support any product or service that competes with the Company's products or services.</span>
+      </div>
+    </div>
+
+    <div class="highlight-box warning mt-12">
+      <strong>BREACH OF RESTRICTIONS:</strong> Any violation of the restrictions set forth in Clause 7 shall constitute a material breach of this Agreement, entitling the Company to immediately suspend or terminate the Subscriber's access to the Service without notice and without refund, in addition to any other remedies available under law.
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 8 — DATA PRIVACY AND SECURITY
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">8. &nbsp;Data Privacy and Security</div>
+
+    <div class="clause">
+      <span class="clause-num">8.1</span>
+      <span class="clause-text"><strong>Applicable Law.</strong> The Company's collection, storage, processing, and use of personal data and Subscriber Data shall be governed by and conducted in compliance with the <strong>Information Technology Act, 2000</strong>, the <strong>Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011</strong>, and the <strong>Digital Personal Data Protection Act, 2023</strong> (DPDP Act), as amended from time to time, and any other applicable data protection laws of India.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">8.2</span>
+      <span class="clause-text"><strong>Data Storage and Encryption.</strong> All CCTV footage and Subscriber Data uploaded to or generated on the Platform shall be stored in encrypted form on cloud servers. The Company employs industry-standard encryption protocols (AES-256 or equivalent) for data at rest and TLS/SSL for data in transit. The Company shall implement and maintain reasonable technical and organizational security measures to protect Subscriber Data against unauthorized access, disclosure, alteration, or destruction.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">8.3</span>
+      <span class="clause-text"><strong>Data Retention.</strong> Subscriber Data shall be retained on the Platform for the following periods, after which it shall be automatically deleted:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">8.3.1</span>
+        <span><strong>Starter and Growth Plans:</strong> 30 (thirty) calendar days from the date of recording;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">8.3.2</span>
+        <span><strong>Pro and Pro+ Plans:</strong> 90 (ninety) calendar days from the date of recording.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">8.4</span>
+      <span class="clause-text"><strong>Subscriber Ownership of Data.</strong> The Subscriber retains full ownership of all Subscriber Data, including video footage captured by the Subscriber's cameras. The Company's access to Subscriber Data is limited to what is necessary to provide the Services. The Company does not claim any ownership rights over Subscriber Data.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">8.5</span>
+      <span class="clause-text"><strong>Non-Disclosure of Footage.</strong> The Company shall not access, view, share, sell, or disclose Subscriber Data (including video footage) to any third party, except:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">8.5.1</span>
+        <span>As required by a valid court order, judicial process, or lawful direction from a competent government authority under applicable Indian law;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">8.5.2</span>
+        <span>As necessary to provide the Services (e.g., to authorized sub-processors or cloud infrastructure providers), subject to appropriate data processing agreements;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">8.5.3</span>
+        <span>With the prior written consent of the Subscriber.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">8.6</span>
+      <span class="clause-text"><strong>AI Model Training.</strong> The Subscriber acknowledges and agrees that the Company may use <strong>anonymized and aggregated</strong> data derived from the Platform (including anonymized event metadata and detection statistics, but expressly <strong>excluding</strong> identifiable video footage or personally identifiable information) to improve, train, and refine the Company's AI models and algorithms. The Company shall ensure that any such use is conducted in a manner that does not identify the Subscriber or any individual captured in the footage.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">8.7</span>
+      <span class="clause-text"><strong>Subscriber's Data Responsibilities.</strong> The Subscriber is the Data Fiduciary (as defined under the DPDP Act, 2023) in respect of personal data of individuals captured by the Subscriber's cameras. The Subscriber is solely responsible for obtaining all necessary consents, providing required notices, and complying with all applicable data protection obligations in relation to individuals whose data is captured through the Subscriber's use of the Service.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">8.8</span>
+      <span class="clause-text"><strong>Security Breach Notification.</strong> In the event of a confirmed security breach affecting Subscriber Data, the Company shall notify the Subscriber within 72 (seventy-two) hours of becoming aware of such breach, and shall take all reasonable steps to contain and remediate the breach.</span>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 9 — INTELLECTUAL PROPERTY
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">9. &nbsp;Intellectual Property</div>
+
+    <div class="clause">
+      <span class="clause-num">9.1</span>
+      <span class="clause-text"><strong>Company's Intellectual Property.</strong> All Intellectual Property rights in and to the Platform, the Services, the underlying software, source code, object code, AI models, machine learning algorithms, neural networks, databases, user interfaces, designs, documentation, trademarks (including the <strong>Retail Nazar</strong> trademark and the <strong>BrainGuardX</strong> trademark), and all improvements, modifications, and derivative works thereof are and shall remain the exclusive property of the Company. Nothing in this Agreement shall be construed as transferring any ownership rights in the Company's Intellectual Property to the Subscriber.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">9.2</span>
+      <span class="clause-text"><strong>Limited License to Subscriber.</strong> Subject to the terms of this Agreement and payment of applicable Subscription Fees, the Company grants the Subscriber a <strong>limited, non-exclusive, non-transferable, non-sublicensable, revocable license</strong> to access and use the Platform solely for the Subscriber's internal business purposes at the Subscriber's disclosed retail premises, in accordance with the terms of this Agreement and the applicable Subscription Plan. This license does not include any right to copy, modify, distribute, sell, or create derivative works of the Platform.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">9.3</span>
+      <span class="clause-text"><strong>Subscriber's Intellectual Property.</strong> The Subscriber retains all ownership rights in and to the Subscriber Data, including video footage captured by the Subscriber's cameras. The Subscriber grants the Company a limited, non-exclusive license to access, process, store, and use the Subscriber Data solely to the extent necessary to provide the Services and as otherwise permitted under this Agreement.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">9.4</span>
+      <span class="clause-text"><strong>Feedback.</strong> If the Subscriber provides any feedback, suggestions, or recommendations regarding the Platform or Services ("Feedback"), the Subscriber hereby grants the Company a perpetual, irrevocable, royalty-free, worldwide license to use, incorporate, and commercialize such Feedback without any obligation to the Subscriber.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">9.5</span>
+      <span class="clause-text"><strong>No Implied Rights.</strong> Except for the limited license expressly granted in Clause 9.2, no other rights or licenses are granted to the Subscriber, whether by implication, estoppel, or otherwise.</span>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 10 — SERVICE LEVELS AND SUPPORT
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">10. &nbsp;Service Levels and Support</div>
+
+    <div class="clause">
+      <span class="clause-num">10.1</span>
+      <span class="clause-text"><strong>Uptime Target.</strong> The Company shall use commercially reasonable efforts to maintain Platform availability of at least <strong>99% (ninety-nine percent)</strong> Uptime in any given calendar month, measured on a 24×7 basis, excluding:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">10.1.1</span>
+        <span>Scheduled maintenance windows (notified at least 48 hours in advance);</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">10.1.2</span>
+        <span>Downtime caused by Force Majeure Events;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">10.1.3</span>
+        <span>Downtime attributable to the Subscriber's network, equipment, or third-party services;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">10.1.4</span>
+        <span>Emergency maintenance required to address critical security vulnerabilities.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">10.2</span>
+      <span class="clause-text">The 99% Uptime target is a service objective and not a guarantee. Failure to meet this target shall not constitute a breach of this Agreement, but the Company shall use reasonable efforts to restore Service as promptly as practicable.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">10.3</span>
+      <span class="clause-text"><strong>Support Channels and Hours.</strong> The Company shall provide technical support to the Subscriber through the following channels:</span>
+    </div>
+
+    <table class="plans-table mt-8">
+      <thead>
+        <tr>
+          <th style="text-align:left;">Channel</th>
+          <th style="text-align:left;">Details</th>
+          <th>Availability</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="text-align:left;font-weight:600;">Email Support</td>
+          <td style="text-align:left;">support@retailnazar.com</td>
+          <td>Mon–Sat, 9:00 AM – 7:00 PM IST</td>
+        </tr>
+        <tr>
+          <td style="text-align:left;font-weight:600;">WhatsApp Support</td>
+          <td style="text-align:left;"><span class="placeholder">[WhatsApp Number — To be filled]</span></td>
+          <td>Mon–Sat, 9:00 AM – 7:00 PM IST</td>
+        </tr>
+        <tr>
+          <td style="text-align:left;font-weight:600;">Platform Helpdesk</td>
+          <td style="text-align:left;">In-app ticket system at retailnazar.com</td>
+          <td>24×7 (ticket submission)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="clause mt-12">
+      <span class="clause-num">10.4</span>
+      <span class="clause-text"><strong>Response Time Targets.</strong></span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">10.4.1</span>
+        <span><strong>Critical Issues</strong> (Platform completely inaccessible, total loss of Service): Target initial response within <strong>4 (four) business hours</strong> of the issue being reported during support hours;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">10.4.2</span>
+        <span><strong>Standard Issues</strong> (partial functionality impairment, configuration queries, billing queries): Target initial response within <strong>24 (twenty-four) business hours</strong> of the issue being reported.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">10.5</span>
+      <span class="clause-text"><strong>Scheduled Maintenance.</strong> The Company shall provide at least <strong>48 (forty-eight) hours' prior notice</strong> to the Subscriber via email and/or Platform notification before any planned maintenance that may result in Service interruption. The Company shall endeavor to schedule maintenance during off-peak hours (typically between 12:00 AM and 5:00 AM IST).</span>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 11 — LIMITATION OF LIABILITY
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">11. &nbsp;Limitation of Liability</div>
+
+    <div class="clause">
+      <span class="clause-num">11.1</span>
+      <span class="clause-text"><strong>Cap on Liability.</strong> To the maximum extent permitted by applicable law, the Company's total aggregate liability to the Subscriber under or in connection with this Agreement, whether arising in contract, tort (including negligence), breach of statutory duty, or otherwise, shall not exceed an amount equal to the <strong>total Subscription Fees actually paid by the Subscriber to the Company in the 3 (three) calendar months immediately preceding the event giving rise to the claim</strong>.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">11.2</span>
+      <span class="clause-text"><strong>Exclusion of Consequential Losses.</strong> To the maximum extent permitted by applicable law, the Company shall not be liable for any:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">11.2.1</span>
+        <span>Indirect, incidental, special, consequential, or punitive damages;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">11.2.2</span>
+        <span>Loss of profits, revenue, business, goodwill, or anticipated savings;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">11.2.3</span>
+        <span>Loss of data or corruption of data;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">11.2.4</span>
+        <span>Loss arising from theft, shoplifting, or other criminal acts that the AI system failed to detect or alert upon, whether due to a false negative, system downtime, or any other reason. The Subscriber expressly acknowledges that the Service is an AI-assisted tool and not a guarantee against theft or loss;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">11.2.5</span>
+        <span>Loss arising from connectivity failures, power outages, or network disruptions on the Subscriber's premises or network.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">11.3</span>
+      <span class="clause-text"><strong>Force Majeure.</strong> Neither party shall be liable to the other for any delay or failure to perform its obligations under this Agreement (other than payment obligations) to the extent that such delay or failure is caused by a Force Majeure Event, provided that the affected party:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">11.3.1</span>
+        <span>Promptly notifies the other party in writing of the Force Majeure Event and its expected duration;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">11.3.2</span>
+        <span>Uses commercially reasonable efforts to mitigate the effects of the Force Majeure Event and resume performance as soon as reasonably practicable.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">11.4</span>
+      <span class="clause-text"><strong>Disclaimer of Warranties.</strong> The Services are provided on an <strong>"as is"</strong> and <strong>"as available"</strong> basis. To the maximum extent permitted by applicable law, the Company expressly disclaims all warranties, whether express, implied, statutory, or otherwise, including but not limited to implied warranties of merchantability, fitness for a particular purpose, non-infringement, and accuracy of AI detections.</span>
+    </div>
+
+    <div class="highlight-box important mt-12">
+      <strong>IMPORTANT:</strong> The limitations of liability set forth in this Clause 11 reflect a reasonable allocation of risk between the parties and are a fundamental element of the basis of the bargain between the parties. The Subscription Fees would be substantially higher without such limitations.
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 12 — TERM AND TERMINATION
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">12. &nbsp;Term and Termination</div>
+
+    <div class="clause">
+      <span class="clause-num">12.1</span>
+      <span class="clause-text"><strong>Term.</strong> This Agreement shall commence on the Effective Date and shall continue in force for the initial subscription period selected by the Subscriber (monthly or annual), and shall thereafter automatically renew for successive periods of the same duration unless terminated in accordance with this Clause 12.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">12.2</span>
+      <span class="clause-text"><strong>Termination by Either Party.</strong> Either party may terminate this Agreement without cause by providing at least <strong>30 (thirty) days' prior written notice</strong> to the other party. In the case of the Subscriber, such notice may be provided through the Platform dashboard or by email to support@retailnazar.com. Termination shall take effect at the end of the then-current billing cycle following the expiry of the notice period.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">12.3</span>
+      <span class="clause-text"><strong>Termination for Cause by Company.</strong> The Company may terminate this Agreement with immediate effect, without notice and without refund, upon:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">12.3.1</span>
+        <span>Any breach by the Subscriber of the restrictions set forth in Clause 7 (Subscriber Restrictions);</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">12.3.2</span>
+        <span>Non-payment of Subscription Fees beyond the 7-day grace period specified in Clause 5.5;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">12.3.3</span>
+        <span>The Subscriber's insolvency, bankruptcy, or the appointment of a liquidator, receiver, or administrator;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">12.3.4</span>
+        <span>Any use of the Service that, in the Company's reasonable judgment, poses a legal, reputational, or security risk to the Company or any third party.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">12.4</span>
+      <span class="clause-text"><strong>Termination for Cause by Subscriber.</strong> The Subscriber may terminate this Agreement with immediate effect by written notice to the Company if the Company commits a material breach of this Agreement and fails to remedy such breach within 30 (thirty) days of receiving written notice from the Subscriber specifying the breach in reasonable detail.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">12.5</span>
+      <span class="clause-text"><strong>Effect of Termination.</strong> Upon termination or expiry of this Agreement for any reason:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">12.5.1</span>
+        <span>The Subscriber's access to the Platform and all Services shall be immediately revoked;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">12.5.2</span>
+        <span>The license granted under Clause 9.2 shall automatically terminate;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">12.5.3</span>
+        <span>All Subscriber Data shall be retained for a period of <strong>30 (thirty) calendar days</strong> following the date of termination, during which the Subscriber may request a data export. After this period, all Subscriber Data shall be permanently deleted from the Company's systems, subject to any legal retention obligations;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">12.5.4</span>
+        <span>No refund shall be issued for any unused portion of the subscription period, except as expressly provided in Clause 5.6;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">12.5.5</span>
+        <span>All outstanding Subscription Fees and other amounts due shall become immediately payable.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">12.6</span>
+      <span class="clause-text"><strong>Survival.</strong> Clauses 2 (Definitions), 8 (Data Privacy), 9 (Intellectual Property), 11 (Limitation of Liability), 13 (Indemnification), 14 (Dispute Resolution), and 15 (Miscellaneous) shall survive the termination or expiry of this Agreement.</span>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 13 — INDEMNIFICATION
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">13. &nbsp;Indemnification</div>
+
+    <div class="clause">
+      <span class="clause-num">13.1</span>
+      <span class="clause-text"><strong>Indemnification by Subscriber.</strong> The Subscriber shall defend, indemnify, and hold harmless the Company, its directors, officers, employees, agents, affiliates, and successors (collectively, "Company Indemnitees") from and against any and all claims, demands, actions, losses, damages, liabilities, costs, and expenses (including reasonable legal fees) arising out of or in connection with:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">13.1.1</span>
+        <span>The Subscriber's use of the Service in violation of applicable law, including any illegal surveillance, privacy violations, or unauthorized monitoring of individuals;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">13.1.2</span>
+        <span>Any breach by the Subscriber of its obligations, representations, or warranties under this Agreement;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">13.1.3</span>
+        <span>Any claim by a third party (including employees, customers, or visitors of the Subscriber) arising from the Subscriber's use of the Service, including claims relating to privacy, data protection, or unlawful surveillance;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">13.1.4</span>
+        <span>The Subscriber's failure to display required surveillance signage as mandated by applicable law.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">13.2</span>
+      <span class="clause-text"><strong>Indemnification by Company.</strong> The Company shall defend, indemnify, and hold harmless the Subscriber from and against any third-party claims alleging that the Platform, as provided by the Company and used by the Subscriber in accordance with this Agreement, infringes any valid Indian patent, copyright, or trademark of a third party, provided that the Subscriber:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">13.2.1</span>
+        <span>Promptly notifies the Company in writing of such claim;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">13.2.2</span>
+        <span>Grants the Company sole control over the defense and settlement of such claim; and</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">13.2.3</span>
+        <span>Provides the Company with all reasonable assistance in connection with such defense.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">13.3</span>
+      <span class="clause-text">The Company's indemnification obligation under Clause 13.2 shall not apply to any infringement claim arising from: (a) modifications to the Platform made by or on behalf of the Subscriber; (b) use of the Platform in combination with third-party products or services not approved by the Company; or (c) use of the Platform in a manner not permitted under this Agreement.</span>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 14 — DISPUTE RESOLUTION
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">14. &nbsp;Dispute Resolution</div>
+
+    <div class="clause">
+      <span class="clause-num">14.1</span>
+      <span class="clause-text"><strong>Governing Law.</strong> This Agreement and any dispute or claim arising out of or in connection with it or its subject matter or formation (including non-contractual disputes or claims) shall be governed by and construed in accordance with the <strong>laws of India</strong>.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">14.2</span>
+      <span class="clause-text"><strong>Step 1 — Good Faith Negotiation.</strong> In the event of any dispute, controversy, or claim arising out of or relating to this Agreement, or the breach, termination, or invalidity thereof ("Dispute"), the parties shall first attempt to resolve the Dispute through good faith negotiations. Either party may initiate this process by delivering a written notice to the other party describing the Dispute in reasonable detail. The parties shall have <strong>15 (fifteen) calendar days</strong> from the date of such notice (or such longer period as the parties may agree in writing) to resolve the Dispute through negotiation.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">14.3</span>
+      <span class="clause-text"><strong>Step 2 — Mediation.</strong> If the Dispute is not resolved through negotiation within the period specified in Clause 14.2, either party may refer the Dispute to mediation. The mediation shall be conducted in <strong>Noida, Uttar Pradesh</strong>, by a mutually agreed mediator. The costs of mediation shall be shared equally between the parties. The mediation proceedings shall be conducted in the <strong>English language</strong>.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">14.4</span>
+      <span class="clause-text"><strong>Step 3 — Arbitration.</strong> If the Dispute is not resolved through mediation within 30 (thirty) calendar days of the commencement of mediation (or such longer period as the parties may agree), the Dispute shall be finally resolved by binding arbitration in accordance with the provisions of the <strong>Arbitration and Conciliation Act, 1996</strong> (as amended), subject to the following:</span>
+    </div>
+    <div class="sub-clauses">
+      <div class="sub-clause">
+        <span class="sub-clause-num">14.4.1</span>
+        <span><strong>Seat of Arbitration:</strong> Noida, Uttar Pradesh, India;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">14.4.2</span>
+        <span><strong>Number of Arbitrators:</strong> A sole arbitrator mutually appointed by the parties. If the parties fail to agree on an arbitrator within 15 (fifteen) days of a request for arbitration, the arbitrator shall be appointed in accordance with the Arbitration and Conciliation Act, 1996;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">14.4.3</span>
+        <span><strong>Language:</strong> English;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">14.4.4</span>
+        <span><strong>Confidentiality:</strong> The arbitration proceedings and the award shall be kept confidential by both parties;</span>
+      </div>
+      <div class="sub-clause">
+        <span class="sub-clause-num">14.4.5</span>
+        <span><strong>Award:</strong> The arbitral award shall be final and binding on both parties and may be enforced in any court of competent jurisdiction.</span>
+      </div>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">14.5</span>
+      <span class="clause-text"><strong>Jurisdiction for Interim Relief.</strong> Notwithstanding the arbitration clause, either party may seek urgent interim or injunctive relief from the courts at <strong>Gautam Buddha Nagar, Uttar Pradesh</strong>, which shall have exclusive jurisdiction for such purposes. The parties hereby irrevocably submit to the exclusive jurisdiction of such courts for interim relief.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">14.6</span>
+      <span class="clause-text"><strong>Continuation of Services.</strong> During the pendency of any Dispute resolution proceedings, the parties shall continue to perform their respective obligations under this Agreement to the extent practicable, unless the Agreement has been terminated in accordance with Clause 12.</span>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 15 — MISCELLANEOUS
+  ============================================================ -->
+  <div class="section">
+    <div class="section-heading">15. &nbsp;Miscellaneous</div>
+
+    <div class="clause">
+      <span class="clause-num">15.1</span>
+      <span class="clause-text"><strong>Amendments.</strong> No amendment, modification, or variation of this Agreement shall be valid or binding unless made in writing and duly signed by authorized representatives of both parties. Notwithstanding the foregoing, the Company may update these terms with <strong>30 (thirty) days' prior written notice</strong> to the Subscriber. Continued use of the Service after the expiry of the notice period shall constitute the Subscriber's acceptance of the updated terms.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">15.2</span>
+      <span class="clause-text"><strong>Severability.</strong> If any provision of this Agreement is held by a court or arbitral tribunal of competent jurisdiction to be invalid, illegal, or unenforceable, such provision shall be modified to the minimum extent necessary to make it valid, legal, and enforceable, and the remaining provisions of this Agreement shall continue in full force and effect.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">15.3</span>
+      <span class="clause-text"><strong>Entire Agreement.</strong> This Agreement, together with any Schedules and Annexures attached hereto, constitutes the entire agreement between the parties with respect to its subject matter and supersedes all prior and contemporaneous agreements, understandings, negotiations, and representations, whether oral or written, relating to such subject matter.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">15.4</span>
+      <span class="clause-text"><strong>Waiver.</strong> No failure or delay by either party in exercising any right, power, or remedy under this Agreement shall operate as a waiver thereof. No single or partial exercise of any right, power, or remedy shall preclude any other or further exercise thereof or the exercise of any other right, power, or remedy. A waiver of any breach of this Agreement shall not be deemed a waiver of any subsequent breach.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">15.5</span>
+      <span class="clause-text"><strong>Electronic Signatures and Execution.</strong> This Agreement may be executed electronically. Electronic signatures affixed to this Agreement shall be deemed valid and legally binding in accordance with the <strong>Information Technology Act, 2000</strong> and the rules made thereunder. A digitally signed or electronically executed copy of this Agreement shall be treated as an original for all purposes.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">15.6</span>
+      <span class="clause-text"><strong>Notices.</strong> All notices, requests, demands, and other communications under this Agreement shall be in writing and shall be deemed duly given when: (a) delivered personally; (b) sent by registered post with acknowledgment due to the address specified in this Agreement; or (c) sent by email to the email addresses specified in this Agreement, with confirmation of receipt. Notices to the Company shall be sent to support@retailnazar.com with a copy to the registered office address.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">15.7</span>
+      <span class="clause-text"><strong>Assignment.</strong> The Subscriber may not assign, transfer, or delegate any of its rights or obligations under this Agreement without the prior written consent of the Company. The Company may assign this Agreement or any of its rights or obligations hereunder to any affiliate or in connection with a merger, acquisition, or sale of all or substantially all of its assets, without the Subscriber's consent, provided that the Company notifies the Subscriber of such assignment.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">15.8</span>
+      <span class="clause-text"><strong>Relationship of Parties.</strong> The parties are independent contractors. Nothing in this Agreement shall be construed to create a partnership, joint venture, agency, employment, or fiduciary relationship between the parties.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">15.9</span>
+      <span class="clause-text"><strong>Counterparts.</strong> This Agreement may be executed in one or more counterparts, each of which shall be deemed an original, and all of which together shall constitute one and the same instrument.</span>
+    </div>
+
+    <div class="clause mt-8">
+      <span class="clause-num">15.10</span>
+      <span class="clause-text"><strong>Language.</strong> This Agreement is executed in the English language. In the event of any conflict between an English version and any translation of this Agreement, the English version shall prevail.</span>
+    </div>
+  </div>
+
+  <hr class="section-rule" />
+
+  <!-- ============================================================
+       SECTION 16 — SIGNATURE BLOCK
+  ============================================================ -->
+  <div class="section sig-section">
+    <div class="section-heading">16. &nbsp;Execution and Signatures</div>
+
+    <div class="clause">
+      <span class="clause-num">16.1</span>
+      <span class="clause-text">IN WITNESS WHEREOF, the parties hereto have executed this Subscriber Service Agreement as of the date first written above, by their duly authorized representatives.</span>
+    </div>
+
+    <div class="sig-grid mt-16">
+      <!-- Company Signatory -->
+      <div class="sig-block">
+        <div class="sig-party">For and on Behalf of<br>BrainGuardX AI Technologies Pvt. Ltd.<br><span style="font-size:8pt;color:var(--muted);font-weight:400;">(Service Provider / Company)</span></div>
+
+        <div class="sig-field">
+          <div class="sig-label">Signature</div>
+          <div class="sig-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Name of Authorized Signatory</div>
+          <div class="sig-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Designation</div>
+          <div class="sig-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Date</div>
+          <div class="sig-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Place</div>
+          <div class="sig-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Company Seal / Stamp</div>
+          <div class="sig-line" style="min-height:50px;"></div>
+        </div>
+      </div>
+
+      <!-- Subscriber Signatory -->
+      <div class="sig-block">
+        <div class="sig-party">Subscriber / Customer<br><span class="placeholder" style="font-size:8pt;font-weight:400;">[Subscriber Name / Business Name]</span><br><span style="font-size:8pt;color:var(--muted);font-weight:400;">(Subscriber)</span></div>
+
+        <div class="sig-field">
+          <div class="sig-label">Signature</div>
+          <div class="sig-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Full Name</div>
+          <div class="sig-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Designation / Capacity</div>
+          <div class="sig-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Date</div>
+          <div class="sig-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Place</div>
+          <div class="sig-line"></div>
+        </div>
+        <div class="sig-field">
+          <div class="sig-label">Business Seal / Stamp (if applicable)</div>
+          <div class="sig-line" style="min-height:50px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Witnesses -->
+    <div class="mt-16">
+      <strong class="navy" style="font-family:Arial,sans-serif;font-size:9pt;">WITNESSES</strong>
+      <div class="witness-grid mt-8">
+        <div class="witness-block">
+          <div class="witness-label">Witness 1 (on behalf of Company)</div>
+          <div class="sig-field">
+            <div class="sig-label">Signature</div>
+            <div class="sig-line"></div>
+          </div>
+          <div class="sig-field">
+            <div class="sig-label">Full Name</div>
+            <div class="sig-line"></div>
+          </div>
+          <div class="sig-field">
+            <div class="sig-label">Address</div>
+            <div class="sig-line" style="min-height:32px;"></div>
+          </div>
+          <div class="sig-field">
+            <div class="sig-label">Date</div>
+            <div class="sig-line"></div>
+          </div>
+        </div>
+        <div class="witness-block">
+          <div class="witness-label">Witness 2 (on behalf of Subscriber)</div>
+          <div class="sig-field">
+            <div class="sig-label">Signature</div>
+            <div class="sig-line"></div>
+          </div>
+          <div class="sig-field">
+            <div class="sig-label">Full Name</div>
+            <div class="sig-line"></div>
+          </div>
+          <div class="sig-field">
+            <div class="sig-label">Address</div>
+            <div class="sig-line" style="min-height:32px;"></div>
+          </div>
+          <div class="sig-field">
+            <div class="sig-label">Date</div>
+            <div class="sig-line"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       FOOTER
+  ============================================================ -->
+  <div class="doc-footer">
+    <span><span class="footer-brand">Retail Nazar</span> &nbsp;|&nbsp; BrainGuardX AI Technologies Pvt. Ltd. &nbsp;|&nbsp; retailnazar.com</span>
+    <span style="color:#b00;font-weight:600;">CONFIDENTIAL</span>
+    <span>Agreement v1.0 &nbsp;|&nbsp; Governed by Laws of India</span>
+  </div>
+
+</div><!-- end .page-wrapper -->
+</body>
+</html>

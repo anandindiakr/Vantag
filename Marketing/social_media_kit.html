@@ -1,0 +1,2081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Retail Nazar — Social Media Content Kit</title>
+<style>
+  :root {
+    --navy: #0f1035;
+    --navy-light: #161a4a;
+    --navy-card: #1a1f55;
+    --gold: #ffd200;
+    --gold-dim: #c9a800;
+    --white: #ffffff;
+    --grey-text: #b0b8d4;
+    --grey-box: #1e2460;
+    --linkedin: #0077B5;
+    --whatsapp: #25D366;
+    --instagram-start: #833ab4;
+    --instagram-end: #fcb045;
+    --facebook: #1877F2;
+    --youtube: #FF0000;
+    --email: #EA4335;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--navy);
+    color: var(--white);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  .site-header {
+    background: linear-gradient(135deg, #0a0d2e 0%, #161a4a 100%);
+    border-bottom: 2px solid var(--gold);
+    padding: 28px 40px 24px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+  }
+  .site-header .brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 6px;
+  }
+  .brand-dot {
+    width: 14px; height: 14px;
+    background: var(--gold);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--gold);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 8px var(--gold); }
+    50% { box-shadow: 0 0 20px var(--gold), 0 0 40px rgba(255,210,0,0.3); }
+  }
+  .site-header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--gold);
+    letter-spacing: 1px;
+  }
+  .site-header .tagline {
+    color: var(--grey-text);
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .kit-badge {
+    display: inline-block;
+    background: var(--gold);
+    color: var(--navy);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+
+  /* ── TAB NAV ── */
+  .tab-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 20px 40px 0;
+    background: var(--navy-light);
+    border-bottom: 1px solid rgba(255,210,0,0.15);
+    justify-content: center;
+  }
+  .tab-btn {
+    padding: 10px 22px;
+    border: none;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    transition: all 0.25s;
+    background: var(--navy-card);
+    color: var(--grey-text);
+    border-bottom: 3px solid transparent;
+    text-transform: uppercase;
+  }
+  .tab-btn:hover { color: var(--white); background: #222870; }
+  .tab-btn.active { color: var(--white); border-bottom-color: var(--gold); }
+  .tab-btn.li.active  { background: rgba(0,119,181,0.25); border-bottom-color: var(--linkedin); }
+  .tab-btn.wa.active  { background: rgba(37,211,102,0.2); border-bottom-color: var(--whatsapp); }
+  .tab-btn.ig.active  { background: rgba(131,58,180,0.25); border-bottom-color: #c13584; }
+  .tab-btn.fb.active  { background: rgba(24,119,242,0.2); border-bottom-color: var(--facebook); }
+  .tab-btn.yt.active  { background: rgba(255,0,0,0.2); border-bottom-color: var(--youtube); }
+  .tab-btn.em.active  { background: rgba(234,67,53,0.2); border-bottom-color: var(--email); }
+
+  /* ── MAIN CONTENT ── */
+  .main { padding: 36px 40px 60px; max-width: 1200px; margin: 0 auto; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── SECTION HEADER ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255,210,0,0.2);
+  }
+  .platform-icon {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+  .section-header h2 { font-size: 1.6rem; font-weight: 800; }
+  .section-header p { color: var(--grey-text); font-size: 0.9rem; margin-top: 2px; }
+
+  /* ── SUBSECTION ── */
+  .subsection { margin-bottom: 40px; }
+  .subsection-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .subsection-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,210,0,0.2);
+  }
+
+  /* ── TEMPLATE CARD ── */
+  .template-card {
+    background: var(--grey-box);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: border-color 0.2s;
+  }
+  .template-card:hover { border-color: rgba(255,210,0,0.3); }
+  .template-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: rgba(0,0,0,0.25);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .template-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--grey-text);
+  }
+  .copy-btn {
+    background: var(--gold);
+    color: var(--navy);
+    border: none;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .copy-btn:hover { background: #ffe44d; transform: scale(1.05); }
+  .copy-btn.copied { background: #25D366; color: white; }
+  .template-body {
+    padding: 18px 20px;
+    font-size: 0.9rem;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    color: #d8dff5;
+    font-family: 'Segoe UI', sans-serif;
+  }
+
+  /* ── INFO CARD ── */
+  .info-card {
+    background: var(--navy-card);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    border-left: 4px solid var(--gold);
+  }
+  .info-card h4 { color: var(--gold); font-size: 0.95rem; margin-bottom: 8px; }
+  .info-card p, .info-card li { color: var(--grey-text); font-size: 0.88rem; line-height: 1.7; }
+  .info-card ul { padding-left: 18px; }
+
+  /* ── GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+  /* ── HASHTAG PILL ── */
+  .hashtag-set { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .hashtag {
+    background: rgba(255,210,0,0.12);
+    color: var(--gold);
+    border: 1px solid rgba(255,210,0,0.3);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  /* ── EMAIL PREVIEW ── */
+  .email-preview {
+    background: #ffffff;
+    color: #1a1a2e;
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .email-preview-header {
+    background: #0f1035;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .email-preview-header .subject-line {
+    color: var(--gold);
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  .email-preview-header .day-badge {
+    background: var(--gold);
+    color: var(--navy);
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .email-body {
+    padding: 28px 32px;
+    font-size: 0.88rem;
+    line-height: 1.8;
+    color: #2d2d2d;
+  }
+  .email-body h3 { color: #0f1035; font-size: 1.1rem; margin-bottom: 12px; }
+  .email-body p { margin-bottom: 12px; }
+  .email-body .cta-btn {
+    display: inline-block;
+    background: #ffd200;
+    color: #0f1035;
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-weight: 800;
+    text-decoration: none;
+    font-size: 0.9rem;
+    margin: 8px 0 16px;
+  }
+  .email-body .highlight-box {
+    background: #f8f4ff;
+    border-left: 4px solid #0f1035;
+    padding: 14px 18px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+    font-style: italic;
+    color: #444;
+  }
+  .email-body .feature-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .email-body .feature-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 2px; }
+  .email-footer {
+    background: #f5f5f5;
+    padding: 16px 32px;
+    font-size: 0.78rem;
+    color: #888;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  /* ── SEGMENT CARD ── */
+  .segment-card {
+    background: var(--navy-card);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+  .segment-card .seg-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+  }
+  .segment-card h4 { font-size: 0.95rem; margin-bottom: 6px; }
+  .segment-card p { font-size: 0.83rem; color: var(--grey-text); }
+
+  /* ── VIDEO CARD ── */
+  .video-card {
+    background: var(--navy-card);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    border: 1px solid rgba(255,0,0,0.15);
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .video-num {
+    background: var(--youtube);
+    color: white;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .video-card h4 { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
+  .video-card p { font-size: 0.82rem; color: var(--grey-text); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .site-header { padding: 20px 20px 16px; }
+    .site-header h1 { font-size: 1.5rem; }
+    .tab-nav { padding: 16px 16px 0; gap: 4px; }
+    .tab-btn { padding: 8px 14px; font-size: 0.75rem; }
+    .main { padding: 24px 16px 48px; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .email-body { padding: 20px 18px; }
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--navy); }
+  ::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 3px; }
+
+  /* ── PLATFORM ACCENT BORDERS ── */
+  .li-accent { border-top: 3px solid var(--linkedin); }
+  .wa-accent { border-top: 3px solid var(--whatsapp); }
+  .ig-accent { border-top: 3px solid #c13584; }
+  .fb-accent { border-top: 3px solid var(--facebook); }
+  .yt-accent { border-top: 3px solid var(--youtube); }
+  .em-accent { border-top: 3px solid var(--email); }
+
+  .divider { height: 1px; background: rgba(255,255,255,0.07); margin: 32px 0; }
+
+  .tip-box {
+    background: rgba(255,210,0,0.08);
+    border: 1px solid rgba(255,210,0,0.25);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    font-size: 0.85rem;
+    color: #e8d87a;
+    margin-bottom: 20px;
+  }
+  .tip-box strong { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     HEADER
+═══════════════════════════════════════════════════════════ -->
+<header class="site-header">
+  <div class="brand">
+    <div class="brand-dot"></div>
+    <h1>Retail Nazar</h1>
+    <div class="brand-dot"></div>
+  </div>
+  <div class="tagline">AI-Powered Retail Surveillance &nbsp;|&nbsp; BrainGuardX AI Technologies Pvt. Ltd.</div>
+  <div class="kit-badge">Social Media Content Kit — Launch Campaign 2026</div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TAB NAVIGATION
+═══════════════════════════════════════════════════════════ -->
+<nav class="tab-nav">
+  <button class="tab-btn li active" onclick="switchTab('linkedin', this)">&#128100; LinkedIn</button>
+  <button class="tab-btn wa" onclick="switchTab('whatsapp', this)">&#128241; WhatsApp</button>
+  <button class="tab-btn ig" onclick="switchTab('instagram', this)">&#128247; Instagram</button>
+  <button class="tab-btn fb" onclick="switchTab('facebook', this)">&#128279; Facebook</button>
+  <button class="tab-btn yt" onclick="switchTab('youtube', this)">&#127909; YouTube</button>
+  <button class="tab-btn em" onclick="switchTab('email', this)">&#128140; Email Marketing</button>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN CONTENT
+═══════════════════════════════════════════════════════════ -->
+<main class="main">
+
+<!-- ╔══════════════════════════════════════════════════════════
+     LINKEDIN TAB
+══════════════════════════════════════════════════════════╗ -->
+<div id="tab-linkedin" class="tab-panel active">
+  <div class="section-header">
+    <div class="platform-icon" style="background:rgba(0,119,181,0.2); color:#0077B5; font-size:1.8rem;">in</div>
+    <div>
+      <h2 style="color:#0077B5;">LinkedIn Content Templates</h2>
+      <p>5 ready-to-post templates — thought leadership, stories, features, founder narrative & partner outreach</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Post Templates</div>
+
+    <!-- Template 1 -->
+    <div class="template-card li-accent">
+      <div class="template-card-header">
+        <span class="template-label">Template 1 — Stat-Led Thought Leadership</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">🔴 Indian retailers lose ₹1,12,000 crore annually to shrinkage.
+
+That's not a typo.
+
+The average store owner doesn't know how much they're losing — until stock audit day.
+
+At Retail Nazar, we've built India's first AI-powered retail surveillance platform that:
+→ Detects suspicious behaviour in real time
+→ Sends WhatsApp alerts to the owner in 3 seconds
+→ Works with existing CCTV cameras — no new hardware needed
+
+We're now live in Noida. First 100 stores get 50% off.
+
+Are you one of them? Drop a comment or DM me.
+
+#RetailSecurity #AIforRetail #ShopliftingPrevention #IndianRetail #RetailTech #StartupIndia</div>
+    </div>
+
+    <!-- Template 2 -->
+    <div class="template-card li-accent">
+      <div class="template-card-header">
+        <span class="template-label">Template 2 — Problem / Solution Story</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">"My staff was honest. At least I thought so."
+
+A clothing retailer in Sector 18, Noida, came to us last month.
+₹2 lakh of inventory. Gone.
+Manual CCTV? No alerts. No flags. Nothing.
+
+We installed Retail Nazar.
+Week 1: 2 suspicious incidents flagged by AI.
+Week 2: One confirmed internal theft caught on alert footage.
+
+Sometimes the problem isn't "if" — it's "when you'll find out."
+
+Retail Nazar tells you in 3 seconds, not 3 weeks.
+
+Free 3-day trial → retailnazar.com
+
+#RetailLoss #StoreOwner #AICamera #RetailIndia #SecurityTech</div>
+    </div>
+
+    <!-- Template 3 -->
+    <div class="template-card li-accent">
+      <div class="template-card-header">
+        <span class="template-label">Template 3 — Feature Spotlight</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">What if your CCTV could think?
+
+Most store cameras record. That's it.
+Retail Nazar's AI goes further:
+
+🎯 Detects loitering near high-value items
+📱 Sends real-time WhatsApp alerts to your phone
+📊 Tracks customer footfall and peak hours
+🚪 Logs every person who enters or exits
+☁️ Stores footage securely in the cloud
+🔴 Live view from anywhere in the world
+
+Your existing cameras. Our AI brain.
+
+Starting at ₹999/month. Free trial: retailnazar.com
+
+#SmartRetail #RetailSurveillance #AISecurity #StartupIndia</div>
+    </div>
+
+    <!-- Template 4 -->
+    <div class="template-card li-accent">
+      <div class="template-card-header">
+        <span class="template-label">Template 4 — Founder Story (Personal Tone)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">We built Retail Nazar because a friend lost his electronics store.
+
+Not to competition. Not to bad marketing.
+To shoplifting and internal theft — over ₹8 lakh in one year.
+
+"I had 4 cameras. I just never watched them."
+
+That conversation changed everything for us.
+
+We spent 18 months building an AI that watches so you don't have to.
+It detects, alerts, and records — automatically.
+
+Today, we're helping stores across Noida catch what they were missing.
+
+We're just getting started.
+
+→ retailnazar.com
+
+#Founder #RetailTech #AIStartup #MadeInIndia #RetailSecurity</div>
+    </div>
+
+    <!-- Template 5 -->
+    <div class="template-card li-accent">
+      <div class="template-card-header">
+        <span class="template-label">Template 5 — Partnership / SI Outreach</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Attention CCTV dealers and System Integrators in Delhi/NCR 📢
+
+Are you selling hardware but leaving recurring revenue on the table?
+
+Retail Nazar's Partner Program gives you:
+✅ 20–25% recurring monthly commission
+✅ Co-branding options available
+✅ Ready-to-sell product — no development needed
+✅ Training and certification provided
+✅ Support for your end customers
+
+Turn your one-time CCTV sale into ₹999–₹5,999/month per customer — every month.
+
+We're onboarding our first 10 SI partners in NCR.
+
+Interested? DM me or write to partners@retailnazar.com
+
+#SystemIntegrator #CCTVDealer #SIPartner #RetailTech #RecurringRevenue</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="subsection">
+    <div class="subsection-title">LinkedIn Banner — Text Description</div>
+    <div class="info-card">
+      <h4>Banner Design Brief</h4>
+      <ul>
+        <li><strong>Background:</strong> Dark navy (#0f1035) with subtle diagonal grid lines</li>
+        <li><strong>Left side:</strong> "Retail Nazar" in bold gold (#ffd200), 72pt — below it: "AI-Powered Retail Surveillance" in white, 28pt</li>
+        <li><strong>Centre:</strong> Glowing red dot animation icon (surveillance indicator)</li>
+        <li><strong>Right side:</strong> "Protecting Indian Stores" in white italic, 24pt — below: retailnazar.com in gold</li>
+        <li><strong>Bottom strip:</strong> Gold bar with "BrainGuardX AI Technologies Pvt. Ltd." in navy text</li>
+        <li><strong>Dimensions:</strong> 1584 × 396 px (LinkedIn recommended)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Posting Strategy Tips</div>
+    <div class="grid-2">
+      <div class="info-card">
+        <h4>Best Times to Post</h4>
+        <ul>
+          <li>Tuesday–Thursday: 8–10 AM or 5–7 PM IST</li>
+          <li>Avoid weekends for B2B content</li>
+          <li>Post 3–4x per week for momentum</li>
+        </ul>
+      </div>
+      <div class="info-card">
+        <h4>Engagement Tactics</h4>
+        <ul>
+          <li>Reply to every comment within 2 hours</li>
+          <li>Tag relevant Noida business groups</li>
+          <li>Use polls to boost reach (ask security questions)</li>
+          <li>Reshare with personal commentary from founder account</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════
+     WHATSAPP TAB
+══════════════════════════════════════════════════════════╗ -->
+<div id="tab-whatsapp" class="tab-panel">
+  <div class="section-header">
+    <div class="platform-icon" style="background:rgba(37,211,102,0.15); color:#25D366; font-size:1.6rem;">💬</div>
+    <div>
+      <h2 style="color:#25D366;">WhatsApp Marketing Templates</h2>
+      <p>6 outreach messages, auto-replies, quick replies & broadcast segmentation strategy</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Outreach Message Templates</div>
+
+    <div class="template-card wa-accent">
+      <div class="template-card-header">
+        <span class="template-label">Template 1 — Cold Outreach (Hindi)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">नमस्ते [नाम] जी 🙏
+
+क्या आपकी दुकान में CCTV है?
+
+अगर हाँ — तो एक सवाल:
+क्या वो camera आपको real-time alert देता है जब कुछ suspicious होता है?
+
+अगर नहीं, तो आप शायद रोज़ कुछ न कुछ miss कर रहे हैं।
+
+हम हैं *Retail Nazar* — India का पहला AI-powered retail surveillance system।
+✅ आपके existing cameras पर काम करता है
+✅ 3 seconds में WhatsApp alert
+✅ ₹999/month से शुरू
+
+*3 दिन का FREE trial* — कोई commitment नहीं।
+
+देखना चाहते हैं? बस "DEMO" reply करें 👇
+
+— Retail Nazar Team
+retailnazar.com</div>
+    </div>
+
+    <div class="template-card wa-accent">
+      <div class="template-card-header">
+        <span class="template-label">Template 2 — Cold Outreach (English)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Hi [Name] 👋
+
+Quick question — do you know what's happening in your store right now?
+
+Most shop owners find out about theft *after* the damage is done.
+
+*Retail Nazar* changes that.
+
+Our AI watches your existing CCTV cameras and:
+→ Detects suspicious activity instantly
+→ Sends you a WhatsApp alert in 3 seconds
+→ Records everything automatically
+
+We're live in Noida. First 100 stores get *50% off*.
+
+Want a free 3-day trial? No setup fee. No commitment.
+
+Reply *TRIAL* and I'll get you started today.
+
+— Retail Nazar | retailnazar.com</div>
+    </div>
+
+    <div class="template-card wa-accent">
+      <div class="template-card-header">
+        <span class="template-label">Template 3 — Follow-Up (Day 3)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Hi [Name] 👋
+
+Just checking in — I messaged you a few days ago about Retail Nazar.
+
+I know you're busy running your store. So I'll keep this short:
+
+*One store owner in Sector 18 caught ₹40,000 worth of theft in his first week.*
+He almost didn't sign up either.
+
+If you'd like to see how it works — I can set up a 10-minute live demo on a call, at your convenience.
+
+No pressure. Just a demo.
+
+Reply *YES* and I'll send you a time slot.
+
+— [Your Name], Retail Nazar</div>
+    </div>
+
+    <div class="template-card wa-accent">
+      <div class="template-card-header">
+        <span class="template-label">Template 4 — Weekly Broadcast (Success Story)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">🔴 *Retail Nazar Weekly Update*
+
+This week's story:
+
+*Rajesh bhai, electronics shop, Noida Sector 62.*
+
+Week 1 with Retail Nazar:
+→ 4 loitering alerts near display counter
+→ 1 confirmed theft attempt — caught on AI footage
+→ Staff behaviour improved immediately (they knew the AI was watching)
+
+His words: *"Pehle lagta tha cameras hain toh safe hoon. Ab actually safe hoon."*
+
+If your store doesn't have AI eyes yet — now is the time.
+
+🎁 *Noida Launch Offer: 50% off for first 100 stores*
+Reply *JOIN* to claim your spot.
+
+retailnazar.com</div>
+    </div>
+
+    <div class="template-card wa-accent">
+      <div class="template-card-header">
+        <span class="template-label">Template 5 — SI / Dealer Outreach</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Hi [Name] 👋
+
+Are you in the CCTV / security systems business in Delhi/NCR?
+
+I'm reaching out because we have a *partner opportunity* that could add ₹20,000–₹60,000/month in recurring income to your business — without any extra investment.
+
+*Retail Nazar Partner Program:*
+✅ 20–25% monthly recurring commission
+✅ Your branding on the product
+✅ We handle support — you just sell
+✅ Training provided (1 day)
+
+We're onboarding only *10 SI partners* in NCR right now.
+
+Interested in a 15-minute call to explore?
+
+Reply *PARTNER* and I'll share the full details.
+
+— Retail Nazar | partners@retailnazar.com</div>
+    </div>
+
+    <div class="template-card wa-accent">
+      <div class="template-card-header">
+        <span class="template-label">Template 6 — Trial Expiry Conversion</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Hi [Name] 🙏
+
+Your Retail Nazar free trial ends *tomorrow*.
+
+In the last 3 days, your AI detected:
+📍 [X] suspicious activity alerts
+👥 [Y] footfall entries logged
+📹 [Z] hours of smart footage saved
+
+This protection stops tomorrow — unless you upgrade.
+
+*Special offer for trial users:*
+🎁 First month at ₹499 (50% off ₹999 Starter plan)
+⏰ Offer valid only for next 24 hours
+
+To continue protecting your store, reply *UPGRADE* or visit:
+👉 retailnazar.com/upgrade
+
+Don't let your guard down now.
+
+— Retail Nazar Team</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="subsection">
+    <div class="subsection-title">WhatsApp Business Auto-Reply Messages</div>
+    <div class="grid-2">
+      <div class="template-card wa-accent">
+        <div class="template-card-header">
+          <span class="template-label">Greeting Message (First Contact)</span>
+          <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+        </div>
+        <div class="template-body">Namaste! 🙏 Welcome to *Retail Nazar*.
+
+India's AI-powered retail surveillance — protecting your store 24/7.
+
+How can we help you today? Reply with:
+
+🔹 *DEMO* — See a live demo
+🔹 *PRICE* — View our plans
+🔹 *TRIAL* — Start free 3-day trial
+🔹 *SUPPORT* — Get help
+
+Our team responds within 30 minutes (9 AM – 8 PM IST).
+
+— Retail Nazar | retailnazar.com</div>
+      </div>
+
+      <div class="template-card wa-accent">
+        <div class="template-card-header">
+          <span class="template-label">Away Message (Out of Hours)</span>
+          <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+        </div>
+        <div class="template-body">Hi! 👋 Thanks for reaching out to *Retail Nazar*.
+
+Our team is currently offline (we're available 9 AM – 8 PM IST, Mon–Sat).
+
+We'll reply first thing tomorrow morning.
+
+In the meantime:
+🌐 Visit retailnazar.com for info
+📧 Email: support@retailnazar.com
+
+Your store's security matters to us. We'll be back soon!
+
+— Retail Nazar Team</div>
+      </div>
+
+      <div class="template-card wa-accent">
+        <div class="template-card-header">
+          <span class="template-label">Quick Reply: PRICE</span>
+          <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+        </div>
+        <div class="template-body">Here are our *Retail Nazar Plans* 💰
+
+🥉 *Starter* — ₹999/month
+Up to 2 cameras | Basic AI alerts | WhatsApp notifications
+
+🥈 *Growth* — ₹2,499/month
+Up to 5 cameras | Advanced AI | Footfall analytics | Cloud storage
+
+🥇 *Pro* — ₹3,999/month
+Up to 10 cameras | Full AI suite | Priority support | Reports
+
+👑 *Pro Plus* — ₹5,999/month
+Unlimited cameras | Custom AI | Dedicated manager | API access
+
+🎁 *All plans include a FREE 3-day trial.*
+No credit card needed to start.
+
+Reply *TRIAL* to begin, or *DEMO* to see it live first.</div>
+      </div>
+
+      <div class="template-card wa-accent">
+        <div class="template-card-header">
+          <span class="template-label">Quick Reply: DEMO / TRIAL / SUPPORT</span>
+          <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+        </div>
+        <div class="template-body">*DEMO reply:*
+Great! Our team will schedule a 15-minute live demo for you. Please share:
+1. Your name
+2. Store type & location
+3. Preferred time (morning/afternoon/evening)
+
+*TRIAL reply:*
+Excellent! Starting your free 3-day trial is easy:
+👉 Visit: retailnazar.com/trial
+Or share your email and we'll set it up for you directly.
+
+*SUPPORT reply:*
+Please describe your issue and we'll connect you with our technical team immediately.
+📧 support@retailnazar.com
+📞 Available 9 AM – 8 PM IST</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="subsection">
+    <div class="subsection-title">Broadcast List Segmentation Strategy</div>
+    <div class="grid-2">
+      <div class="segment-card">
+        <div class="seg-label" style="color:#ff6b6b;">Segment A</div>
+        <h4>Noida Shop Owners (Cold)</h4>
+        <p>First-time outreach. Use Template 1 (Hindi) or Template 2 (English). Send Tuesday–Thursday, 10–11 AM. Max 1 message/week. Goal: get DEMO or TRIAL reply.</p>
+      </div>
+      <div class="segment-card">
+        <div class="seg-label" style="color:#ffa94d;">Segment B</div>
+        <h4>Delhi Shop Owners (Cold)</h4>
+        <p>Same as Segment A but English-first. Mention Delhi expansion coming soon. Use scarcity: "Noida is live — Delhi next." Goal: waitlist signup.</p>
+      </div>
+      <div class="segment-card">
+        <div class="seg-label" style="color:#69db7c;">Segment C</div>
+        <h4>Trial Users (Warm)</h4>
+        <p>Active trial users. Send daily check-ins (Day 1, 3, 6). Share their own alert stats. Use Template 6 on Day 3. Goal: convert to paid plan.</p>
+      </div>
+      <div class="segment-card">
+        <div class="seg-label" style="color:#ffd200;">Segment D</div>
+        <h4>Paid Customers (Hot — Upsell/Referral)</h4>
+        <p>Weekly success digest. Monthly plan upgrade nudge. Referral program: "Refer a store, get 1 month free." Goal: upsell + referrals.</p>
+      </div>
+      <div class="segment-card" style="grid-column: 1 / -1;">
+        <div class="seg-label" style="color:#74c0fc;">Segment E</div>
+        <h4>CCTV Dealers / System Integrators</h4>
+        <p>Use Template 5. Send on Monday mornings. Follow up with commission structure PDF. Invite to partner webinar. Goal: onboard 10 SI partners in NCR within 60 days.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════
+     INSTAGRAM TAB
+══════════════════════════════════════════════════════════╗ -->
+<div id="tab-instagram" class="tab-panel">
+  <div class="section-header">
+    <div class="platform-icon" style="background: linear-gradient(135deg,rgba(131,58,180,0.3),rgba(252,176,69,0.3)); font-size:1.6rem;">📸</div>
+    <div>
+      <h2 style="background: linear-gradient(90deg,#833ab4,#fd1d1d,#fcb045); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">Instagram Content Templates</h2>
+      <p>9 post captions, Reels script, Stories polls & complete hashtag sets</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Post Captions</div>
+
+    <div class="template-card ig-accent">
+      <div class="template-card-header">
+        <span class="template-label">Caption 1 — Product Demo</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Watch AI catch what your eyes miss. 👁️
+
+This is Retail Nazar in action — real-time detection, instant WhatsApp alert, zero manual monitoring.
+
+Your cameras are already there. We just give them a brain.
+
+🔗 Free 3-day trial at retailnazar.com (link in bio)
+
+#RetailNazar #AIRetailSecurity #SmartSurveillance #RetailTech #MadeInIndia #ShopSecurity</div>
+    </div>
+
+    <div class="template-card ig-accent">
+      <div class="template-card-header">
+        <span class="template-label">Caption 2 — "Did You Know" Stat Post</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Did you know? 🤯
+
+Indian retailers lose ₹1,12,000 CRORE every year to shrinkage.
+
+That's theft. Internal fraud. Shoplifting.
+And most of it happens while the owner is looking away.
+
+The average CCTV camera records.
+Retail Nazar's AI *reacts*.
+
+3-second WhatsApp alert. Every time. Automatically.
+
+Start your free trial → link in bio 🔗
+
+#RetailIndia #ShopOwner #StoreOwner #RetailLoss #AICamera #DukaanSecurity #RetailNazar</div>
+    </div>
+
+    <div class="template-card ig-accent">
+      <div class="template-card-header">
+        <span class="template-label">Caption 3 — Hindi Motivational (Shop Owners)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">दुकानदार भाई, एक बात पूछें? 🙏
+
+आपकी दुकान में camera है — लेकिन क्या वो camera आपको बताता है जब कुछ गलत हो रहा हो?
+
+अगर नहीं, तो आप सिर्फ record कर रहे हैं — protect नहीं।
+
+*Retail Nazar* आपकी दुकान की असली नज़र है।
+AI जो सोती नहीं। Alert जो 3 seconds में आता है।
+
+₹999/month से शुरू। 3 दिन FREE।
+
+Link in bio 👆
+
+#DukaanKiNazar #ChoriRokein #SmartDukaan #RetailNazar #NoidaBusiness #DukaanSecurity</div>
+    </div>
+
+    <div class="template-card ig-accent">
+      <div class="template-card-header">
+        <span class="template-label">Caption 4 — Customer Testimonial (Template)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">"[Customer Name] se suniye..." 🗣️
+
+[He/She] runs a [store type] in [location], Noida.
+
+Before Retail Nazar: [describe their problem — theft, no alerts, manual monitoring]
+
+After Retail Nazar: [describe the result — alerts caught, money saved, peace of mind]
+
+"[Direct quote from customer in their own words]"
+
+This is why we built Retail Nazar. Real stores. Real protection. Real results.
+
+Want the same for your store? Free trial → link in bio 🔗
+
+#CustomerStory #RetailNazar #AIRetailSecurity #NoidaBusiness #ShopOwner</div>
+    </div>
+
+    <div class="template-card ig-accent">
+      <div class="template-card-header">
+        <span class="template-label">Caption 5 — Behind the Scenes (Tech Team)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Behind every 3-second alert is months of work. 🛠️
+
+Our team at BrainGuardX AI has spent 18 months training AI models on thousands of hours of retail footage.
+
+Teaching a machine to understand:
+→ What "loitering" looks like vs. browsing
+→ When someone is concealing an item
+→ Unusual crowd patterns near high-value shelves
+
+It's not magic. It's machine learning — built specifically for Indian retail.
+
+And it's now available for ₹999/month.
+
+#BehindTheScenes #AIStartup #MadeInIndia #RetailTech #BrainGuardX #MachineLearning</div>
+    </div>
+
+    <div class="template-card ig-accent">
+      <div class="template-card-header">
+        <span class="template-label">Caption 6 — Comparison Post (Old CCTV vs Retail Nazar)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Old CCTV vs Retail Nazar 👇
+
+❌ Old CCTV:
+— Records everything, alerts nothing
+— You watch footage AFTER theft happens
+— Needs someone to monitor 24/7
+— Footage stored locally (can be deleted)
+— No analytics, no insights
+
+✅ Retail Nazar:
+— AI detects suspicious activity in real time
+— WhatsApp alert in 3 seconds
+— Fully automated — no monitoring needed
+— Secure cloud storage
+— Footfall analytics + peak hour reports
+
+Same cameras. Completely different protection.
+
+Try it free for 3 days → link in bio
+
+#RetailNazar #SmartCCTV #AICamera #RetailSecurity #UpgradeYourStore</div>
+    </div>
+
+    <div class="template-card ig-accent">
+      <div class="template-card-header">
+        <span class="template-label">Caption 7 — Offer Post (Noida Launch)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">🎉 Noida, we're HERE!
+
+Retail Nazar is officially live in Noida — and we're celebrating with an exclusive launch offer.
+
+🎁 *First 100 stores get 50% OFF*
+✅ No new hardware needed
+✅ Setup in under 30 minutes
+✅ Free 3-day trial first
+
+Sectors covered: 18, 62, 63, 125, Rajnagar Extension & more.
+
+Spots are filling fast. Don't miss this.
+
+👉 Claim your spot: retailnazar.com (link in bio)
+
+Tag a Noida shop owner who needs this! 👇
+
+#NoidaLaunch #RetailNazar #NoidaBusiness #Sector18Noida #NoidaMarket #AIRetailSecurity</div>
+    </div>
+
+    <div class="template-card ig-accent">
+      <div class="template-card-header">
+        <span class="template-label">Caption 8 — Reels Script (30 Seconds)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">🎬 REELS SCRIPT — "3 Seconds"
+
+[0–3s] HOOK (text on screen): "Your CCTV is recording. But is it protecting?"
+[Visual: Store footage, normal day]
+
+[3–8s] PROBLEM: "Most store owners find out about theft days later — during stock audit."
+[Visual: Shocked owner looking at empty shelf]
+
+[8–15s] SOLUTION: "Retail Nazar's AI detects suspicious activity the moment it happens."
+[Visual: AI detection overlay on camera feed]
+
+[15–22s] ALERT: "And sends you a WhatsApp alert in 3 seconds — wherever you are."
+[Visual: Phone buzzing with WhatsApp notification]
+
+[22–27s] PROOF: "One store in Noida caught ₹40,000 in theft in week 1."
+[Visual: Alert screenshot / store owner smiling]
+
+[27–30s] CTA: "Free 3-day trial. No new cameras needed."
+[Text: retailnazar.com | Link in bio]
+
+Caption: Your cameras are already there. Give them a brain. 🧠 Free trial → link in bio
+#RetailNazar #AICamera #ShopSecurity #RetailIndia #Reels</div>
+    </div>
+
+    <div class="template-card ig-accent">
+      <div class="template-card-header">
+        <span class="template-label">Caption 9 — Stories Poll Ideas (5 Polls)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">📊 INSTAGRAM STORIES POLL IDEAS
+
+Poll 1:
+"Do you have CCTV in your store?"
+Option A: Yes ✅  |  Option B: No ❌
+
+Poll 2:
+"Have you ever experienced theft in your store?"
+Option A: Yes (it hurts 😔)  |  Option B: No (lucky so far 🤞)
+
+Poll 3:
+"How do you currently monitor your store?"
+Option A: I watch the footage myself  |  Option B: I don't really monitor it
+
+Poll 4:
+"Would you pay ₹999/month to get instant theft alerts on WhatsApp?"
+Option A: Absolutely YES 🔥  |  Option B: Tell me more...
+
+Poll 5:
+"What's your biggest store security concern?"
+Option A: Shoplifting by customers  |  Option B: Internal theft by staff
+
+[Follow each poll with a swipe-up or DM CTA]</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="subsection">
+    <div class="subsection-title">Hashtag Sets</div>
+    <div class="info-card">
+      <h4>Primary Brand Hashtags</h4>
+      <div class="hashtag-set">
+        <span class="hashtag">#RetailNazar</span>
+        <span class="hashtag">#AIRetailSecurity</span>
+        <span class="hashtag">#DukaanSecurity</span>
+        <span class="hashtag">#RetailNazarIndia</span>
+      </div>
+    </div>
+    <div class="info-card" style="margin-top:12px;">
+      <h4>Noida / Local Hashtags</h4>
+      <div class="hashtag-set">
+        <span class="hashtag">#NoidaBusiness</span>
+        <span class="hashtag">#Sector18Noida</span>
+        <span class="hashtag">#NoidaMarket</span>
+        <span class="hashtag">#NoidaShops</span>
+        <span class="hashtag">#NoidaStartup</span>
+        <span class="hashtag">#DelhiNCR</span>
+      </div>
+    </div>
+    <div class="info-card" style="margin-top:12px;">
+      <h4>Hindi / Vernacular Hashtags</h4>
+      <div class="hashtag-set">
+        <span class="hashtag">#DukaanKiNazar</span>
+        <span class="hashtag">#ChoriRokein</span>
+        <span class="hashtag">#SmartDukaan</span>
+        <span class="hashtag">#DukaandarBhai</span>
+        <span class="hashtag">#ApniDukaan</span>
+      </div>
+    </div>
+    <div class="info-card" style="margin-top:12px;">
+      <h4>General Retail Hashtags</h4>
+      <div class="hashtag-set">
+        <span class="hashtag">#RetailIndia</span>
+        <span class="hashtag">#ShopOwner</span>
+        <span class="hashtag">#KiranaStore</span>
+        <span class="hashtag">#RetailSecurity</span>
+        <span class="hashtag">#StoreOwner</span>
+        <span class="hashtag">#IndianRetail</span>
+      </div>
+    </div>
+    <div class="info-card" style="margin-top:12px;">
+      <h4>Tech / Startup Hashtags</h4>
+      <div class="hashtag-set">
+        <span class="hashtag">#AIStartup</span>
+        <span class="hashtag">#MadeInIndia</span>
+        <span class="hashtag">#RetailTech</span>
+        <span class="hashtag">#SmartSurveillance</span>
+        <span class="hashtag">#StartupIndia</span>
+        <span class="hashtag">#BrainGuardX</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════
+     FACEBOOK TAB
+══════════════════════════════════════════════════════════╗ -->
+<div id="tab-facebook" class="tab-panel">
+  <div class="section-header">
+    <div class="platform-icon" style="background:rgba(24,119,242,0.2); color:#1877F2; font-size:1.6rem;">f</div>
+    <div>
+      <h2 style="color:#1877F2;">Facebook Content Templates</h2>
+      <p>5 post templates, group strategy, ad copy & community engagement tactics</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Post Templates</div>
+
+    <div class="template-card fb-accent">
+      <div class="template-card-header">
+        <span class="template-label">Post 1 — Community Introduction (Hindi)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">नमस्ते Noida के दुकानदार भाइयों और बहनों! 🙏
+
+हम हैं *Retail Nazar* — BrainGuardX AI Technologies की एक नई पहल।
+
+हमने एक सवाल से शुरुआत की:
+"क्या India के छोटे और मध्यम दुकानदारों को भी enterprise-level security मिल सकती है?"
+
+जवाब है — हाँ। और वो भी ₹999/month में।
+
+*Retail Nazar क्या करता है?*
+🔴 आपके existing CCTV cameras पर AI लगाता है
+📱 Suspicious activity होने पर 3 seconds में WhatsApp alert भेजता है
+📊 Footfall और peak hours track करता है
+☁️ Footage cloud में safe रखता है
+
+हम Noida में launch हो चुके हैं।
+*पहले 100 stores को 50% discount।*
+
+अगर आप Noida में दुकान चलाते हैं — comment में "INTERESTED" लिखें।
+हम आपसे personally connect करेंगे।
+
+🌐 retailnazar.com | 📧 support@retailnazar.com</div>
+    </div>
+
+    <div class="template-card fb-accent">
+      <div class="template-card-header">
+        <span class="template-label">Post 2 — Local Market Shoutout</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Shoutout to the hardworking shop owners of Sector 18, Noida! 🛍️
+
+You run some of the most vibrant retail in the NCR — clothing, electronics, food, jewellery, everything.
+
+And you deserve protection that matches your hustle.
+
+That's why Retail Nazar is starting right here — in Noida's busiest markets.
+
+We're already working with stores in:
+📍 Sector 18 | Sector 62 | Sector 63 | Rajnagar Extension | Sector 125
+
+If your store is in Noida and you want to see how AI surveillance works — we'll come to you.
+
+Free demo. No commitment. Just 20 minutes.
+
+Comment your sector below or DM us to book a slot 👇
+
+#NoidaMarket #Sector18Noida #NoidaBusiness #RetailNazar</div>
+    </div>
+
+    <div class="template-card fb-accent">
+      <div class="template-card-header">
+        <span class="template-label">Post 3 — Poll Post (Security Survey)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Quick poll for Noida shop owners 👇
+
+We're doing research on retail security in our area and would love your honest answers.
+
+🔵 POLL: What is your biggest security challenge right now?
+
+A) Shoplifting by customers
+B) Internal theft by staff
+C) No real-time monitoring system
+D) CCTV footage is hard to review
+E) I don't have a security system at all
+
+Drop your answer in the comments! We read every single one.
+
+(And if you want to know how Retail Nazar solves all 5 — visit retailnazar.com)
+
+#RetailSecurity #NoidaBusiness #ShopOwner #RetailIndia</div>
+    </div>
+
+    <div class="template-card fb-accent">
+      <div class="template-card-header">
+        <span class="template-label">Post 4 — Video Post Description (Demo Video)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">🎥 Watch Retail Nazar catch a theft attempt — in real time.
+
+In this video, you'll see:
+✅ How our AI detects suspicious behaviour near a display counter
+✅ The exact WhatsApp alert that goes to the store owner (3 seconds later)
+✅ How the footage is automatically saved and tagged
+
+This is not a simulation. This is a real store in Noida.
+
+The store owner was at home when this happened. He got the alert, called his manager, and the situation was handled — before any loss occurred.
+
+This is what AI surveillance looks like in 2026.
+
+🎁 Try it free for 3 days — no new cameras needed.
+👉 retailnazar.com/trial
+
+Share this with any shop owner who needs to see it. 🙏
+
+#RetailNazar #AICamera #ShoplifitingPrevention #RetailSecurity #NoidaBusiness</div>
+    </div>
+
+    <div class="template-card fb-accent">
+      <div class="template-card-header">
+        <span class="template-label">Post 5 — Webinar / Free Demo Session Announcement</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">📣 FREE ONLINE DEMO — "How AI is Protecting Noida's Retail Stores"
+
+Date: [Date] | Time: 7:00 PM IST | Platform: Zoom (free to join)
+
+In this 45-minute live session, you'll learn:
+
+🔹 How Retail Nazar's AI works on your existing cameras
+🔹 Real examples of theft caught by AI in Noida stores
+🔹 How to set up in under 30 minutes
+🔹 Pricing, plans & the Noida launch offer
+🔹 Live Q&A — ask us anything
+
+This session is FREE and open to all Noida shop owners.
+
+Seats are limited to 50 participants.
+
+👉 Register here: [Registration Link]
+Or comment "REGISTER" below and we'll send you the link.
+
+See you there! 🙏
+
+#FreeWebinar #RetailNazar #NoidaBusiness #RetailSecurity #OnlineDemo</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="subsection">
+    <div class="subsection-title">Facebook Group Posting Strategy</div>
+    <div class="info-card">
+      <h4>Types of Groups to Target</h4>
+      <ul>
+        <li>Noida Business Network / Noida Traders Association groups</li>
+        <li>Delhi NCR Shop Owners / Retailers groups</li>
+        <li>CCTV & Security Systems India groups (for SI outreach)</li>
+        <li>Indian Startup & Entrepreneur communities</li>
+        <li>Sector-specific groups (Sector 18 Noida, Sector 62 Business, etc.)</li>
+        <li>Kirana & Small Business India groups</li>
+      </ul>
+    </div>
+    <div class="template-card fb-accent" style="margin-top:16px;">
+      <div class="template-card-header">
+        <span class="template-label">Sample First Message for Group Introduction</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">Hi everyone! 👋
+
+I'm [Your Name] from Retail Nazar — an AI-powered surveillance platform built specifically for Indian retail stores.
+
+We've just launched in Noida and I wanted to introduce ourselves to this community.
+
+Quick context: We help store owners get real-time WhatsApp alerts when suspicious activity is detected — using their existing CCTV cameras. No new hardware. Starts at ₹999/month.
+
+We're offering a free 3-day trial to the first 100 Noida stores.
+
+Happy to answer any questions here or connect 1:1. Not here to spam — just genuinely want to help store owners protect what they've built.
+
+Anyone interested in a free demo? 🙏</div>
+    </div>
+    <div class="info-card" style="margin-top:12px;">
+      <h4>Group Posting Rules</h4>
+      <ul>
+        <li>Always read group rules before posting — never post if promotional content is banned</li>
+        <li>Lead with value (tips, stats, questions) — not direct sales pitches</li>
+        <li>Engage with other posts in the group for 1 week before posting your own</li>
+        <li>Never post the same content in multiple groups on the same day</li>
+        <li>Respond to every comment within 2 hours</li>
+        <li>Use personal profile for group posts — not the business page (more authentic)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="subsection">
+    <div class="subsection-title">Facebook Ad Copy</div>
+    <div class="info-card">
+      <h4>Headline Options (A/B Test These)</h4>
+      <ul>
+        <li>1. "Your Store Is Being Watched — But Not By You"</li>
+        <li>2. "AI Caught ₹40,000 in Theft. In Week 1."</li>
+        <li>3. "Stop Watching Footage. Start Getting Alerts."</li>
+        <li>4. "Noida's Smartest Stores Use Retail Nazar"</li>
+        <li>5. "₹999/month. AI That Never Sleeps."</li>
+      </ul>
+    </div>
+    <div class="template-card fb-accent" style="margin-top:16px;">
+      <div class="template-card-header">
+        <span class="template-label">Ad Primary Text — Option A (Emotional)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">You built your store with years of hard work.
+
+Don't let it disappear in seconds.
+
+Indian retailers lose ₹1,12,000 crore every year to theft and shrinkage. Most of it happens when the owner isn't watching.
+
+Retail Nazar's AI watches for you — 24/7. And sends you a WhatsApp alert in 3 seconds when something suspicious happens.
+
+Works with your existing cameras. Setup in 30 minutes. Free 3-day trial.
+
+First 100 Noida stores get 50% off. Claim your spot now.</div>
+    </div>
+    <div class="template-card fb-accent" style="margin-top:12px;">
+      <div class="template-card-header">
+        <span class="template-label">Ad Primary Text — Option B (Feature-Led)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">What if your CCTV could send you a WhatsApp message the moment something suspicious happens?
+
+That's exactly what Retail Nazar does.
+
+✅ AI detects loitering, concealment & unusual behaviour
+✅ WhatsApp alert to your phone in 3 seconds
+✅ Works on your existing cameras — no new hardware
+✅ Cloud storage + footfall analytics included
+✅ Starting at ₹999/month
+
+Free 3-day trial. No credit card needed. Setup in 30 minutes.
+
+Noida launch offer: 50% off for first 100 stores.</div>
+    </div>
+    <div class="template-card fb-accent" style="margin-top:12px;">
+      <div class="template-card-header">
+        <span class="template-label">Ad Primary Text — Option C (Hindi)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">दुकानदार भाई — क्या आपकी दुकान सच में safe है?
+
+CCTV है, लेकिन कोई alert नहीं?
+Footage है, लेकिन देखने का time नहीं?
+
+*Retail Nazar* आपकी दुकान की असली नज़र है।
+
+🔴 AI real-time में suspicious activity detect करता है
+📱 3 seconds में WhatsApp alert आता है आपके phone पर
+📹 सब कुछ automatically record और cloud में save होता है
+
+₹999/month से शुरू। 3 दिन FREE trial।
+Noida में launch — पहले 100 stores को 50% off।
+
+अभी claim करें 👇</div>
+    </div>
+    <div class="tip-box" style="margin-top:16px;">
+      <strong>CTA Button:</strong> "Learn More" → retailnazar.com/trial &nbsp;|&nbsp; <strong>Audience:</strong> Noida/Delhi NCR, 25–55 age, Business owners, Retail/Shop owners interest &nbsp;|&nbsp; <strong>Budget:</strong> Start ₹500/day, scale winning ad
+    </div>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════
+     YOUTUBE TAB
+══════════════════════════════════════════════════════════╗ -->
+<div id="tab-youtube" class="tab-panel">
+  <div class="section-header">
+    <div class="platform-icon" style="background:rgba(255,0,0,0.15); color:#FF0000; font-size:1.6rem;">▶</div>
+    <div>
+      <h2 style="color:#FF0000;">YouTube Content Strategy</h2>
+      <p>Channel setup, 20 video ideas, 3 Shorts scripts & SEO-optimized description template</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">Channel Setup</div>
+    <div class="grid-2">
+      <div class="template-card yt-accent">
+        <div class="template-card-header">
+          <span class="template-label">Channel Description</span>
+          <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+        </div>
+        <div class="template-body">Retail Nazar — India's AI-Powered Retail Surveillance Platform
+
+We help Indian shop owners protect their stores with AI that detects theft, sends instant WhatsApp alerts, and works on existing CCTV cameras.
+
+On this channel, you'll find:
+🔴 Live demos of AI catching suspicious activity
+📊 Tips to reduce retail shrinkage and theft
+🏪 Real customer stories from Noida stores
+🛠️ Setup tutorials and how-to guides
+📱 Product updates and new features
+
+Built by BrainGuardX AI Technologies Pvt. Ltd.
+Starting at ₹999/month | Free 3-day trial at retailnazar.com
+
+Subscribe for weekly content on retail security, AI technology, and protecting your business.
+
+📧 support@retailnazar.com | 🌐 retailnazar.com</div>
+      </div>
+
+      <div class="template-card yt-accent">
+        <div class="template-card-header">
+          <span class="template-label">About Section Text</span>
+          <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+        </div>
+        <div class="template-body">Retail Nazar is India's first AI-powered retail surveillance SaaS platform, built by BrainGuardX AI Technologies Pvt. Ltd.
+
+We believe every Indian shop owner — from a kirana store to a multi-outlet chain — deserves enterprise-grade security at an affordable price.
+
+Our AI works on your existing CCTV cameras to detect suspicious behaviour, send real-time WhatsApp alerts, track footfall, and store footage securely in the cloud.
+
+Currently live in Noida, Delhi/NCR. Expanding across India.
+
+🌐 retailnazar.com
+📧 support@retailnazar.com
+📍 Noida, Uttar Pradesh, India</div>
+      </div>
+    </div>
+    <div class="info-card" style="margin-top:12px;">
+      <h4>Channel Art Text Description</h4>
+      <ul>
+        <li><strong>Background:</strong> Dark navy (#0f1035) with subtle surveillance grid overlay</li>
+        <li><strong>Left:</strong> "Retail Nazar" in gold bold, 80pt — "AI Retail Surveillance" in white, 32pt</li>
+        <li><strong>Centre:</strong> Glowing eye/camera icon in gold</li>
+        <li><strong>Right:</strong> "New videos every week" in grey — "Subscribe for free" in gold</li>
+        <li><strong>Dimensions:</strong> 2560 × 1440 px (YouTube recommended)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="subsection">
+    <div class="subsection-title">20 Video Ideas</div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+      <div class="video-card"><div class="video-num">1</div><div><h4>How AI Catches Shoplifters Before You Lose Money</h4><p>Demo video — show real AI detection in action. Hook: "Watch this happen in 3 seconds."</p></div></div>
+      <div class="video-card"><div class="video-num">2</div><div><h4>5 Signs Your Store Is Being Robbed Right Now</h4><p>Tips/education — common theft patterns most owners miss. High search volume topic.</p></div></div>
+      <div class="video-card"><div class="video-num">3</div><div><h4>Retail Nazar Setup — Under 30 Minutes</h4><p>Tutorial — step-by-step installation walkthrough. Reduces sales friction.</p></div></div>
+      <div class="video-card"><div class="video-num">4</div><div><h4>Customer Story: Saved ₹40,000 in First Month</h4><p>Testimonial — interview format with Noida store owner. Most trusted content type.</p></div></div>
+      <div class="video-card"><div class="video-num">5</div><div><h4>Internal Theft vs Shoplifting — What's Costing You More?</h4><p>Education — data-driven breakdown. Positions Retail Nazar as the expert.</p></div></div>
+      <div class="video-card"><div class="video-num">6</div><div><h4>Why Normal CCTV Is Not Enough in 2026</h4><p>Comparison — old vs AI surveillance. Directly addresses objection "I already have cameras."</p></div></div>
+      <div class="video-card"><div class="video-num">7</div><div><h4>How to Read Your Store's Footfall Data</h4><p>Tutorial — using Retail Nazar analytics dashboard. Adds value beyond security.</p></div></div>
+      <div class="video-card"><div class="video-num">8</div><div><h4>₹999/month vs ₹1 Lakh Loss — The Math Every Shop Owner Needs</h4><p>ROI calculator video. Converts fence-sitters with pure logic.</p></div></div>
+      <div class="video-card"><div class="video-num">9</div><div><h4>Live Demo: AI Detects Loitering in Real Time</h4><p>Screen recording of dashboard + live detection. Most shareable demo format.</p></div></div>
+      <div class="video-card"><div class="video-num">10</div><div><h4>How We Built India's First AI Retail Surveillance Platform</h4><p>Founder story — behind the scenes of BrainGuardX. Builds brand trust.</p></div></div>
+      <div class="video-card"><div class="video-num">11</div><div><h4>Top 10 Retail Security Mistakes Indian Shop Owners Make</h4><p>Listicle format — highly shareable. Positions brand as authority.</p></div></div>
+      <div class="video-card"><div class="video-num">12</div><div><h4>WhatsApp Alert Demo — See It Arrive in 3 Seconds</h4><p>Short demo — phone screen recording of alert arriving. Perfect for social sharing.</p></div></div>
+      <div class="video-card"><div class="video-num">13</div><div><h4>Retail Nazar for Jewellery Stores — Special Use Case</h4><p>Vertical-specific content. High-value stores = high willingness to pay.</p></div></div>
+      <div class="video-card"><div class="video-num">14</div><div><h4>How Cloud Storage Protects Your Footage from Tampering</h4><p>Feature deep-dive. Addresses "what if staff deletes footage" concern.</p></div></div>
+      <div class="video-card"><div class="video-num">15</div><div><h4>Retail Nazar Partner Program — Earn ₹20,000+/month as SI</h4><p>SI/dealer recruitment video. Opens B2B channel.</p></div></div>
+      <div class="video-card"><div class="video-num">16</div><div><h4>How to Reduce Shrinkage by 60% — Proven Retail Strategies</h4><p>SEO-optimised education video. Targets "reduce retail shrinkage" searches.</p></div></div>
+      <div class="video-card"><div class="video-num">17</div><div><h4>Noida Store Owner Reacts to Retail Nazar for the First Time</h4><p>Reaction video — authentic, unscripted. High engagement format.</p></div></div>
+      <div class="video-card"><div class="video-num">18</div><div><h4>AI vs Human Security Guard — Which Protects Your Store Better?</h4><p>Comparison — controversial angle drives comments and shares.</p></div></div>
+      <div class="video-card"><div class="video-num">19</div><div><h4>Retail Nazar Dashboard Tour — Everything You Can See</h4><p>Product walkthrough — helps prospects visualise the product before buying.</p></div></div>
+      <div class="video-card"><div class="video-num">20</div><div><h4>Q&A: Your Top 10 Questions About AI Retail Surveillance Answered</h4><p>Community engagement — collect questions from comments/WhatsApp. Builds trust.</p></div></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="subsection">
+    <div class="subsection-title">YouTube Shorts Scripts (3 Complete Scripts)</div>
+
+    <div class="template-card yt-accent">
+      <div class="template-card-header">
+        <span class="template-label">Short 1 — "AI Caught This in 3 Seconds" (Suspense Hook)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">🎬 SHORT 1 SCRIPT — Duration: 45 seconds
+
+[0–3s] HOOK (voiceover + text on screen):
+"Watch what happened in this Noida store at 2:47 PM."
+[Visual: CCTV footage, normal store activity]
+
+[3–10s] BUILD-UP:
+"The store owner was at home. His manager was at the counter. Nobody noticed this man."
+[Visual: Person entering, moving toward display]
+
+[10–20s] AI DETECTION:
+"But Retail Nazar's AI did."
+[Visual: Red bounding box appears on screen, "SUSPICIOUS BEHAVIOUR DETECTED" overlay]
+"It flagged loitering near high-value items."
+
+[20–30s] THE ALERT:
+"3 seconds later — this arrived on the owner's phone."
+[Visual: WhatsApp notification on phone screen]
+"He called his manager. The situation was handled."
+
+[30–40s] REVEAL:
+"No theft occurred. No loss. Just a 3-second alert."
+[Text on screen: "This is Retail Nazar."]
+
+[40–45s] CTA:
+"Free 3-day trial. Your cameras. Our AI."
+[Text: retailnazar.com | Link in bio]
+
+Caption: Your cameras are recording. But are they protecting? 👁️ #RetailNazar #AICamera #Shorts</div>
+    </div>
+
+    <div class="template-card yt-accent">
+      <div class="template-card-header">
+        <span class="template-label">Short 2 — "Is Your CCTV Actually Protecting You?" (Question Hook)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">🎬 SHORT 2 SCRIPT — Duration: 35 seconds
+
+[0–4s] HOOK (direct to camera):
+"Quick question for every shop owner watching this."
+"You have CCTV. But when was the last time it actually stopped a theft?"
+
+[4–12s] PROBLEM:
+"Most CCTV systems just record. They don't alert. They don't detect. They don't think."
+[Visual: Old DVR footage, grainy, no alerts]
+"You find out about theft during stock audit — days later."
+
+[12–22s] SOLUTION:
+"Retail Nazar is different."
+[Visual: Clean AI dashboard, detection overlay]
+"Our AI watches your cameras 24/7 and sends you a WhatsApp alert the moment something suspicious happens."
+"3 seconds. Every time."
+
+[22–30s] PROOF:
+"Stores in Noida are already using it."
+"One caught ₹40,000 in theft in week 1."
+
+[30–35s] CTA:
+"Try it free for 3 days. No new cameras needed."
+[Text: retailnazar.com]
+
+Caption: CCTV records. Retail Nazar protects. Big difference. #RetailSecurity #AIStartup #Shorts</div>
+    </div>
+
+    <div class="template-card yt-accent">
+      <div class="template-card-header">
+        <span class="template-label">Short 3 — "₹999/month to Protect Crores of Inventory" (Value Hook)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">🎬 SHORT 3 SCRIPT — Duration: 40 seconds
+
+[0–5s] HOOK (text + voiceover):
+"₹999 per month."
+"That's less than your electricity bill."
+"And it could save you lakhs."
+
+[5–15s] THE MATH:
+"Indian retailers lose an average of ₹2–5 lakh per year to theft."
+"That's ₹16,000–₹40,000 per month — gone."
+[Visual: Calculator, numbers on screen]
+"Retail Nazar costs ₹999/month."
+"The math is simple."
+
+[15–28s] WHAT YOU GET:
+"For ₹999, you get:"
+[Text appears one by one]
+"✅ AI that watches your cameras 24/7"
+"✅ WhatsApp alerts in 3 seconds"
+"✅ Cloud storage for all footage"
+"✅ Footfall analytics"
+"✅ Works on your existing cameras"
+
+[28–35s] SOCIAL PROOF:
+"Stores in Noida are already saving lakhs."
+"First 100 stores get 50% off."
+
+[35–40s] CTA:
+"Free 3-day trial. No credit card."
+[Text: retailnazar.com]
+
+Caption: ₹999/month vs ₹2 lakh/year in losses. You do the math. 🧮 #RetailNazar #SmartRetail #Shorts</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="subsection">
+    <div class="subsection-title">SEO-Optimized Video Description Template</div>
+    <div class="template-card yt-accent">
+      <div class="template-card-header">
+        <span class="template-label">Video Description Template (Copy & Customize)</span>
+        <button class="copy-btn" onclick="copyTemplate(this)">Copy</button>
+      </div>
+      <div class="template-body">[VIDEO TITLE — keep it keyword-rich]
+
+In this video: [1-2 sentence summary of what viewers will learn/see]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔴 ABOUT RETAIL NAZAR
+India's first AI-powered retail surveillance platform.
+Works on your existing CCTV cameras. No new hardware needed.
+Real-time WhatsApp alerts. Cloud storage. Footfall analytics.
+
+Starting at ₹999/month | Free 3-day trial: https://retailnazar.com/trial
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏱️ TIMESTAMPS
+0:00 — Introduction
+[Add timestamps as relevant]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 LINKS
+🌐 Website: https://retailnazar.com
+📧 Support: support@retailnazar.com
+💼 Partner Program: partners@retailnazar.com
+📱 WhatsApp: [Your WhatsApp number]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔑 KEYWORDS (for SEO)
+retail surveillance India, AI CCTV India, shoplifting prevention India, retail theft detection, WhatsApp security alert, store security system India, retail nazar, AI retail security, CCTV AI India, Noida retail security, shop owner security, kirana store security, retail shrinkage India, BrainGuardX AI
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+#RetailNazar #AIRetailSecurity #RetailIndia #ShopSecurity #MadeInIndia #RetailTech #AICamera #StartupIndia #BrainGuardX</div>
+    </div>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════
+     EMAIL MARKETING TAB
+══════════════════════════════════════════════════════════╗ -->
+<div id="tab-email" class="tab-panel">
+  <div class="section-header">
+    <div class="platform-icon" style="background:rgba(234,67,53,0.15); color:#EA4335; font-size:1.6rem;">✉</div>
+    <div>
+      <h2 style="color:#EA4335;">Email Marketing Templates</h2>
+      <p>7-email onboarding drip, monthly newsletter, win-back sequence — all fully written</p>
+    </div>
+  </div>
+
+  <div class="subsection">
+    <div class="subsection-title">7-Email Onboarding Drip Sequence (Trial Signups)</div>
+
+    <!-- Email 1 -->
+    <div class="email-preview em-accent">
+      <div class="email-preview-header">
+        <span class="subject-line">Subject: Your Retail Nazar trial is live — here's how to get started</span>
+        <span class="day-badge">Day 0 — Welcome</span>
+      </div>
+      <div class="email-body">
+        <h3>Welcome to Retail Nazar, [First Name]! 🎉</h3>
+        <p>Your free 3-day trial is now active. Your store just got a lot smarter.</p>
+        <div class="highlight-box">"The best time to protect your store was yesterday. The second best time is right now."</div>
+        <p>Here's what happens next:</p>
+        <div class="feature-row"><span class="feature-icon">1️⃣</span><span><strong>Connect your cameras</strong> — takes under 30 minutes. We'll walk you through it.</span></div>
+        <div class="feature-row"><span class="feature-icon">2️⃣</span><span><strong>Set your WhatsApp number</strong> — this is where your alerts will arrive.</span></div>
+        <div class="feature-row"><span class="feature-icon">3️⃣</span><span><strong>Watch the AI work</strong> — your first alert usually arrives within hours.</span></div>
+        <p style="margin-top:16px;">Ready to set up?</p>
+        <a href="https://retailnazar.com/setup" class="cta-btn">Start Setup — 30 Minutes</a>
+        <p>Need help? Reply to this email or WhatsApp us at [Support Number]. We respond within 30 minutes.</p>
+        <p>Welcome to the family. Your store is in good hands now.</p>
+        <p>Warm regards,<br><strong>The Retail Nazar Team</strong><br>BrainGuardX AI Technologies Pvt. Ltd.</p>
+      </div>
+      <div class="email-footer">Retail Nazar | retailnazar.com | support@retailnazar.com | Noida, UP, India<br>You're receiving this because you signed up for a free trial. <a href="#" style="color:#888;">Unsubscribe</a></div>
+    </div>
+
+    <!-- Email 2 -->
+    <div class="email-preview em-accent">
+      <div class="email-preview-header">
+        <span class="subject-line">Subject: Have you set up your first camera? Here's a 2-minute guide</span>
+        <span class="day-badge">Day 1 — Feature Spotlight</span>
+      </div>
+      <div class="email-body">
+        <h3>Hi [First Name] — your AI is waiting to get to work 👁️</h3>
+        <p>If you haven't connected your cameras yet, don't worry — it takes less than 2 minutes per camera.</p>
+        <p><strong>Here's exactly what to do:</strong></p>
+        <div class="feature-row"><span class="feature-icon">📱</span><span>Open your Retail Nazar dashboard at <strong>retailnazar.com/dashboard</strong></span></div>
+        <div class="feature-row"><span class="feature-icon">➕</span><span>Click "Add Camera" and enter your camera's RTSP stream URL (found in your camera settings)</span></div>
+        <div class="feature-row"><span class="feature-icon">✅</span><span>Click "Enable AI" — that's it. Your camera is now intelligent.</span></div>
+        <p style="margin-top:16px;">Once connected, here's what Retail Nazar will start doing automatically:</p>
+        <div class="feature-row"><span class="feature-icon">🎯</span><span>Detecting loitering near high-value areas</span></div>
+        <div class="feature-row"><span class="feature-icon">📊</span><span>Counting footfall and tracking peak hours</span></div>
+        <div class="feature-row"><span class="feature-icon">📱</span><span>Sending WhatsApp alerts to your phone in real time</span></div>
+        <div class="feature-row"><span class="feature-icon">☁️</span><span>Saving all footage securely to the cloud</span></div>
+        <a href="https://retailnazar.com/setup" class="cta-btn">Connect My Camera Now</a>
+        <p>Stuck? Watch our 2-minute setup video: <a href="https://retailnazar.com/setup-video" style="color:#0f1035; font-weight:700;">retailnazar.com/setup-video</a></p>
+        <p>Your trial has 2 days left. Make the most of it.</p>
+        <p>— Retail Nazar Team</p>
+      </div>
+      <div class="email-footer">Retail Nazar | retailnazar.com | support@retailnazar.com<br><a href="#" style="color:#888;">Unsubscribe</a></div>
+    </div>
+
+    <!-- Email 3 -->
+    <div class="email-preview em-accent">
+      <div class="email-preview-header">
+        <span class="subject-line">Subject: 48 hours in — what's Retail Nazar catching for you?</span>
+        <span class="day-badge">Day 3 — Midway Check</span>
+      </div>
+      <div class="email-body">
+        <h3>Hi [First Name] — you're halfway through your trial 🔴</h3>
+        <p>By now, your AI should have been watching your store for 48 hours. Here's a quick check-in:</p>
+        <div class="highlight-box">Log in to your dashboard to see your first 48-hour report — footfall counts, alert history, and peak hours for your store.</div>
+        <p><strong>What are other Noida stores seeing at this stage?</strong></p>
+        <div class="feature-row"><span class="feature-icon">📊</span><span>Average: <strong>3–8 footfall alerts</strong> per day (people entering/exiting)</span></div>
+        <div class="feature-row"><span class="feature-icon">🚨</span><span>Average: <strong>1–2 suspicious activity flags</strong> in the first 48 hours</span></div>
+        <div class="feature-row"><span class="feature-icon">📱</span><span>Most owners say: <strong>"I didn't realise how much I was missing."</strong></span></div>
+        <p style="margin-top:16px;">If you haven't received any alerts yet — check that your camera is connected and AI is enabled. Reply to this email and we'll help you troubleshoot in minutes.</p>
+        <a href="https://retailnazar.com/dashboard" class="cta-btn">View My 48-Hour Report</a>
+        <p>Your trial ends in 24 hours. Tomorrow, we'll share a special offer to continue your protection.</p>
+        <p>— Retail Nazar Team</p>
+      </div>
+      <div class="email-footer">Retail Nazar | retailnazar.com | support@retailnazar.com<br><a href="#" style="color:#888;">Unsubscribe</a></div>
+    </div>
+
+    <!-- Email 4 -->
+    <div class="email-preview em-accent">
+      <div class="email-preview-header">
+        <span class="subject-line">Subject: How Rajesh caught 3 theft attempts in week 1</span>
+        <span class="day-badge">Day 5 — Social Proof</span>
+      </div>
+      <div class="email-body">
+        <h3>Hi [First Name] — a story worth reading 📖</h3>
+        <p>Rajesh runs an electronics store in Sector 62, Noida. He'd had CCTV for 3 years. Never caught a single theft on camera.</p>
+        <p>He signed up for Retail Nazar on a Tuesday.</p>
+        <p>By Friday, he had 3 suspicious activity alerts.</p>
+        <div class="highlight-box">"The first alert came at 4:15 PM. I was at home. I saw the notification, opened the clip, and called my manager immediately. The person left without taking anything — but I know they were planning to."<br><br>— Rajesh K., Electronics Store Owner, Noida Sector 62</div>
+        <p>By the end of week 1:</p>
+        <div class="feature-row"><span class="feature-icon">🚨</span><span>3 suspicious activity alerts flagged by AI</span></div>
+        <div class="feature-row"><span class="feature-icon">✅</span><span>1 confirmed theft attempt prevented</span></div>
+        <div class="feature-row"><span class="feature-icon">💰</span><span>Estimated ₹40,000+ in inventory protected</span></div>
+        <div class="feature-row"><span class="feature-icon">😌</span><span>"I sleep better now," he told us.</span></div>
+        <p style="margin-top:16px;">Your trial is still active, [First Name]. What is your AI catching for you?</p>
+        <a href="https://retailnazar.com/dashboard" class="cta-btn">Check My Alert History</a>
+        <p>Tomorrow, we'll send you a special offer to keep your store protected after the trial ends.</p>
+        <p>— Retail Nazar Team</p>
+      </div>
+      <div class="email-footer">Retail Nazar | retailnazar.com | support@retailnazar.com<br><a href="#" style="color:#888;">Unsubscribe</a></div>
+    </div>
+
+    <!-- Email 5 -->
+    <div class="email-preview em-accent">
+      <div class="email-preview-header">
+        <span class="subject-line">Subject: Your free trial ends tomorrow — here's your special offer</span>
+        <span class="day-badge">Day 6 — Trial Ending</span>
+      </div>
+      <div class="email-body">
+        <h3>Hi [First Name] — your trial ends in 24 hours ⏰</h3>
+        <p>Tomorrow at [time], your Retail Nazar free trial will expire. Your AI will stop watching. Your alerts will stop arriving.</p>
+        <p>We don't want that to happen. So here's a special offer — just for you:</p>
+        <div class="highlight-box" style="background:#fff8e1; border-left-color:#ffd200;">
+          <strong>🎁 Noida Launch Offer — Trial User Exclusive</strong><br><br>
+          Starter Plan: <del>₹999/month</del> → <strong>₹499/month</strong> (50% off)<br>
+          Growth Plan: <del>₹2,499/month</del> → <strong>₹1,249/month</strong> (50% off)<br><br>
+          <em>Valid only for the next 24 hours. First 3 months at this price.</em>
+        </div>
+        <p>In the last 3 days, your AI has been:</p>
+        <div class="feature-row"><span class="feature-icon">👁️</span><span>Watching your store 24/7</span></div>
+        <div class="feature-row"><span class="feature-icon">📊</span><span>Tracking every person who enters and exits</span></div>
+        <div class="feature-row"><span class="feature-icon">🚨</span><span>Ready to alert you the moment something suspicious happens</span></div>
+        <p style="margin-top:16px;">Don't let your guard down now.</p>
+        <a href="https://retailnazar.com/upgrade" class="cta-btn">Claim 50% Off — Upgrade Now</a>
+        <p>Questions? Reply to this email or WhatsApp us. We'll respond within 30 minutes.</p>
+        <p>— Retail Nazar Team</p>
+      </div>
+      <div class="email-footer">Retail Nazar | retailnazar.com | support@retailnazar.com<br><a href="#" style="color:#888;">Unsubscribe</a></div>
+    </div>
+
+    <!-- Email 6 -->
+    <div class="email-preview em-accent">
+      <div class="email-preview-header">
+        <span class="subject-line">Subject: Don't lose your Noida launch discount (expires tonight)</span>
+        <span class="day-badge">Day 7 — Conversion</span>
+      </div>
+      <div class="email-body">
+        <h3>Hi [First Name] — this is your last chance today 🔴</h3>
+        <p>Your Retail Nazar trial has ended. Your store is no longer being monitored by AI.</p>
+        <p>Your 50% launch discount expires at midnight tonight.</p>
+        <p>After tonight, the price goes back to full rate.</p>
+        <div class="highlight-box" style="background:#fff0f0; border-left-color:#EA4335;">
+          <strong>Tonight only:</strong><br>
+          Starter Plan → ₹499/month (was ₹999)<br>
+          Growth Plan → ₹1,249/month (was ₹2,499)<br>
+          <em>First 3 months at this price. Cancel anytime.</em>
+        </div>
+        <p>You've seen what Retail Nazar can do. You know your store is safer with it than without it.</p>
+        <p>The only question is: will you act before midnight?</p>
+        <a href="https://retailnazar.com/upgrade" class="cta-btn">Upgrade Before Midnight →</a>
+        <p>If you have any concerns or questions, reply to this email right now. I'll personally respond.</p>
+        <p>— [Founder Name]<br>Retail Nazar | BrainGuardX AI Technologies</p>
+      </div>
+      <div class="email-footer">Retail Nazar | retailnazar.com | support@retailnazar.com<br><a href="#" style="color:#888;">Unsubscribe</a></div>
+    </div>
+
+    <!-- Email 7 -->
+    <div class="email-preview em-accent">
+      <div class="email-preview-header">
+        <span class="subject-line">Subject: We saved your 50% discount for 3 more days</span>
+        <span class="day-badge">Day 10 — Last Chance</span>
+      </div>
+      <div class="email-body">
+        <h3>Hi [First Name] — good news 🙏</h3>
+        <p>We noticed you didn't upgrade yesterday. We get it — life gets busy.</p>
+        <p>So we've done something we don't normally do:</p>
+        <div class="highlight-box" style="background:#f0fff4; border-left-color:#25D366;">
+          <strong>We've extended your 50% discount for 3 more days.</strong><br><br>
+          Starter Plan → ₹499/month<br>
+          Growth Plan → ₹1,249/month<br><br>
+          <em>This extension expires on [Date + 3 days]. After that, full price applies.</em>
+        </div>
+        <p>This is genuinely the last time we'll extend this offer. We want you to protect your store — but we also have to be fair to the stores that upgraded on time.</p>
+        <p>If you have any hesitation — any question, any concern — please reply to this email right now. I'll personally answer within the hour.</p>
+        <a href="https://retailnazar.com/upgrade" class="cta-btn">Claim My Extended Discount</a>
+        <p>Your store deserves protection. And you deserve peace of mind.</p>
+        <p>— [Founder Name]<br>Retail Nazar | BrainGuardX AI Technologies Pvt. Ltd.</p>
+      </div>
+      <div class="email-footer">Retail Nazar | retailnazar.com | support@retailnazar.com<br><a href="#" style="color:#888;">Unsubscribe</a></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="subsection">
+    <div class="subsection-title">Monthly Newsletter Template</div>
+    <div class="email-preview em-accent">
+      <div class="email-preview-header">
+        <span class="subject-line">Subject: Retail Security Digest — [Month] 2026</span>
+        <span class="day-badge">Monthly Newsletter</span>
+      </div>
+      <div class="email-body">
+        <h3>Retail Security Digest — [Month] 2026 🔴</h3>
+        <p style="color:#888; font-size:0.82rem;">Your monthly briefing from Retail Nazar | BrainGuardX AI Technologies</p>
+        <hr style="border:none; border-top:1px solid #eee; margin:16px 0;" />
+
+        <h3 style="font-size:1rem; color:#0f1035;">📊 Industry Stat of the Month</h3>
+        <div class="highlight-box">[Insert relevant retail security statistic — e.g., "Organised retail crime in India grew 18% in Q1 2026, with electronics and apparel being the most targeted categories." — Source: [Source]]</div>
+
+        <h3 style="font-size:1rem; color:#0f1035; margin-top:20px;">💡 Product Tip: [Feature Name]</h3>
+        <p>[Explain one Retail Nazar feature in simple terms. E.g., "Did you know you can set custom alert zones in your camera view? Here's how to use Zone Detection to focus AI attention on your most valuable shelves..."]</p>
+        <a href="https://retailnazar.com/help" class="cta-btn" style="font-size:0.82rem; padding:8px 20px;">Read the Full Guide</a>
+
+        <h3 style="font-size:1rem; color:#0f1035; margin-top:20px;">🏪 Customer Story: [Store Name], [Location]</h3>
+        <p>[2–3 paragraph customer story. Include: store type, problem they had, how Retail Nazar helped, specific result (₹ saved or incidents caught). End with a direct quote.]</p>
+
+        <h3 style="font-size:1rem; color:#0f1035; margin-top:20px;">🆕 New Feature: [Feature Name]</h3>
+        <p>[Announce one new feature or improvement. Keep it simple: what it does, why it matters, how to access it.]</p>
+
+        <h3 style="font-size:1rem; color:#0f1035; margin-top:20px;">🎁 This Month's Special Offer</h3>
+        <div class="highlight-box" style="background:#fff8e1; border-left-color:#ffd200;">[Monthly offer — e.g., "Refer a store owner this month and get 1 month free. Share your referral link: retailnazar.com/refer/[your-code]"]</div>
+
+        <p style="margin-top:20px; font-size:0.85rem; color:#555;">As always — reply to this email with any questions, feedback, or stories from your store. We read every message.</p>
+        <p>— The Retail Nazar Team</p>
+      </div>
+      <div class="email-footer">Retail Nazar | retailnazar.com | support@retailnazar.com | Noida, UP, India<br>You're receiving this as a Retail Nazar subscriber. <a href="#" style="color:#888;">Unsubscribe</a> | <a href="#" style="color:#888;">Update Preferences</a></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="subsection">
+    <div class="subsection-title">Win-Back Email Sequence (Churned Customers)</div>
+
+    <div class="email-preview em-accent">
+      <div class="email-preview-header">
+        <span class="subject-line">Subject: We noticed you left — what went wrong?</span>
+        <span class="day-badge">Win-Back Email 1</span>
+      </div>
+      <div class="email-body">
+        <h3>Hi [First Name] — we miss you 🙏</h3>
+        <p>We noticed your Retail Nazar subscription ended on [Date]. We're sorry to see you go.</p>
+        <p>Before you leave for good, I wanted to reach out personally — not with a sales pitch, but with a genuine question:</p>
+        <div class="highlight-box"><strong>What went wrong?</strong><br><br>Was it the price? A technical issue? Did the product not meet your expectations? Or did something change in your business?</div>
+        <p>Your feedback matters to us — not just for our business, but because we genuinely want to build something that works for Indian shop owners like you.</p>
+        <p>If there was a problem we can fix — tell us. We'll fix it.</p>
+        <p>If it was the price — we might be able to help.</p>
+        <p>If it was something else — we want to know.</p>
+        <p>Just reply to this email. I'll personally read and respond.</p>
+        <a href="mailto:support@retailnazar.com" class="cta-btn">Tell Us What Went Wrong</a>
+        <p>Thank you for giving Retail Nazar a chance. Whatever happens next, we wish your store all the best.</p>
+        <p>— [Founder Name]<br>Retail Nazar | BrainGuardX AI Technologies</p>
+      </div>
+      <div class="email-footer">Retail Nazar | retailnazar.com | support@retailnazar.com<br><a href="#" style="color:#888;">Unsubscribe</a></div>
+    </div>
+
+    <div class="email-preview em-accent">
+      <div class="email-preview-header">
+        <span class="subject-line">Subject: Come back with 2 months free</span>
+        <span class="day-badge">Win-Back Email 2</span>
+      </div>
+      <div class="email-body">
+        <h3>Hi [First Name] — one last thing 🎁</h3>
+        <p>We heard your feedback (or we noticed you didn't reply — which tells us something too).</p>
+        <p>We've been working hard since you left. Here's what's new:</p>
+        <div class="feature-row"><span class="feature-icon">🆕</span><span>[New feature 1 — e.g., "Improved AI accuracy — 40% fewer false alerts"]</span></div>
+        <div class="feature-row"><span class="feature-icon">🆕</span><span>[New feature 2 — e.g., "Hindi dashboard interface now available"]</span></div>
+        <div class="feature-row"><span class="feature-icon">🆕</span><span>[New feature 3 — e.g., "Faster WhatsApp alerts — now under 2 seconds"]</span></div>
+        <p style="margin-top:16px;">And because we want you back — we're making you an offer we've never made before:</p>
+        <div class="highlight-box" style="background:#f0fff4; border-left-color:#25D366;">
+          <strong>Come back and get 2 months completely free.</strong><br><br>
+          Reactivate your account at your previous plan rate.<br>
+          First 2 months: ₹0.<br>
+          No questions asked.<br><br>
+          <em>Offer valid for 7 days from this email.</em>
+        </div>
+        <p>Your store deserves protection. We'd love to be the ones providing it.</p>
+        <a href="https://retailnazar.com/reactivate" class="cta-btn">Reactivate — 2 Months Free</a>
+        <p>If you have any questions or want to talk first — reply to this email or WhatsApp us at [Number].</p>
+        <p>We hope to see you back.</p>
+        <p>— [Founder Name]<br>Retail Nazar | BrainGuardX AI Technologies Pvt. Ltd.</p>
+      </div>
+      <div class="email-footer">Retail Nazar | retailnazar.com | support@retailnazar.com<br><a href="#" style="color:#888;">Unsubscribe</a></div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- ═══════════════════════════════════════════════════════════
+     FOOTER
+═══════════════════════════════════════════════════════════ -->
+<footer style="background:#0a0d2e; border-top:1px solid rgba(255,210,0,0.15); padding:24px 40px; text-align:center; color:var(--grey-text); font-size:0.82rem;">
+  <div style="color:var(--gold); font-weight:700; margin-bottom:6px;">Retail Nazar — Social Media Content Kit</div>
+  <div>BrainGuardX AI Technologies Pvt. Ltd. &nbsp;|&nbsp; retailnazar.com &nbsp;|&nbsp; support@retailnazar.com</div>
+  <div style="margin-top:6px; color:#555;">Internal use only. All templates are ready to use — replace [placeholders] before publishing.</div>
+</footer>
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════════ -->
+<script>
+  function switchTab(tabId, btn) {
+    // Hide all panels
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    // Deactivate all buttons
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    // Show selected
+    document.getElementById('tab-' + tabId).classList.add('active');
+    btn.classList.add('active');
+    // Scroll to top of main
+    document.querySelector('.main').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function copyTemplate(btn) {
+    const body = btn.closest('.template-card').querySelector('.template-body');
+    const text = body.innerText || body.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.classList.remove('copied');
+      }, 2000);
+    }).catch(() => {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+</script>
+
+</body>
+</html>

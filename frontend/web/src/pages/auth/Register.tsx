@@ -14,7 +14,15 @@ const COUNTRIES = [
   { code: 'IN', name: '🇮🇳 India' },
   { code: 'SG', name: '🇸🇬 Singapore' },
   { code: 'MY', name: '🇲🇾 Malaysia' },
+  { code: 'PH', name: '🇵🇭 Philippines' },
 ] as const;
+
+const PHONE_PLACEHOLDER: Record<string, string> = {
+  IN: '+91 98765 43210',
+  SG: '+65 9123 4567',
+  MY: '+60 12 345 6789',
+  PH: '+63 917 123 4567',
+};
 
 type CountryCode = typeof COUNTRIES[number]['code'];
 
@@ -104,11 +112,11 @@ export default function Register() {
             <div>
               <label className="text-sm text-white/60 flex items-center mb-1.5">
                 Phone Number
-                <InfoTooltip text="Your mobile number for SMS alerts. Include country code, e.g. +91 98765 43210." />
+                <InfoTooltip text="Your mobile number for SMS alerts. Include country code (e.g. +63 for Philippines, +91 for India)." />
               </label>
               <input type="tel" value={form.phone} onChange={e => up('phone', e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
-                placeholder="+91 98765 43210" />
+                placeholder={PHONE_PLACEHOLDER[form.country] ?? '+91 98765 43210'} />
             </div>
             <div>
               <label className="text-sm text-white/60 flex items-center mb-1.5">

@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Trademark Filing Checklist — Retail Nazar</title>
+<style>
+  :root{
+    --navy:#0d1b3e; --gold:#ffd200; --green:#1a7a4a; --red:#c0392b;
+    --orange:#d35400; --blue:#1a4fa0; --light:#f4f6fb;
+    --border:#d0d8e8; --text:#1a2340; --sub:#5a6a8a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#eef1f7;color:var(--text);font-size:15px}
+
+  nav{background:var(--navy);padding:18px 40px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(0,0,0,.35)}
+  nav .brand{color:var(--gold);font-size:1.1rem;font-weight:700}
+  nav .tag{color:rgba(255,255,255,.6);font-size:.75rem;margin-top:2px}
+  nav .badge{background:var(--gold);color:var(--navy);font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:20px}
+
+  .hero{background:linear-gradient(135deg,var(--navy) 0%,#1a3070 100%);color:#fff;padding:56px 40px 44px;text-align:center}
+  .hero h1{font-size:2rem;color:var(--gold);margin-bottom:10px}
+  .hero .subtitle{opacity:.8;max-width:650px;margin:0 auto 20px;font-size:1rem}
+  .hero .meta{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+  .hero .meta span{background:rgba(255,255,255,.1);padding:7px 16px;border-radius:20px;font-size:.82rem;color:rgba(255,255,255,.85)}
+  .hero .meta strong{color:var(--gold)}
+
+  .container{max-width:960px;margin:0 auto;padding:40px 20px}
+
+  .progress-bar{background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(13,27,62,.1);padding:28px;margin-bottom:32px}
+  .progress-bar h3{color:var(--navy);font-size:1rem;margin-bottom:16px}
+  .prog-track{display:flex;gap:0}
+  .prog-step{flex:1;text-align:center;position:relative}
+  .prog-step::after{content:'';position:absolute;top:14px;left:50%;width:100%;height:2px;background:var(--border);z-index:0}
+  .prog-step:last-child::after{display:none}
+  .prog-dot{width:30px;height:30px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;position:relative;z-index:1;font-size:.75rem;font-weight:700;color:#fff}
+  .prog-dot.done{background:var(--green)}
+  .prog-dot.now{background:var(--gold);color:var(--navy)}
+  .prog-dot.future{background:#bdc3d0}
+  .prog-label{font-size:.68rem;color:var(--sub);line-height:1.3}
+  .prog-time{font-size:.65rem;color:var(--sub);margin-top:2px}
+
+  .section-hdr{display:flex;align-items:center;gap:12px;margin:36px 0 16px}
+  .section-hdr .num{background:var(--navy);color:var(--gold);width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0}
+  .section-hdr h2{font-size:1.2rem;color:var(--navy)}
+
+  .card{background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(13,27,62,.1);margin-bottom:24px;overflow:hidden}
+  .card-hdr{background:var(--navy);padding:18px 24px;color:#fff;display:flex;align-items:center;justify-content:space-between}
+  .card-hdr h3{font-size:1rem;font-weight:700}
+  .card-hdr .phase-badge{background:var(--gold);color:var(--navy);font-size:.7rem;font-weight:700;padding:4px 12px;border-radius:12px}
+  .card-body{padding:24px}
+
+  .checklist-group{margin-bottom:20px}
+  .checklist-group h4{font-size:.78rem;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
+  .check-item{display:flex;align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid #f0f2f8}
+  .check-item:last-child{border-bottom:none}
+  .check-box{width:22px;height:22px;border:2px solid var(--border);border-radius:5px;flex-shrink:0;margin-top:1px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.2s}
+  .check-box:hover{border-color:var(--navy);background:#f0f3ff}
+  .check-box.checked{background:var(--green);border-color:var(--green)}
+  .check-box.checked::after{content:'✓';color:#fff;font-size:.75rem;font-weight:700}
+  .check-content{flex:1}
+  .check-title{font-size:.92rem;font-weight:600;color:var(--text);margin-bottom:3px}
+  .check-desc{font-size:.82rem;color:var(--sub);line-height:1.6}
+  .check-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .tag{font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:10px}
+  .tag-required{background:#ffe8e8;color:var(--red)}
+  .tag-optional{background:#e8f5e9;color:var(--green)}
+  .tag-cost{background:#fff8e1;color:#b8860b}
+  .tag-time{background:#e8f0ff;color:var(--blue)}
+  .tag-urgent{background:#fff0e8;color:var(--orange)}
+
+  .info-box{background:#e8f0ff;border-left:4px solid var(--blue);padding:16px 20px;border-radius:0 8px 8px 0;margin:16px 0;font-size:.87rem;line-height:1.7;color:#1a2e60}
+  .warn-box{background:#fff8e1;border-left:4px solid var(--gold);padding:16px 20px;border-radius:0 8px 8px 0;margin:16px 0;font-size:.87rem;line-height:1.7;color:#6d5800}
+  .success-box{background:#e8f5e9;border-left:4px solid var(--green);padding:16px 20px;border-radius:0 8px 8px 0;margin:16px 0;font-size:.87rem;line-height:1.7;color:#1a5c35}
+
+  table{width:100%;border-collapse:collapse;font-size:.86rem;margin-top:8px}
+  thead{background:var(--navy);color:#fff}
+  thead th{padding:11px 14px;text-align:left;font-weight:600}
+  tbody tr:nth-child(even){background:#f4f6fb}
+  tbody td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+
+  .class-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:10px}
+  .class-card{border:1px solid var(--border);border-radius:10px;padding:16px}
+  .class-card .class-num{background:var(--navy);color:var(--gold);font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:12px;display:inline-block;margin-bottom:8px}
+  .class-card h4{font-size:.88rem;font-weight:700;color:var(--navy);margin-bottom:6px}
+  .class-card p{font-size:.8rem;color:var(--sub);line-height:1.5}
+  .class-card .rec{font-size:.72rem;font-weight:700;margin-top:6px}
+  .rec-primary{color:var(--green)}
+  .rec-secondary{color:var(--blue)}
+
+  .cost-summary{background:var(--navy);color:#fff;border-radius:12px;padding:28px;margin-top:24px}
+  .cost-summary h3{color:var(--gold);margin-bottom:16px;font-size:1rem}
+  .cost-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.1);font-size:.88rem}
+  .cost-row:last-child{border-bottom:none;padding-top:14px;margin-top:4px}
+  .cost-row.total{font-weight:700;font-size:1rem;color:var(--gold)}
+  .cost-label{color:rgba(255,255,255,.8)}
+  .cost-value{color:#fff;font-weight:600}
+
+  .attorney-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:10px}
+  .attorney-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:18px}
+  .attorney-card h4{font-size:.88rem;font-weight:700;color:var(--navy);margin-bottom:4px}
+  .attorney-card .location{font-size:.75rem;color:var(--sub);margin-bottom:8px}
+  .attorney-card .specialty{font-size:.78rem;color:var(--blue);line-height:1.5}
+
+  footer{background:var(--navy);color:rgba(255,255,255,.5);text-align:center;padding:24px;font-size:.77rem;margin-top:48px}
+  footer strong{color:var(--gold)}
+
+  @media(max-width:600px){
+    .hero h1{font-size:1.4rem}
+    nav{padding:14px 18px}
+    .container{padding:24px 14px}
+    .prog-track{flex-direction:column;gap:12px}
+    .prog-step::after{display:none}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div>
+    <div class="brand">Retail Nazar — Trademark Filing Checklist</div>
+    <div class="tag">BrainGuardX AI Technologies Pvt. Ltd. | CONFIDENTIAL</div>
+  </div>
+  <div class="badge">ACTIONABLE — Start Now</div>
+</nav>
+
+<div class="hero">
+  <h1>Trademark Filing Checklist</h1>
+  <p class="subtitle">"Retail Nazar" Brand Protection — India Trademark Registration under the Trade Marks Act, 1999</p>
+  <div class="meta">
+    <span><strong>Mark:</strong> Retail Nazar</span>
+    <span><strong>Applicant:</strong> BrainGuardX AI Technologies Pvt. Ltd.</span>
+    <span><strong>Jurisdiction:</strong> India (TM India) + Priority Countries</span>
+    <span><strong>Timeline:</strong> File within 30 days</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="progress-bar">
+    <h3>Trademark Registration Journey</h3>
+    <div class="prog-track">
+      <div class="prog-step">
+        <div class="prog-dot now">1</div>
+        <div class="prog-label">Pre-Filing<br/>Preparation</div>
+        <div class="prog-time">Now</div>
+      </div>
+      <div class="prog-step">
+        <div class="prog-dot future">2</div>
+        <div class="prog-label">Search &amp;<br/>Clearance</div>
+        <div class="prog-time">Week 1–2</div>
+      </div>
+      <div class="prog-step">
+        <div class="prog-dot future">3</div>
+        <div class="prog-label">Filing<br/>Application</div>
+        <div class="prog-time">Month 1</div>
+      </div>
+      <div class="prog-step">
+        <div class="prog-dot future">4</div>
+        <div class="prog-label">Vienna<br/>Codification</div>
+        <div class="prog-time">Month 2–3</div>
+      </div>
+      <div class="prog-step">
+        <div class="prog-dot future">5</div>
+        <div class="prog-label">Examination<br/>Report</div>
+        <div class="prog-time">Month 4–6</div>
+      </div>
+      <div class="prog-step">
+        <div class="prog-dot future">6</div>
+        <div class="prog-label">Publication<br/>in TM Journal</div>
+        <div class="prog-time">Month 6–8</div>
+      </div>
+      <div class="prog-step">
+        <div class="prog-dot future">7</div>
+        <div class="prog-label">Opposition<br/>Period</div>
+        <div class="prog-time">Month 8–12</div>
+      </div>
+      <div class="prog-step">
+        <div class="prog-dot future">8</div>
+        <div class="prog-label">Registration<br/>Certificate</div>
+        <div class="prog-time">Month 12–18</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: PRE-FILING -->
+  <div class="section-hdr">
+    <div class="num">1</div>
+    <h2>Phase 1 — Pre-Filing Preparation (Do This First)</h2>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><h3>Search &amp; Availability Check</h3><span class="phase-badge">Week 1</span></div>
+    <div class="card-body">
+
+      <div class="checklist-group">
+        <h4>Trademark Availability Search</h4>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Search IP India TM Database for "Retail Nazar"</div>
+            <div class="check-desc">Go to <strong>ipindia.gov.in → Trademark → Trademark Search (Vienna Codification)</strong>. Search for "RETAIL NAZAR" in Class 42 (Software/SaaS) and Class 45 (Security Services). Also search phonetic variants: "Retail Nazar", "RetailNazar", "Retail Nazzar".</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span><span class="tag tag-time">1–2 hours</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Search for "Nazar" standalone in SaaS/tech classes</div>
+            <div class="check-desc">Search "NAZAR" alone in Class 9 (software/apps), Class 42, Class 45 to check for existing marks that might cause confusion.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span><span class="tag tag-time">30 min</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Google trademark clearance check</div>
+            <div class="check-desc">Search "Retail Nazar" on Google. Check if any Indian or global company uses this name for a retail or surveillance product. Check App Store and Play Store for any app named "Retail Nazar".</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span><span class="tag tag-time">20 min</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">WIPO Global Brand Database search</div>
+            <div class="check-desc">Search branddb.wipo.int for "RETAIL NAZAR" to check international registrations that might conflict with future global expansion.</div>
+            <div class="check-tags"><span class="tag tag-optional">Recommended</span><span class="tag tag-time">20 min</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="checklist-group">
+        <h4>Logo &amp; Brand Asset Preparation</h4>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Finalize the Retail Nazar logo design</div>
+            <div class="check-desc">The exact logo you plan to use commercially must be finalized before filing. You can file as (a) Word Mark — just the text "RETAIL NAZAR" without any logo, or (b) Device Mark — the text + logo/graphic combined. Recommended: file BOTH as two separate applications for maximum protection.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span><span class="tag tag-urgent">Urgent</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Prepare logo in required format: JPG/PNG, minimum 8cm × 8cm, black &amp; white version</div>
+            <div class="check-desc">TM India requires a high-resolution image of the mark. Prepare both a color version and a black &amp; white version. File size must not exceed 1MB for online filing.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Transliteration of "Retail Nazar" in Hindi/Devanagari (optional but recommended)</div>
+            <div class="check-desc">Consider filing "रिटेल नज़र" (Retail Nazar in Devanagari script) as a separate mark or as a transliteration within the same application to protect the Hindi branding.</div>
+            <div class="check-tags"><span class="tag tag-optional">Recommended for India</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTION 2: TRADEMARK CLASSES -->
+  <div class="section-hdr">
+    <div class="num">2</div>
+    <h2>Phase 2 — Identify Correct Trademark Classes</h2>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><h3>Nice Classification — Recommended Classes for Retail Nazar</h3><span class="phase-badge">Critical Decision</span></div>
+    <div class="card-body">
+      <div class="info-box">India follows the Nice Classification system (12th Edition). Each class requires a separate filing fee. File in the classes most relevant to your current and planned business. The wrong class = no protection in that area.</div>
+
+      <div class="class-grid">
+        <div class="class-card">
+          <span class="class-num">Class 9</span>
+          <h4>Computer Software &amp; Apps</h4>
+          <p>Software for surveillance, AI detection, video analytics, mobile application for retail security monitoring, downloadable software</p>
+          <div class="rec rec-primary">PRIMARY — Must File</div>
+        </div>
+        <div class="class-card">
+          <span class="class-num">Class 42</span>
+          <h4>SaaS / Technology Services</h4>
+          <p>Software-as-a-Service (SaaS), cloud computing services, AI and machine learning services, video analytics platform, multi-tenant software services</p>
+          <div class="rec rec-primary">PRIMARY — Must File</div>
+        </div>
+        <div class="class-card">
+          <span class="class-num">Class 45</span>
+          <h4>Security &amp; Surveillance Services</h4>
+          <p>Retail security monitoring services, theft detection services, loss prevention services, security alert services</p>
+          <div class="rec rec-primary">PRIMARY — Must File</div>
+        </div>
+        <div class="class-card">
+          <span class="class-num">Class 38</span>
+          <h4>Telecommunications / Alerts</h4>
+          <p>WhatsApp-based alert notification services, real-time messaging services for security alerts, data transmission services</p>
+          <div class="rec rec-secondary">SECONDARY — Recommended</div>
+        </div>
+        <div class="class-card">
+          <span class="class-num">Class 35</span>
+          <h4>Business Intelligence / Analytics</h4>
+          <p>Footfall analytics services, retail business intelligence, customer traffic analysis, business data analysis services for retailers</p>
+          <div class="rec rec-secondary">SECONDARY — Recommended</div>
+        </div>
+        <div class="class-card">
+          <span class="class-num">Class 37</span>
+          <h4>Installation / Maintenance</h4>
+          <p>CCTV installation services, surveillance system setup, camera system configuration, maintenance of security equipment</p>
+          <div class="rec" style="color:var(--sub)">OPTIONAL — Future Business</div>
+        </div>
+      </div>
+
+      <div class="warn-box" style="margin-top:20px">
+        <strong>Minimum recommendation:</strong> File in Class 9 + Class 42 + Class 45 as your core trio. This covers the software product, the SaaS delivery, and the security service. Add Class 38 and Class 35 if budget allows — each additional class costs ₹4,500–₹9,000.
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3: DOCUMENTS REQUIRED -->
+  <div class="section-hdr">
+    <div class="num">3</div>
+    <h2>Phase 3 — Documents &amp; Information Required for Filing</h2>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><h3>Document Checklist</h3><span class="phase-badge">Gather Before Filing</span></div>
+    <div class="card-body">
+      <div class="checklist-group">
+        <h4>Applicant Details</h4>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Company Incorporation Certificate (CIN)</div>
+            <div class="check-desc">Certificate of Incorporation from Ministry of Corporate Affairs for BrainGuardX AI Technologies Pvt. Ltd.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Company PAN Card</div>
+            <div class="check-desc">PAN of BrainGuardX AI Technologies Pvt. Ltd.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Registered Office Address</div>
+            <div class="check-desc">Full registered address of the company as per MCA records. This will appear on the trademark registration certificate.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Authorized Signatory Details</div>
+            <div class="check-desc">Name, designation, and signature of person authorized to sign TM-A form on behalf of the company (typically Director).</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="checklist-group">
+        <h4>Mark Details</h4>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Mark representation (JPG/PNG) — 8cm × 8cm minimum</div>
+            <div class="check-desc">High-resolution image of the mark (logo or word mark). For word mark (text only), a typed representation is acceptable.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Description of goods/services for each class</div>
+            <div class="check-desc">A precise description of what products/services the mark will be used for, in each class being applied for. Prepared by attorney based on class heading.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Date of First Use in India (or "Proposed to be Used")</div>
+            <div class="check-desc">If you are already using "Retail Nazar" in commerce (website, invoices, pitch decks, product demos), state the earliest date. If not yet commercially launched, mark as "Proposed to be Used" — this is fine.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Evidence of use (if claiming "Used" status)</div>
+            <div class="check-desc">If claiming prior use: screenshots of website, invoices with brand name, marketing materials, app screenshots. If "Proposed to be Used": no evidence needed.</div>
+            <div class="check-tags"><span class="tag tag-optional">Only if claiming use</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="checklist-group">
+        <h4>Power of Attorney (if filing via attorney)</h4>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Form TM-48 — Power of Attorney</div>
+            <div class="check-desc">Signed by authorized company representative, authorizing the trademark attorney/agent to file on behalf of BrainGuardX AI Technologies Pvt. Ltd. Company stamp required.</div>
+            <div class="check-tags"><span class="tag tag-required">Required if using attorney</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Affidavit for Startup India fee benefit (if applicable)</div>
+            <div class="check-desc">DPIIT-recognized startups get 50% fee reduction. If BrainGuardX is registered under Startup India, prepare the DPIIT recognition certificate.</div>
+            <div class="check-tags"><span class="tag tag-optional">If startup registered</span><span class="tag tag-cost">50% fee saving</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: FILING -->
+  <div class="section-hdr">
+    <div class="num">4</div>
+    <h2>Phase 4 — Filing the Application</h2>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><h3>TM-A Application Filing</h3><span class="phase-badge">Month 1</span></div>
+    <div class="card-body">
+      <div class="checklist-group">
+        <h4>Filing Options</h4>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Online Filing via ipindia.gov.in (RECOMMENDED)</div>
+            <div class="check-desc">File Form TM-A online at the IP India e-filing portal. Online filing is faster, cheaper (lower fees), and gives instant acknowledgement with filing date. URL: <strong>ipindia.gov.in → e-Services → e-TM → Online Trademark Filing</strong></div>
+            <div class="check-tags"><span class="tag tag-required">Recommended</span><span class="tag tag-cost">₹4,500/class (company) or ₹2,250 (startup)</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">File in Delhi TM Registry (jurisdiction for Noida)</div>
+            <div class="check-desc">Noida (UP) falls under the Delhi Trademark Registry jurisdiction. Filing in the correct jurisdiction is required. Principal place of business determines jurisdiction.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">File separately for each class</div>
+            <div class="check-desc">TM-A must be filed separately for each Nice Class. File Class 9, Class 42, and Class 45 as three separate applications. Request multi-class filing (single form, multiple classes) if your attorney recommends it.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Obtain TM Application Number and Filing Receipt</div>
+            <div class="check-desc">Upon successful filing, you receive an Application Number (e.g., 6001234). Save this — you can use "TM" symbol (™) immediately after filing. The ® symbol is only allowed after registration is granted.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span><span class="tag tag-urgent">Use ™ immediately after filing</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="checklist-group">
+        <h4>Immediate Actions After Filing</h4>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Update website, app, and all materials with ™ symbol</div>
+            <div class="check-desc">Add "Retail Nazar™" to your website footer, app store listing, pitch decks, and all marketing materials immediately after filing.</div>
+            <div class="check-tags"><span class="tag tag-required">Do Immediately</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Track application status at ipindia.gov.in</div>
+            <div class="check-desc">Monitor your application status every 2–3 weeks. You will receive the Examination Report (typically within 3–6 months) requiring a response.</div>
+            <div class="check-tags"><span class="tag tag-required">Ongoing</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Respond to Examination Report within 30 days</div>
+            <div class="check-desc">If the TM examiner raises objections (e.g., similar existing marks, descriptiveness), you must file a counter-statement within 30 days. Missing this deadline abandons your application.</div>
+            <div class="check-tags"><span class="tag tag-required">Critical Deadline</span><span class="tag tag-urgent">30-day window</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: POST REGISTRATION -->
+  <div class="section-hdr">
+    <div class="num">5</div>
+    <h2>Phase 5 — Post-Registration &amp; Maintenance</h2>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><h3>After Registration is Granted</h3><span class="phase-badge">Month 12–18 onwards</span></div>
+    <div class="card-body">
+      <div class="checklist-group">
+        <h4>Registration &amp; Renewal</h4>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Update all materials from ™ to ® symbol</div>
+            <div class="check-desc">Only after receiving registration certificate can you use the ® symbol. Update website, app, letterheads, contracts, and all marketing materials.</div>
+            <div class="check-tags"><span class="tag tag-required">After Registration</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Set renewal reminder for 10 years (TM-R form)</div>
+            <div class="check-desc">Indian trademark registration is valid for 10 years from the date of filing, renewable every 10 years. File Form TM-R before expiry. Set calendar reminder 12 months before expiry.</div>
+            <div class="check-tags"><span class="tag tag-required">Set Reminder</span><span class="tag tag-cost">₹9,000 renewal fee (company)</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Use the trademark continuously in commerce</div>
+            <div class="check-desc">A trademark can be challenged for non-use if not used for 5 consecutive years after registration. Maintain records of use (invoices, advertisements, screenshots) as evidence of continuous use.</div>
+            <div class="check-tags"><span class="tag tag-required">Ongoing</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="checklist-group">
+        <h4>Monitoring &amp; Enforcement</h4>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Monitor TM Journal for similar new filings (every 4 weeks)</div>
+            <div class="check-desc">Regularly check the Indian Trademark Journal for any new applications similar to "Retail Nazar". You have 4 months to file an opposition after a conflicting mark is published.</div>
+            <div class="check-tags"><span class="tag tag-required">Ongoing</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Set up Google Alerts for "Retail Nazar" brand monitoring</div>
+            <div class="check-desc">Create Google Alerts for "Retail Nazar", "RetailNazar", "Retail Nazzar" to catch any unauthorized use of your brand online.</div>
+            <div class="check-tags"><span class="tag tag-optional">Recommended</span><span class="tag tag-cost">Free</span></div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-box" onclick="this.classList.toggle('checked')"></div>
+          <div class="check-content">
+            <div class="check-title">Include trademark notice in all contracts, agreements, and licenses</div>
+            <div class="check-desc">All customer contracts, reseller agreements, and OEM agreements should include a clause identifying "Retail Nazar" as a registered trademark of BrainGuardX AI Technologies Pvt. Ltd.</div>
+            <div class="check-tags"><span class="tag tag-required">Required</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 6: INTERNATIONAL -->
+  <div class="section-hdr">
+    <div class="num">6</div>
+    <h2>Phase 6 — International Trademark Protection (Future)</h2>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><h3>Madrid Protocol Filing — When to Go International</h3><span class="phase-badge">Month 18+ / After India Grant</span></div>
+    <div class="card-body">
+      <div class="info-box">India is a signatory to the Madrid Protocol. Once your Indian trademark is registered (or even after filing), you can file a single international application through WIPO's Madrid System to protect the mark in multiple countries at once.</div>
+
+      <table>
+        <thead><tr><th>Priority Country</th><th>Why</th><th>Timing</th></tr></thead>
+        <tbody>
+          <tr><td><strong>UAE / Middle East</strong></td><td>Enalytix is eyeing UAE; Indian diaspora retail businesses; large Indian retail community</td><td>File within 6 months of India registration</td></tr>
+          <tr><td><strong>Singapore</strong></td><td>ASEAN hub; Indian retail presence; potential SaaS expansion</td><td>File within 12 months of India registration</td></tr>
+          <tr><td><strong>UK</strong></td><td>Indian retail businesses; Anavid competes here</td><td>File within 18 months of India registration</td></tr>
+          <tr><td><strong>USA</strong></td><td>If Series A funding targeted; protect against US competitors</td><td>Only if US expansion planned — expensive</td></tr>
+        </tbody>
+      </table>
+
+      <div class="success-box" style="margin-top:16px">
+        <strong>Recommendation:</strong> Focus on India registration first. International filing via Madrid Protocol costs $250–$500 per country designation (WIPO fees) + Indian attorney fees. Do this only after Indian grant and when you have real expansion plans or investor interest in those markets.
+      </div>
+    </div>
+  </div>
+
+  <!-- COST SUMMARY -->
+  <div class="cost-summary">
+    <h3>Complete Cost Estimate — India Trademark Filing</h3>
+    <div class="cost-row"><span class="cost-label">Class 9 — Filing fee (company, online)</span><span class="cost-value">₹4,500</span></div>
+    <div class="cost-row"><span class="cost-label">Class 42 — Filing fee (company, online)</span><span class="cost-value">₹4,500</span></div>
+    <div class="cost-row"><span class="cost-label">Class 45 — Filing fee (company, online)</span><span class="cost-value">₹4,500</span></div>
+    <div class="cost-row"><span class="cost-label">Class 38 &amp; Class 35 (optional)</span><span class="cost-value">₹9,000</span></div>
+    <div class="cost-row"><span class="cost-label">Word mark (separate application, Class 42)</span><span class="cost-value">₹4,500</span></div>
+    <div class="cost-row"><span class="cost-label">Attorney fees (drafting, filing, follow-up)</span><span class="cost-value">₹25,000–₹50,000</span></div>
+    <div class="cost-row total"><span class="cost-label">TOTAL (3 core classes + attorney)</span><span class="cost-value">₹38,500–₹63,500</span></div>
+    <div style="font-size:.78rem;color:rgba(255,255,255,.5);margin-top:8px">* DPIIT Startup India registered companies get 50% fee reduction on govt fees, saving ₹6,750–₹13,500</div>
+  </div>
+
+  <!-- RECOMMENDED ATTORNEYS -->
+  <div class="section-hdr" style="margin-top:36px">
+    <div class="num">7</div>
+    <h2>Recommended IP Firms (Delhi/Noida Region)</h2>
+  </div>
+
+  <div class="attorney-grid">
+    <div class="attorney-card">
+      <h4>Anand and Anand</h4>
+      <div class="location">Noida, UP (closest to you)</div>
+      <div class="specialty">India's top IP firm. Strong in trademarks, patents for tech startups. Has filed for many Indian SaaS companies.</div>
+    </div>
+    <div class="attorney-card">
+      <h4>K&amp;S Partners</h4>
+      <div class="location">New Delhi</div>
+      <div class="specialty">Full IP practice including patents + trademarks. Startup-friendly. Good for filing both TM and patent applications simultaneously.</div>
+    </div>
+    <div class="attorney-card">
+      <h4>LexOrbis</h4>
+      <div class="location">New Delhi</div>
+      <div class="specialty">IP boutique firm with strong tech practice. Has handled AI/software trademark filings. Reasonable startup rates.</div>
+    </div>
+    <div class="attorney-card">
+      <h4>Remfry &amp; Sagar</h4>
+      <div class="location">Gurugram/Delhi</div>
+      <div class="specialty">Long-standing IP firm with trademark and patent practice. Good for combined filing of both BGX patents and Retail Nazar TM.</div>
+    </div>
+    <div class="attorney-card">
+      <h4>iPleaders / Online TM Filing</h4>
+      <div class="location">Online</div>
+      <div class="specialty">For budget-conscious filing only (₹999–₹2,999 service fee). Not recommended for multi-class or contested filings. Use only for word mark in single class.</div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <strong>BrainGuardX AI Technologies Pvt. Ltd.</strong> — Retail Nazar™ Trademark Filing Checklist — CONFIDENTIAL<br/>
+  Consult a registered Trademark Attorney before filing. This document is for internal guidance only.
+</footer>
+
+<script>
+  // Interactive progress tracker
+  const boxes = document.querySelectorAll('.check-box');
+  boxes.forEach(b => {
+    b.addEventListener('click', () => {
+      const total = boxes.length;
+      const done = document.querySelectorAll('.check-box.checked').length;
+      // could add a counter display here
+    });
+  });
+</script>
+
+</body>
+</html>

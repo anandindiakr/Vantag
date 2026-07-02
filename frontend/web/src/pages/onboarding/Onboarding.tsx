@@ -5,6 +5,7 @@ import { Shield, Store, CreditCard, Camera, Smartphone, CheckCircle, ChevronRigh
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { usePayment } from '../../hooks/usePayment';
+import { useRegion } from '../../hooks/useRegion';
 import InfoTooltip from '../../components/InfoTooltip';
 
 // ── helpers ───────────────────────────────────────────────────────────────
@@ -62,14 +63,22 @@ const PLANS = [
   { id: 'proplus', name: 'Pro Plus', cameras: 'Up to 30', price: { IN: '₹15,000', SG: 'S$199', MY: 'RM 599', PH: '₱17,999' }, features: ['Everything in Pro', 'Custom AI Training', 'SLA Uptime Guarantee', 'Dedicated Account Manager', 'On-site Support'] },
 ];
 
+const PHONE_PLACEHOLDER: Record<string, string> = {
+  IN: '+91 98765 43210',
+  SG: '+65 9123 4567',
+  MY: '+60 12 345 6789',
+  PH: '+63 917 123 4567',
+};
+
 // ── Main Onboarding Component ─────────────────────────────────────────────
 export default function Onboarding() {
   const nav = useNavigate();
   const { pay: payNow } = usePayment();
+  const regionData = useRegion();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
-  const [country, setCountry] = useState('IN');
+  const [country, setCountry] = useState(regionData.region || 'IN');
   const [selectedPlan, setSelectedPlan] = useState('starter');
   const [agentData, setAgentData] = useState<any>(null);
   const [cameras, setCameras] = useState<CameraEntry[]>([{ ip: '', name: '', location: '', rtsp_url: '', brand: '', probeStatus: 'idle' }]);
@@ -257,6 +266,7 @@ export default function Onboarding() {
                       <option value="IN" className="bg-gray-900">🇮🇳 India</option>
                       <option value="SG" className="bg-gray-900">🇸🇬 Singapore</option>
                       <option value="MY" className="bg-gray-900">🇲🇾 Malaysia</option>
+                      <option value="PH" className="bg-gray-900">🇵🇭 Philippines</option>
                     </select>
                   </div>
                   <div>
@@ -285,7 +295,7 @@ export default function Onboarding() {
                   </label>
                   <input type="tel" value={shopForm.phone} onChange={e => setShopForm(f => ({...f, phone: e.target.value}))}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500/50 transition-colors"
-                    placeholder="+91 98765 43210" />
+                    placeholder={PHONE_PLACEHOLDER[country] ?? '+91 98765 43210'} />
                 </div>
                 <div>
                   <label className="text-sm text-white/60 flex items-center mb-1.5">
@@ -297,6 +307,7 @@ export default function Onboarding() {
                     <option value="en" className="bg-gray-900">English</option>
                     <option value="hi" className="bg-gray-900">हिंदी (Hindi)</option>
                     <option value="ms" className="bg-gray-900">Bahasa Malaysia</option>
+                    <option value="tl" className="bg-gray-900">Filipino (Tagalog)</option>
                     <option value="zh" className="bg-gray-900">中文 (Chinese)</option>
                   </select>
                 </div>

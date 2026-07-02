@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retail Nazar - Handout (English)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Poppins', sans-serif;
+    background: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .flyer {
+    width: 210mm;
+    min-height: 297mm;
+    background: white;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  }
+
+  /* TOP HEADER */
+  .header {
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    color: white;
+    padding: 28px 32px 20px;
+    position: relative;
+  }
+
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -18px;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: white;
+    clip-path: ellipse(55% 100% at 50% 100%);
+  }
+
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .logo-icon {
+    width: 52px;
+    height: 52px;
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+  }
+
+  .logo-text {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
+
+  .logo-text span { color: #ffd200; }
+
+  .tagline {
+    font-size: 13px;
+    opacity: 0.75;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-left: 64px;
+    margin-top: -8px;
+  }
+
+  .headline {
+    font-size: 22px;
+    font-weight: 700;
+    text-align: center;
+    margin-top: 18px;
+    line-height: 1.35;
+  }
+
+  .headline span {
+    color: #ffd200;
+  }
+
+  /* HERO STAT BAR */
+  .stat-bar {
+    display: flex;
+    justify-content: space-around;
+    padding: 32px 24px 16px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-number {
+    font-size: 32px;
+    font-weight: 800;
+    color: #302b63;
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  /* PROBLEM SECTION */
+  .problem-section {
+    background: #fff8e1;
+    margin: 16px 24px;
+    border-radius: 12px;
+    padding: 16px 20px;
+    border-left: 4px solid #ffd200;
+  }
+
+  .problem-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #333;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+
+  .problem-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .problem-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #444;
+  }
+
+  .problem-item::before {
+    content: '⚠';
+    font-size: 14px;
+    color: #e65100;
+    flex-shrink: 0;
+  }
+
+  /* FEATURES */
+  .section-title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 700;
+    color: #302b63;
+    margin: 16px 24px 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin: 0 24px 16px;
+  }
+
+  .feature-card {
+    background: linear-gradient(135deg, #f8f9ff, #eef0ff);
+    border-radius: 12px;
+    padding: 14px 12px;
+    text-align: center;
+    border: 1px solid #e0e4ff;
+  }
+
+  .feature-icon {
+    font-size: 28px;
+    margin-bottom: 6px;
+  }
+
+  .feature-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #302b63;
+    line-height: 1.3;
+  }
+
+  .feature-desc {
+    font-size: 10px;
+    color: #666;
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+
+  /* PRICING */
+  .pricing-section {
+    background: linear-gradient(135deg, #0f0c29, #302b63);
+    margin: 0 24px 16px;
+    border-radius: 16px;
+    padding: 20px;
+    color: white;
+  }
+
+  .pricing-title {
+    text-align: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #ffd200;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .plans {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .plan {
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 12px 8px;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .plan.popular {
+    background: rgba(255, 210, 0, 0.15);
+    border-color: #ffd200;
+    position: relative;
+  }
+
+  .plan-badge {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffd200;
+    color: #302b63;
+    font-size: 8px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+
+  .plan-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffd200;
+    text-transform: uppercase;
+  }
+
+  .plan-price {
+    font-size: 20px;
+    font-weight: 800;
+    margin: 6px 0 2px;
+  }
+
+  .plan-price-unit {
+    font-size: 9px;
+    color: rgba(255,255,255,0.6);
+  }
+
+  .plan-cameras {
+    font-size: 9px;
+    color: rgba(255,255,255,0.7);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+
+  .intro-offer {
+    text-align: center;
+    margin-top: 14px;
+    background: rgba(255,210,0,0.15);
+    border-radius: 8px;
+    padding: 10px;
+    border: 1px dashed #ffd200;
+  }
+
+  .intro-offer-text {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffd200;
+  }
+
+  .intro-offer-sub {
+    font-size: 10px;
+    color: rgba(255,255,255,0.7);
+    margin-top: 3px;
+  }
+
+  /* TESTIMONIAL */
+  .testimonial {
+    margin: 0 24px 16px;
+    background: #f9fdf9;
+    border-radius: 12px;
+    padding: 16px;
+    border-left: 4px solid #4caf50;
+    position: relative;
+  }
+
+  .quote-mark {
+    font-size: 40px;
+    color: #4caf50;
+    opacity: 0.3;
+    position: absolute;
+    top: 5px;
+    left: 14px;
+    line-height: 1;
+    font-family: Georgia, serif;
+  }
+
+  .testimonial-text {
+    font-size: 12px;
+    color: #333;
+    line-height: 1.6;
+    padding-left: 20px;
+    font-style: italic;
+  }
+
+  .testimonial-author {
+    font-size: 11px;
+    font-weight: 700;
+    color: #4caf50;
+    margin-top: 8px;
+    padding-left: 20px;
+  }
+
+  /* HOW IT WORKS */
+  .steps {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    margin: 0 24px 16px;
+  }
+
+  .step {
+    flex: 1;
+    text-align: center;
+  }
+
+  .step-num {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #302b63, #0f0c29);
+    color: #ffd200;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    margin: 0 auto 6px;
+  }
+
+  .step-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #302b63;
+    line-height: 1.4;
+  }
+
+  .step-arrow {
+    flex: 0 0 16px;
+    font-size: 18px;
+    color: #ccc;
+    margin-top: 7px;
+  }
+
+  /* FOOTER CTA */
+  .footer-cta {
+    background: linear-gradient(135deg, #f7971e, #ffd200);
+    padding: 20px 24px;
+    text-align: center;
+  }
+
+  .cta-headline {
+    font-size: 16px;
+    font-weight: 800;
+    color: #1a1a2e;
+    margin-bottom: 8px;
+  }
+
+  .cta-sub {
+    font-size: 11px;
+    color: rgba(0,0,0,0.6);
+    margin-bottom: 12px;
+  }
+
+  .contact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+
+  .contact-item {
+    background: rgba(255,255,255,0.5);
+    border-radius: 10px;
+    padding: 10px;
+  }
+
+  .contact-icon {
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+
+  .contact-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(0,0,0,0.5);
+    font-weight: 600;
+  }
+
+  .contact-value {
+    font-size: 11px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-top: 2px;
+  }
+
+  .free-trial-badge {
+    display: inline-block;
+    background: #1a1a2e;
+    color: #ffd200;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 8px 24px;
+    border-radius: 30px;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .flyer { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="flyer">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo-area">
+      <div class="logo-icon">👁</div>
+      <div>
+        <div class="logo-text">Retail <span>Nazar</span></div>
+      </div>
+    </div>
+    <div class="tagline">AI-Powered Smart Surveillance for Your Store</div>
+    <div class="headline">
+      Stop Losing Money to Theft.<br>
+      <span>Start Watching Smarter.</span>
+    </div>
+  </div>
+
+  <!-- STAT BAR -->
+  <div class="stat-bar">
+    <div class="stat">
+      <div class="stat-number">2%</div>
+      <div class="stat-label">Avg. shrinkage in Indian retail</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number">24/7</div>
+      <div class="stat-label">AI monitoring, zero breaks</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number">3s</div>
+      <div class="stat-label">Alert on suspicious activity</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number">₹0</div>
+      <div class="stat-label">Setup cost for 3-day trial</div>
+    </div>
+  </div>
+
+  <!-- PROBLEM -->
+  <div class="problem-section">
+    <div class="problem-title">Does Your Store Face These Challenges?</div>
+    <div class="problem-list">
+      <div class="problem-item">Shoplifting costing you daily</div>
+      <div class="problem-item">Staff not monitored when you're away</div>
+      <div class="problem-item">Old CCTV with no smart alerts</div>
+      <div class="problem-item">No proof when billing disputes arise</div>
+      <div class="problem-item">Blind spots in your store</div>
+      <div class="problem-item">Theft detected only after it happens</div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <div class="section-title">What Retail Nazar Does For You</div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🎯</div>
+      <div class="feature-name">AI Theft Detection</div>
+      <div class="feature-desc">Detects suspicious behaviour in real time — not after</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📱</div>
+      <div class="feature-name">WhatsApp Alerts</div>
+      <div class="feature-desc">Instant alerts on your phone, wherever you are</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔴</div>
+      <div class="feature-name">Live Remote View</div>
+      <div class="feature-desc">Watch your store live from anywhere, anytime</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <div class="feature-name">Customer Analytics</div>
+      <div class="feature-desc">Know peak hours, footfall & customer patterns</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🚪</div>
+      <div class="feature-name">Door Entry Control</div>
+      <div class="feature-desc">Auto-log everyone who enters or exits</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">☁️</div>
+      <div class="feature-name">Cloud Storage</div>
+      <div class="feature-desc">Footage saved securely — no local DVR needed</div>
+    </div>
+  </div>
+
+  <!-- PRICING -->
+  <div class="pricing-section">
+    <div class="pricing-title">Simple Honest Pricing — No Hidden Charges</div>
+    <div class="plans">
+      <div class="plan">
+        <div class="plan-name">Starter</div>
+        <div class="plan-price">₹999</div>
+        <div class="plan-price-unit">per month</div>
+        <div class="plan-cameras">1–2 cameras<br>Basic alerts</div>
+      </div>
+      <div class="plan popular">
+        <div class="plan-badge">Most Popular</div>
+        <div class="plan-name">Growth</div>
+        <div class="plan-price">₹1,999</div>
+        <div class="plan-price-unit">per month</div>
+        <div class="plan-cameras">Up to 5 cameras<br>AI detection</div>
+      </div>
+      <div class="plan">
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">₹3,499</div>
+        <div class="plan-price-unit">per month</div>
+        <div class="plan-cameras">Up to 10 cameras<br>Analytics</div>
+      </div>
+      <div class="plan">
+        <div class="plan-name">Pro+</div>
+        <div class="plan-price">₹5,999</div>
+        <div class="plan-price-unit">per month</div>
+        <div class="plan-cameras">Unlimited<br>Full suite</div>
+      </div>
+    </div>
+    <div class="intro-offer">
+      <div class="intro-offer-text">NOIDA LAUNCH OFFER — First 3 Months at 50% OFF</div>
+      <div class="intro-offer-sub">Valid for the first 100 stores in Noida only • No contract • Cancel anytime</div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="section-title">How to Get Started</div>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-label">WhatsApp us or visit website</div>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-label">Free 3-day trial — no payment</div>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-label">We connect to your existing cameras</div>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-label">AI starts protecting your store</div>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-label">Pay only if you love it</div>
+    </div>
+  </div>
+
+  <!-- TESTIMONIAL (placeholder — replace with real one soon) -->
+  <div class="testimonial">
+    <div class="quote-mark">"</div>
+    <div class="testimonial-text">We caught two shoplifting attempts in the first week itself. Earlier we would only know after stock was missing. Retail Nazar sends an alert to my phone instantly — even when I am not at the shop.</div>
+    <div class="testimonial-author">— Rajesh Sharma, Electronics Store Owner, Sector 18, Noida</div>
+  </div>
+
+  <!-- FOOTER CTA -->
+  <div class="footer-cta">
+    <div class="free-trial-badge">Try Free for 3 Days — No Credit Card</div>
+    <div class="cta-headline">Start Protecting Your Store Today</div>
+    <div class="cta-sub">Works with your existing cameras • Setup in under 30 minutes • Cancel anytime</div>
+    <div class="contact-grid">
+      <div class="contact-item">
+        <div class="contact-icon">💬</div>
+        <div class="contact-label">WhatsApp</div>
+        <div class="contact-value">+91 XXXXX XXXXX</div>
+      </div>
+      <div class="contact-item">
+        <div class="contact-icon">🌐</div>
+        <div class="contact-label">Website</div>
+        <div class="contact-value">retailnazar.com</div>
+      </div>
+      <div class="contact-item">
+        <div class="contact-icon">📧</div>
+        <div class="contact-label">Email</div>
+        <div class="contact-value">hello@retailnazar.com</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
