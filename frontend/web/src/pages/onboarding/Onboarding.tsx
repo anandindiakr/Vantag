@@ -65,7 +65,7 @@ const PLANS = [
 // ── Main Onboarding Component ─────────────────────────────────────────────
 export default function Onboarding() {
   const nav = useNavigate();
-  const { pay: payNow, gateway } = usePayment();
+  const { pay: payNow } = usePayment();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [payLoading, setPayLoading] = useState(false);

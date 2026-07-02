@@ -279,7 +279,7 @@ export default function Landing() {
   const domainRegion = useRegion();
 
   // On localhost dev, allow switching between regions to preview prices/branding
-  const [activeCode, setActiveCode] = useState<'IN' | 'SG' | 'MY'>(domainRegion.region);
+  const [activeCode, setActiveCode] = useState<'IN' | 'SG' | 'MY' | 'PH'>(domainRegion.region);
   const [annual, setAnnual] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
