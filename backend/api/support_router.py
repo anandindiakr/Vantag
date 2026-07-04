@@ -287,5 +287,156 @@ async def get_faq() -> dict:
                 "a": "Typical accuracy: 92–95% on theft/sweeping, 88% on loitering, "
                      "95%+ on empty shelves. Accuracy improves as you tune zones.",
             },
+
+            # ── Finding Your Camera's IP Address ──
+            {
+                "q": "I don't know the IP address of my camera. How do I find it?",
+                "a": "The easiest way is to log into your WiFi router (usually by typing "
+                     "192.168.1.1 or 192.168.0.1 into your browser). Look for a section "
+                     "called \"Connected Devices\", \"DHCP Clients\", or \"Device List\" — "
+                     "your camera will appear there with its IP address. It usually looks "
+                     "like 192.168.1.xx.",
+            },
+            {
+                "q": "Can I find my camera's IP address from the camera's own app?",
+                "a": "Yes! Most camera brands have a phone app (Hikvision uses iVMS-4500, "
+                     "Dahua uses DMSS). Open the app, go to your camera's settings, and "
+                     "look for \"Network Settings\" or \"Device Info\" — the IP address is "
+                     "listed there.",
+            },
+            {
+                "q": "My camera came with a CD or a tool — can I use that to find the IP?",
+                "a": "Absolutely. Most brands include a \"search tool\" or \"IP scanner\" "
+                     "on their CD or available for free download (e.g. Hikvision's \"SADP "
+                     "Tool\", Dahua's \"ConfigTool\"). Install it on any Windows PC on the "
+                     "same network, run it, and it will automatically find all cameras and "
+                     "display their IP addresses.",
+            },
+            {
+                "q": "I don't have a router login. Can I still find my camera's IP?",
+                "a": "Yes. Download a free app called \"Fing\" on your phone (iOS or "
+                     "Android). Connect your phone to the same WiFi as your cameras, open "
+                     "Fing, and tap \"Scan Network.\" It lists every device connected to "
+                     "your network, including cameras, along with their IP addresses.",
+            },
+
+            # ── RTSP & Camera Streams ──
+            {
+                "q": "What is an RTSP link and where do I get it?",
+                "a": "RTSP is just the address your camera uses to share its video. It "
+                     "looks like: rtsp://username:password@192.168.1.64:554/stream. The IP "
+                     "address part (192.168.1.64) is your camera's IP. The username and "
+                     "password are your camera's login. The /stream part varies by brand — "
+                     "we have a list of common formats in our camera compatibility guide.",
+            },
+            {
+                "q": "I don't know the username and password for my camera. What should I try?",
+                "a": "Most cameras come with default credentials. Common ones are: admin / "
+                     "admin, admin / 12345, admin / (blank). Check the sticker on the back "
+                     "or bottom of your camera — it often shows the default login. If "
+                     "someone changed it and you don't know it, you can factory reset the "
+                     "camera (usually a small reset button held for 10 seconds).",
+            },
+            {
+                "q": "My RTSP link isn't working. What could be wrong?",
+                "a": "The three most common reasons are: (1) wrong IP address — double-check "
+                     "it with the steps above, (2) wrong username/password — try the "
+                     "defaults listed above, (3) the camera and your PC are on different "
+                     "networks — they must both be connected to the same router.",
+            },
+
+            # ── Network & PC Setup ──
+            {
+                "q": "Does my PC (the one running Nazar) need to be on the same WiFi as the cameras?",
+                "a": "Yes — the PC running the Nazar agent must be connected to the same "
+                     "network (WiFi or LAN cable) as your cameras. The cameras and the PC "
+                     "need to be able to \"talk\" to each other directly inside your "
+                     "store's network.",
+            },
+            {
+                "q": "Can I use wireless (WiFi) cameras, or do they need to be wired?",
+                "a": "Both work fine. WiFi cameras and wired (PoE/LAN) cameras are both "
+                     "supported, as long as they support the RTSP protocol. Wired cameras "
+                     "tend to be more reliable and are recommended for stores with 4+ cameras.",
+            },
+            {
+                "q": "Do I need a fast internet connection?",
+                "a": "Nazar processes video locally on your PC — it does NOT upload video to "
+                     "the internet. You only need internet to send small alert snapshots and "
+                     "event data to the cloud. A basic 10 Mbps upload connection is more "
+                     "than enough even for 10+ cameras.",
+            },
+            {
+                "q": "What happens if my internet goes down?",
+                "a": "Your cameras keep recording and Nazar keeps detecting incidents "
+                     "locally. Events are stored on your PC and automatically sync to the "
+                     "cloud once the internet comes back. You won't lose any detections.",
+            },
+            {
+                "q": "Does my PC need to be on 24 hours a day?",
+                "a": "Yes — for continuous monitoring, the PC running Nazar should stay on. "
+                     "You can set Windows to never sleep (Control Panel → Power Options → "
+                     "\"Never\" sleep). Many stores use a small, low-power mini-PC for this "
+                     "purpose.",
+            },
+
+            # ── Camera Compatibility ──
+            {
+                "q": "Will my existing cameras work with Nazar?",
+                "a": "Nazar works with any IP camera that supports RTSP streaming — this "
+                     "includes most cameras from Hikvision, Dahua, CP Plus, Godrej, Axis, "
+                     "Reolink, and most generic Chinese IP cameras. It does NOT work with "
+                     "old analog CCTV cameras unless you have a DVR/NVR that supports RTSP "
+                     "output.",
+            },
+            {
+                "q": "I have a DVR/NVR. Can I connect Nazar to it?",
+                "a": "Yes! Most modern DVRs and NVRs (Hikvision, Dahua, CP Plus) support "
+                     "RTSP streaming for each channel. You can point Nazar to the NVR's "
+                     "RTSP stream instead of individual cameras. The IP address will be "
+                     "your NVR's IP, and each camera has a channel number in the stream URL "
+                     "(e.g. channel=1, channel=2).",
+            },
+            {
+                "q": "I bought cameras from a local shop and they have no brand name. Will they work?",
+                "a": "Likely yes — most generic IP cameras sold in India use standard RTSP. "
+                     "Try the RTSP URL format: rtsp://admin:admin@[camera-IP]:554/stream1. "
+                     "If that doesn't work, check the camera's web interface (open the "
+                     "camera IP in a browser) and look for \"Video Stream\" or \"RTSP\" "
+                     "settings.",
+            },
+
+            # ── Installation & Troubleshooting ──
+            {
+                "q": "The Nazar app says \"Connection Failed\" for my camera. What do I do?",
+                "a": "Check these in order: (1) Can you open the camera's IP in a browser "
+                     "from the same PC? If not, the camera and PC are not on the same "
+                     "network. (2) Is the username/password correct? (3) Try pinging the "
+                     "camera: open Command Prompt and type ping 192.168.1.xx (replace with "
+                     "your camera's IP). If it says \"Request timed out,\" the camera is "
+                     "not reachable.",
+            },
+            {
+                "q": "I can see my camera in the Nazar app but the video is blurry or choppy.",
+                "a": "This usually means the camera is set to a high resolution that the "
+                     "network can't handle smoothly. Log into your camera's web interface, "
+                     "go to Video Settings, and lower the main stream resolution to 1080p "
+                     "or 720p, and the bitrate to 2048–4096 Kbps. This gives a clear "
+                     "picture without overloading the network.",
+            },
+            {
+                "q": "My camera has a static IP (doesn't change) — do I need to do anything differently?",
+                "a": "No — static IPs are actually better for Nazar because the camera "
+                     "address never changes. Just enter the static IP when adding the "
+                     "camera. No extra steps needed.",
+            },
+            {
+                "q": "I want to monitor my store remotely from my phone. Do I need to do anything extra?",
+                "a": "No extra setup needed on your end. Nazar automatically sends live "
+                     "previews and alerts to the cloud, which you can view from the Nazar "
+                     "dashboard on any phone or browser. You do not need to set up port "
+                     "forwarding or expose your cameras to the internet — the Nazar agent "
+                     "handles it securely.",
+            },
         ]
     }
