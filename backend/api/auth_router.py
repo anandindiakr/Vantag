@@ -6,6 +6,8 @@ forgot-password, reset-password.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import secrets
 import uuid
@@ -21,6 +23,18 @@ from ..db.database import get_session
 from ..db.models.tenant import Tenant, TenantUser
 from ..services.tenant_service import create_tenant
 from ..services.email_service import generate_otp, send_verification_email, is_dev_mode
+
+
+def _jwt_secret() -> str:
+    return os.getenv("VANTAG_JWT_SECRET", "change-me")
+
+
+def _hash_otp(code: str) -> str:
+    """Timing-safe, keyed hash of an OTP/code so plaintext is never stored."""
+    return hmac.new(_jwt_secret().encode(), code.encode(), hashlib.sha256).hexdigest()
+
+
+_MAX_OTP_ATTEMPTS = 5
 
 
 # ── Disposable email domain blocklist ──────────────────────────────────────
@@ -96,7 +110,7 @@ try:
     def make_token(payload: dict, expires_delta: timedelta) -> str:
         data = payload.copy()
         data["exp"] = datetime.now(timezone.utc) + expires_delta
-        return jwt.encode(data, os.getenv("VANTAG_JWT_SECRET", "change-me"), algorithm="HS256")
+        return jwt.encode(data, _jwt_secret(), algorithm="HS256")
 except ImportError:
     import json, base64, hmac, hashlib
     def make_token(payload: dict, expires_delta: timedelta) -> str:
@@ -170,7 +184,7 @@ async def register(
 
     access = make_token(
         {"sub": user.id, "tenant_id": tenant.id, "email": user.email,
-         "role": user.role, "is_super_admin": False},
+         "role": user.role, "is_super_admin": False, "ver": user.token_version or 0},
         timedelta(hours=JWT_EXPIRE_HOURS),
     )
     refresh = make_token(
@@ -232,7 +246,8 @@ async def login(
 
             access = make_token(
                 {"sub": user.id, "tenant_id": tenant.id, "email": user.email,
-                 "role": user.role, "is_super_admin": user.is_super_admin},
+                 "role": user.role, "is_super_admin": user.is_super_admin,
+                 "ver": user.token_version or 0},
                 timedelta(hours=JWT_EXPIRE_HOURS),
             )
             refresh = make_token(
@@ -263,9 +278,7 @@ async def login(
     raise HTTPException(status_code=401, detail="Invalid email or password")
 
 
-# ── OTP store (in-memory, TTL 10 min) ────────────────────────────────────────
-# { email: (otp_code, expires_at) }
-_otp_store: dict[str, tuple[str, datetime]] = {}
+# ── OTP (DB-backed, hashed, TTL 10 min, attempt-limited) ─────────────────────
 
 
 class SendOtpRequest(BaseModel):
@@ -282,7 +295,7 @@ async def send_otp(
     body: SendOtpRequest,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Generate a 6-digit OTP and email it to the user."""
+    """Generate a 6-digit OTP, store its hash on the user row, and email it."""
     result = await session.execute(
         select(TenantUser).where(TenantUser.email == body.email.lower())
     )
@@ -295,8 +308,10 @@ async def send_otp(
         return {"message": "Email already verified."}
 
     otp = generate_otp(6)
-    expires = datetime.now(timezone.utc) + timedelta(minutes=10)
-    _otp_store[body.email.lower()] = (otp, expires)
+    user.otp_code_hash = _hash_otp(otp)
+    user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    user.otp_attempts = 0
+    await session.commit()
 
     # Get tenant name for personalisation
     tenant_result = await session.execute(select(Tenant).where(Tenant.id == user.tenant_id))
@@ -324,33 +339,44 @@ async def verify_email(
     body: VerifyOtpRequest,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Validate the OTP and mark user email as verified."""
+    """Validate the OTP (hashed, expiring, attempt-limited) and mark verified."""
     key = body.email.lower()
-    entry = _otp_store.get(key)
-    if not entry:
-        raise HTTPException(status_code=400, detail="No verification code found. Request a new one.")
-
-    otp_code, expires = entry
-    if datetime.now(timezone.utc) > expires:
-        del _otp_store[key]
-        raise HTTPException(status_code=400, detail="Code expired. Request a new one.")
-
-    if not secrets.compare_digest(otp_code, body.otp.strip()):
-        raise HTTPException(status_code=400, detail="Invalid code. Please try again.")
-
-    # Mark verified in DB
     result = await session.execute(
         select(TenantUser).where(TenantUser.email == key)
     )
     user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    if not user or not user.otp_code_hash or not user.otp_expires_at:
+        raise HTTPException(status_code=400, detail="No verification code found. Request a new one.")
 
+    expires = user.otp_expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expires:
+        user.otp_code_hash = None
+        user.otp_expires_at = None
+        user.otp_attempts = 0
+        await session.commit()
+        raise HTTPException(status_code=400, detail="Code expired. Request a new one.")
+
+    if (user.otp_attempts or 0) >= _MAX_OTP_ATTEMPTS:
+        user.otp_code_hash = None
+        user.otp_expires_at = None
+        await session.commit()
+        raise HTTPException(status_code=429, detail="Too many attempts. Request a new code.")
+
+    if not secrets.compare_digest(user.otp_code_hash, _hash_otp(body.otp.strip())):
+        user.otp_attempts = (user.otp_attempts or 0) + 1
+        await session.commit()
+        raise HTTPException(status_code=400, detail="Invalid code. Please try again.")
+
+    # Success — mark verified and consume the OTP (one-time use).
     user.is_email_verified = True
     user.email_verify_token = None
+    user.otp_code_hash = None
+    user.otp_expires_at = None
+    user.otp_attempts = 0
     await session.commit()
 
-    del _otp_store[key]
     return {"message": "Email verified successfully.", "verified": True}
 
 
@@ -396,10 +422,18 @@ async def forgot_password(
         region = get_region(country)
         region_domain = region.get("domain", "retailnazar.com")
 
+        jti = secrets.token_hex(32)
         reset_token = make_token(
-            {"sub": user.id, "tenant_id": user.tenant_id, "purpose": _RESET_TOKEN_PURPOSE},
+            {"sub": user.id, "tenant_id": user.tenant_id,
+             "purpose": _RESET_TOKEN_PURPOSE, "jti": jti},
             timedelta(minutes=_RESET_TOKEN_EXPIRY_MINUTES),
         )
+        # Bind this single token to the user row (one active reset token at a
+        # time; issuing a new one overwrites/invalidates the previous one).
+        user.pw_reset_jti = jti
+        user.pw_reset_expires_at = datetime.now(timezone.utc) + timedelta(minutes=_RESET_TOKEN_EXPIRY_MINUTES)
+        await session.commit()
+
         reset_link = f"https://{region_domain}/reset-password?token={reset_token}"
 
         from ..services.email_service import send_password_reset_email
@@ -417,17 +451,22 @@ async def reset_password(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """
-    Reset the user's password using the signed reset token.
+    Reset the user's password using the signed, one-time-use reset token.
 
-    Verifies the JWT, ensures it has purpose=password_reset, updates the
-    hashed password, and invalidates existing sessions by clearing any
-    stored refresh tokens (when session persistence is implemented).
+    Security properties:
+      * JWT signature + expiry verified.
+      * purpose claim must be password_reset.
+      * jti claim must match the value stored on the user row (single-use);
+        it is cleared after a successful reset so the link cannot be reused.
+      * token_version is incremented, which invalidates every previously
+        issued access token for this user (enforced in the auth middleware).
     """
-    jwt_secret = os.getenv("VANTAG_JWT_SECRET", "change-me")
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
     try:
-        from jose import jwt as _jwt, JWTError
-        payload = _jwt.decode(body.token, jwt_secret, algorithms=["HS256"])
+        from jose import jwt as _jwt
+        payload = _jwt.decode(body.token, _jwt_secret(), algorithms=["HS256"])
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
@@ -435,7 +474,8 @@ async def reset_password(
         raise HTTPException(status_code=400, detail="Invalid reset token purpose")
 
     user_id: str | None = payload.get("sub")
-    if not user_id:
+    token_jti: str | None = payload.get("jti")
+    if not user_id or not token_jti:
         raise HTTPException(status_code=400, detail="Malformed reset token")
 
     result = await session.execute(
@@ -445,10 +485,26 @@ async def reset_password(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if len(body.new_password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    # One-time-use enforcement: the jti must match the current stored value.
+    if not user.pw_reset_jti or not secrets.compare_digest(user.pw_reset_jti, token_jti):
+        raise HTTPException(status_code=400, detail="This reset link has already been used or is no longer valid.")
+
+    # Server-side expiry check (defence in depth alongside JWT exp).
+    if user.pw_reset_expires_at is not None:
+        exp = user.pw_reset_expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > exp:
+            user.pw_reset_jti = None
+            user.pw_reset_expires_at = None
+            await session.commit()
+            raise HTTPException(status_code=400, detail="Reset link expired. Request a new one.")
 
     user.hashed_password = hash_password(body.new_password)
+    # Consume the token and invalidate all existing sessions.
+    user.pw_reset_jti = None
+    user.pw_reset_expires_at = None
+    user.token_version = (user.token_version or 0) + 1
     await session.commit()
 
     return {"message": "Password has been reset successfully. Please sign in with your new password."}

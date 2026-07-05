@@ -89,10 +89,48 @@ _CONFIG_PATH = Path(
 # Set VANTAG_ALLOWED_ORIGINS="https://app.example.com,https://admin.example.com"
 # ---------------------------------------------------------------------------
 
-_raw_origins = os.getenv("VANTAG_ALLOWED_ORIGINS", "*")
-_ALLOWED_ORIGINS = (
-    ["*"] if _raw_origins == "*" else [o.strip() for o in _raw_origins.split(",")]
+_IS_PROD = os.getenv("VANTAG_ENV", "").lower() in ("prod", "production")
+
+# Default production allow-list — the live customer domains. Overridable via
+# VANTAG_ALLOWED_ORIGINS="https://a.com,https://b.com".
+_PROD_DEFAULT_ORIGINS = (
+    "https://retailnazar.com,https://www.retailnazar.com,"
+    "https://retailbantay.com,https://www.retailbantay.com,"
+    "https://retail-vantag.com,https://www.retail-vantag.com"
 )
+_raw_origins = os.getenv(
+    "VANTAG_ALLOWED_ORIGINS",
+    _PROD_DEFAULT_ORIGINS if _IS_PROD else "*",
+)
+# Never allow wildcard origin together with credentials — browsers reject it and
+# it defeats CSRF protection. In production, fall back to the known domains.
+if _raw_origins.strip() == "*":
+    if _IS_PROD:
+        _ALLOWED_ORIGINS = [o.strip() for o in _PROD_DEFAULT_ORIGINS.split(",")]
+    else:
+        _ALLOWED_ORIGINS = ["*"]
+else:
+    _ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
+# When a concrete origin list is configured we can safely send credentials.
+# With the dev wildcard we must disable credentialed CORS (browser requirement).
+_ALLOW_CREDENTIALS = _ALLOWED_ORIGINS != ["*"]
+
+# ---------------------------------------------------------------------------
+# JWT secret hard-guard — refuse to boot in production with the default secret.
+# A predictable secret lets anyone forge admin/super-admin tokens.
+# ---------------------------------------------------------------------------
+_JWT_SECRET = os.getenv("VANTAG_JWT_SECRET", "")
+if _IS_PROD and _JWT_SECRET in ("", "change-me", "dev-secret-change-in-production"):
+    raise RuntimeError(
+        "VANTAG_JWT_SECRET is unset or using an insecure default in production. "
+        "Set a strong random secret (e.g. `openssl rand -hex 32`) before starting."
+    )
+if not _JWT_SECRET or _JWT_SECRET in ("change-me", "dev-secret-change-in-production"):
+    logger.warning(
+        "VANTAG_JWT_SECRET is unset/default — tokens are forgeable. "
+        "Set a strong secret before any real deployment."
+    )
 
 # ---------------------------------------------------------------------------
 # Application-level singletons (populated during lifespan)
@@ -229,9 +267,11 @@ app = FastAPI(
         "camera management, watchlist control, and intercom signaling."
     ),
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    # In production the interactive schema/docs are disabled to avoid exposing
+    # the full API surface publicly. Enable in non-prod for developer use.
+    docs_url=None if _IS_PROD else "/docs",
+    redoc_url=None if _IS_PROD else "/redoc",
+    openapi_url=None if _IS_PROD else "/openapi.json",
 )
 
 # ---------------------------------------------------------------------------
@@ -241,7 +281,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_credentials=_ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

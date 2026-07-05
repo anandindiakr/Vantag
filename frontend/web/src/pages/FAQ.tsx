@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useRegion } from '../hooks/useRegion';
+import Seo from '../components/Seo';
 
 interface Faq { q: string; a: string; }
 
@@ -23,6 +24,22 @@ export default function FAQ({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <div className={embedded ? 'text-white' : 'min-h-screen bg-[#0a0a0f] text-white'}>
+      {!embedded && (
+        <Seo
+          title="Frequently Asked Questions — Retail Nazar"
+          description="Answers to common questions about Retail Nazar CCTV AI setup, pricing, camera compatibility, alerts and data privacy."
+          path="/faq"
+          jsonLd={faqs.length ? {
+            '@context': 'https://schema.org',
+            '@type': 'FAQPage',
+            mainEntity: faqs.map((f) => ({
+              '@type': 'Question',
+              name: f.q,
+              acceptedAnswer: { '@type': 'Answer', text: f.a },
+            })),
+          } : undefined}
+        />
+      )}
       {!embedded && (
       <nav className="px-8 py-4 flex items-center justify-between border-b border-white/10">
         <Link to="/" className="text-xl font-bold">Vantag</Link>

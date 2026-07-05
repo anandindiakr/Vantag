@@ -19,7 +19,7 @@ except ImportError:
 
 # DB imports are safe here — database.py does NOT import from middleware
 from ..db.database import AsyncSessionLocal, get_session
-from ..db.models.tenant import Tenant
+from ..db.models.tenant import Tenant, TenantUser
 
 JWT_SECRET = os.getenv("VANTAG_JWT_SECRET", "change-me")
 JWT_ALGORITHM = "HS256"
@@ -56,8 +56,27 @@ async def get_current_user_id(
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
     payload = _decode_token(credentials.credentials)
+    user_id = payload.get("sub")
+
+    # Session-epoch enforcement: if the token carries a version claim, it must
+    # match the user's current token_version in the DB. A password reset bumps
+    # token_version, which instantly invalidates every previously issued token.
+    token_ver = payload.get("ver")
+    if token_ver is not None and user_id:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(TenantUser.token_version).where(TenantUser.id == user_id)
+            )
+            current_ver = result.scalar_one_or_none()
+        if current_ver is not None and int(current_ver) != int(token_ver):
+            raise HTTPException(
+                status_code=401,
+                detail="Session expired. Please sign in again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
     return {
-        "user_id": payload.get("sub"),
+        "user_id": user_id,
         "tenant_id": payload.get("tenant_id"),
         "role": payload.get("role", "viewer"),
         "email": payload.get("email"),

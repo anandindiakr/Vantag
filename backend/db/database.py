@@ -80,3 +80,19 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Idempotent, additive column migration for auth security fields.
+        # Postgres supports ADD COLUMN IF NOT EXISTS; safe to run every boot.
+        from sqlalchemy import text
+        _stmts = (
+            "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS otp_code_hash VARCHAR(128)",
+            "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMPTZ",
+            "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS otp_attempts INTEGER DEFAULT 0",
+            "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS pw_reset_jti VARCHAR(64)",
+            "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS pw_reset_expires_at TIMESTAMPTZ",
+            "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 0",
+        )
+        for _sql in _stmts:
+            try:
+                await conn.exec_driver_sql(_sql)
+            except Exception:  # noqa: BLE001
+                pass

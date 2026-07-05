@@ -1,0 +1,77 @@
+name: Deploy Backend (Vantag FastAPI)
+
+# Real infra: each region runs its own VPS with a git checkout of this repo.
+# docker/docker-compose.prod.yml builds the backend image from source via
+# docker/Dockerfile.edge (context = repo root). Deploying is:
+#   git pull -> docker compose build vantag-backend -> up -d vantag-backend
+# Only the backend container is rebuilt/restarted — postgres, mosquitto,
+# nginx, certbot keep running untouched.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "docker/Dockerfile.edge"
+      - "docker/docker-compose.prod.yml"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+    inputs:
+      regions:
+        description: "Comma-separated regions to deploy (in,sg,my) or 'all'"
+        default: "all"
+
+jobs:
+  deploy-in:
+    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'in') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy backend to India VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_IN_HOST }}
+          username: ${{ secrets.VPS_IN_USER }}
+          key: ${{ secrets.VPS_IN_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_IN_REPO_PATH }}
+            git pull origin main
+            docker compose -f docker/docker-compose.prod.yml build vantag-backend
+            docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+            docker image prune -f
+
+  deploy-sg:
+    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'sg') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy backend to Singapore VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_SG_HOST }}
+          username: ${{ secrets.VPS_SG_USER }}
+          key: ${{ secrets.VPS_SG_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_SG_REPO_PATH }}
+            git pull origin main
+            docker compose -f docker/docker-compose.prod.yml build vantag-backend
+            docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+            docker image prune -f
+
+  deploy-my:
+    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'my') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy backend to Malaysia VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_MY_HOST }}
+          username: ${{ secrets.VPS_MY_USER }}
+          key: ${{ secrets.VPS_MY_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_MY_REPO_PATH }}
+            git pull origin main
+            docker compose -f docker/docker-compose.prod.yml build vantag-backend
+            docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+            docker image prune -f

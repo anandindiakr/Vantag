@@ -202,10 +202,10 @@
             var el = document.getElementById(id);
             if (el) el.setAttribute(attr, value);
           }
-          setMeta('seo-canonical', 'href', origin + '/');
+          setMeta('seo-canonical', 'href', origin + location.pathname);
           setMeta('og-title', 'content', cfg.title);
           setMeta('og-description', 'content', cfg.description);
-          setMeta('og-url', 'content', origin + '/');
+          setMeta('og-url', 'content', origin + location.pathname);
           setMeta('og-site', 'content', cfg.brand);
           setMeta('tw-title', 'content', cfg.title);
           setMeta('tw-description', 'content', cfg.description);

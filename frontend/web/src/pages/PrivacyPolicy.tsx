@@ -1,24 +1,16 @@
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import Seo from '../components/Seo';
 
 const LAST_UPDATED = '1 May 2026';
 
 export default function PrivacyPolicy() {
-  useEffect(() => {
-    document.title = 'Privacy Policy | Vantag';
-    let m = document.querySelector('meta[name="description"]');
-    if (!m) {
-      m = document.createElement('meta');
-      m.setAttribute('name', 'description');
-      document.head.appendChild(m);
-    }
-    m.setAttribute('content',
-      'Vantag Privacy Policy — how we collect, use, store and protect CCTV and personal data under GDPR, DPDP Act (India), PDPA (Singapore) and PDPA (Malaysia).'
-    );
-  }, []);
-
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-slate-200">
+      <Seo
+        title="Privacy Policy | Retail Nazar"
+        description="Retail Nazar Privacy Policy — how we collect, use, store and protect CCTV and personal data under GDPR, DPDP Act (India), PDPA (Singapore) and PDPA (Malaysia)."
+        path="/privacy"
+      />
       <header className="border-b border-white/10 px-6 py-4">
         <Link to="/" className="text-violet-400 hover:text-violet-300 text-sm">&larr; Back to Vantag</Link>
       </header>

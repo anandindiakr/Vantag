@@ -62,6 +62,15 @@ class TenantUser(Base):
     is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_super_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     email_verify_token: Mapped[str | None] = mapped_column(String(200))
+    # ── Email OTP (verification) — persisted, hashed, attempt-limited ──────
+    otp_code_hash: Mapped[str | None] = mapped_column(String(128))
+    otp_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    otp_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    # ── Password reset — one-time-use token binding ───────────────────────
+    pw_reset_jti: Mapped[str | None] = mapped_column(String(64))
+    pw_reset_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # ── Session epoch — bumped on password change to invalidate old JWTs ──
+    token_version: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     tenant: Mapped[Tenant] = relationship("Tenant", back_populates="users")

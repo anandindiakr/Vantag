@@ -1,0 +1,74 @@
+name: Deploy Frontend (Multi-Domain)
+
+# Real infra: each region runs on its OWN VPS, from its own git checkout of
+# this repo. nginx (docker/nginx/conf.d/vantag.conf) bind-mounts
+# ../frontend/web/dist directly — so deploying the frontend is just:
+#   git pull -> npm ci -> npm run build:<region>  (rebuilds dist in place)
+# nginx picks up the new static files immediately, no container restart needed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/web/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+    inputs:
+      regions:
+        description: "Comma-separated regions to deploy (in,sg,my) or 'all'"
+        default: "all"
+
+jobs:
+  deploy-in:
+    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'in') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy retailnazar.com (India VPS)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_IN_HOST }}
+          username: ${{ secrets.VPS_IN_USER }}
+          key: ${{ secrets.VPS_IN_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_IN_REPO_PATH }}
+            git pull origin main
+            cd frontend/web
+            npm ci
+            npm run build:in
+
+  deploy-sg:
+    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'sg') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy retail-vantag.com (Singapore VPS)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_SG_HOST }}
+          username: ${{ secrets.VPS_SG_USER }}
+          key: ${{ secrets.VPS_SG_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_SG_REPO_PATH }}
+            git pull origin main
+            cd frontend/web
+            npm ci
+            npm run build:sg
+
+  deploy-my:
+    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'my') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy jagajaga.my (Malaysia VPS)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_MY_HOST }}
+          username: ${{ secrets.VPS_MY_USER }}
+          key: ${{ secrets.VPS_MY_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_MY_REPO_PATH }}
+            git pull origin main
+            cd frontend/web
+            npm ci
+            npm run build:my

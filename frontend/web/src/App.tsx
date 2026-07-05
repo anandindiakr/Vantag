@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import './i18n/index';
@@ -96,6 +97,7 @@ function AppLayout() {
 // ── Root App ────────────────────────────────────────────────────────────────
 export default function App() {
   return (
+    <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Toaster
@@ -156,5 +158,6 @@ export default function App() {
         <SupportChat />
       </BrowserRouter>
     </QueryClientProvider>
+    </HelmetProvider>
   );
 }

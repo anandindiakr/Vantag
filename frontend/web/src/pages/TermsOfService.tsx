@@ -1,27 +1,20 @@
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useRegion } from '../hooks/useRegion';
+import Seo from '../components/Seo';
 
 const LAST_UPDATED = '1 May 2026';
 
 export default function TermsOfService() {
   const region = useRegion();
   const supportEmail = region.region === 'IN' ? 'support@retailnazar.com' : 'support@retail-vantag.com';
-  useEffect(() => {
-    document.title = 'Terms of Service | Vantag';
-    let m = document.querySelector('meta[name="description"]');
-    if (!m) {
-      m = document.createElement('meta');
-      m.setAttribute('name', 'description');
-      document.head.appendChild(m);
-    }
-    m.setAttribute('content',
-      'Vantag Terms of Service — user obligations, acceptable use, subscription billing, SLA, liability limits and governing law for India, Singapore and Malaysia.'
-    );
-  }, []);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-slate-200">
+      <Seo
+        title="Terms of Service | Retail Nazar"
+        description="Retail Nazar Terms of Service — user obligations, acceptable use, subscription billing, SLA, liability limits and governing law for India, Singapore and Malaysia."
+        path="/terms"
+      />
       <header className="border-b border-white/10 px-6 py-4">
         <Link to="/" className="text-violet-400 hover:text-violet-300 text-sm">&larr; Back to Vantag</Link>
       </header>

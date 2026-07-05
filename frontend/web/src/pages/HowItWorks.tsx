@@ -3,6 +3,7 @@
  */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import Seo from '../components/Seo';
 
 const Step = ({ num, title, body, icon }: { num: number; title: string; body: string; icon: string }) => (
   <div className="bg-white/5 border border-white/10 rounded-xl p-6">
@@ -21,6 +22,13 @@ export default function HowItWorks({ embedded = false }: { embedded?: boolean })
   const { t } = useTranslation();
   return (
     <div className={embedded ? 'text-white' : 'min-h-screen bg-[#0a0a0f] text-white'}>
+      {!embedded && (
+        <Seo
+          title="How Retail Nazar Works — AI CCTV Setup Guide | Retail Nazar"
+          description="See how Retail Nazar turns your existing CCTV cameras into an AI security and analytics system in minutes — no new hardware required."
+          path="/how-it-works"
+        />
+      )}
       {!embedded && (
       <nav className="px-8 py-4 flex items-center justify-between border-b border-white/10">
         <Link to="/" className="text-xl font-bold">Vantag</Link>

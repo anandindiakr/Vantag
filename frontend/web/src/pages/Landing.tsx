@@ -5,6 +5,7 @@ import { motion, useInView } from 'framer-motion';
 import { useRegion } from '../hooks/useRegion';
 import { REGIONS as REGION_MAP, type RegionConfig } from '../config/regions';
 import { LanguageSelector } from '../components/LanguageSelector';
+import Seo from '../components/Seo';
 import {
   Shield, Camera, Lock, BarChart3, Bell,
   CheckCircle, ArrowRight, Eye, Cpu, Smartphone,
@@ -310,6 +311,19 @@ export default function Landing() {
       className="min-h-screen text-white overflow-x-hidden font-body-alt"
       style={{ background: '#080c10' }}
     >
+      <Seo
+        title="Retail Nazar — AI CCTV Theft Detection & Store Analytics"
+        description="Turn your existing CCTV cameras into an AI-powered security and analytics system. Real-time shoplifting alerts, footfall analytics and restricted zone monitoring for Indian retail stores."
+        path="/"
+        jsonLd={{
+          '@context': 'https://schema.org',
+          '@type': 'SoftwareApplication',
+          name: 'Retail Nazar',
+          applicationCategory: 'BusinessApplication',
+          operatingSystem: 'Web, Android, iOS',
+          offers: { '@type': 'Offer', priceCurrency: 'INR' },
+        }}
+      />
       {/* ── Ambient background glows ── */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div

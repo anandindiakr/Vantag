@@ -5,6 +5,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "postbuild": "node scripts/prerender.mjs && node scripts/generate-seo-files.mjs",
+    "build:in": "cross-env PRERENDER_BASE_URL=https://retailnazar.com npm run build",
+    "build:sg": "cross-env PRERENDER_BASE_URL=https://retail-vantag.com npm run build",
+    "build:my": "cross-env PRERENDER_BASE_URL=https://jagajaga.my npm run build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -24,6 +28,7 @@
     "qrcode.react": "^4.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
+    "react-helmet-async": "^2.0.5",
     "react-hot-toast": "^2.4.1",
     "react-i18next": "^17.0.2",
     "react-router-dom": "^6.23.0",
@@ -35,7 +40,10 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.19",
+    "cross-env": "^7.0.3",
+    "playwright": "^1.47.0",
     "postcss": "^8.4.38",
+    "serve-handler": "^6.1.6",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.4.5",
     "vite": "^5.2.11"
