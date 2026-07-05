@@ -6,6 +6,13 @@ name: Deploy Backend (Vantag FastAPI)
 #   git pull -> docker compose build vantag-backend -> up -d vantag-backend
 # Only the backend container is rebuilt/restarted — postgres, mosquitto,
 # nginx, certbot keep running untouched.
+#
+# Safety: the previously-deployed commit SHA is recorded before pulling. The
+# new backend image is health-checked (docker compose healthcheck status,
+# then a real HTTP call to /health through nginx) with retries. If it does
+# not become healthy in time, the workflow automatically rolls back: git
+# checkout the previous commit, rebuild, and restart — leaving the VPS on
+# the last known-good version — then fails the job so it's visible in CI.
 
 on:
   push:
@@ -35,10 +42,43 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.VPS_IN_REPO_PATH }}
+            PREV_SHA=$(git rev-parse HEAD)
+            echo "Previous known-good commit: $PREV_SHA"
             git pull origin main
-            docker compose -f docker/docker-compose.prod.yml build vantag-backend
-            docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
-            docker image prune -f
+
+            deploy_and_check() {
+              docker compose -f docker/docker-compose.prod.yml build vantag-backend
+              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+
+              echo "Waiting for container health..."
+              for i in $(seq 1 15); do
+                STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
+                if [ "$STATUS" = "healthy" ]; then
+                  break
+                fi
+                sleep 4
+              done
+
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+              if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
+                return 0
+              else
+                echo "Backend unhealthy (container status=$STATUS, /health HTTP=$HTTP_CODE)"
+                return 1
+              fi
+            }
+
+            if deploy_and_check; then
+              echo "Backend deploy successful and healthy."
+              docker image prune -f
+            else
+              echo "Deploy failed health check — rolling back to $PREV_SHA"
+              git checkout "$PREV_SHA" -- .
+              docker compose -f docker/docker-compose.prod.yml build vantag-backend
+              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+              echo "Rolled back to previous version. Failing job for visibility."
+              exit 1
+            fi
 
   deploy-sg:
     if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'sg') }}
@@ -53,10 +93,42 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.VPS_SG_REPO_PATH }}
+            PREV_SHA=$(git rev-parse HEAD)
+            echo "Previous known-good commit: $PREV_SHA"
             git pull origin main
-            docker compose -f docker/docker-compose.prod.yml build vantag-backend
-            docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
-            docker image prune -f
+
+            deploy_and_check() {
+              docker compose -f docker/docker-compose.prod.yml build vantag-backend
+              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+
+              for i in $(seq 1 15); do
+                STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
+                if [ "$STATUS" = "healthy" ]; then
+                  break
+                fi
+                sleep 4
+              done
+
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+              if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
+                return 0
+              else
+                echo "Backend unhealthy (container status=$STATUS, /health HTTP=$HTTP_CODE)"
+                return 1
+              fi
+            }
+
+            if deploy_and_check; then
+              echo "Backend deploy successful and healthy."
+              docker image prune -f
+            else
+              echo "Deploy failed health check — rolling back to $PREV_SHA"
+              git checkout "$PREV_SHA" -- .
+              docker compose -f docker/docker-compose.prod.yml build vantag-backend
+              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+              echo "Rolled back to previous version. Failing job for visibility."
+              exit 1
+            fi
 
   deploy-my:
     if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'my') }}
@@ -71,7 +143,39 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.VPS_MY_REPO_PATH }}
+            PREV_SHA=$(git rev-parse HEAD)
+            echo "Previous known-good commit: $PREV_SHA"
             git pull origin main
-            docker compose -f docker/docker-compose.prod.yml build vantag-backend
-            docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
-            docker image prune -f
+
+            deploy_and_check() {
+              docker compose -f docker/docker-compose.prod.yml build vantag-backend
+              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+
+              for i in $(seq 1 15); do
+                STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
+                if [ "$STATUS" = "healthy" ]; then
+                  break
+                fi
+                sleep 4
+              done
+
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+              if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
+                return 0
+              else
+                echo "Backend unhealthy (container status=$STATUS, /health HTTP=$HTTP_CODE)"
+                return 1
+              fi
+            }
+
+            if deploy_and_check; then
+              echo "Backend deploy successful and healthy."
+              docker image prune -f
+            else
+              echo "Deploy failed health check — rolling back to $PREV_SHA"
+              git checkout "$PREV_SHA" -- .
+              docker compose -f docker/docker-compose.prod.yml build vantag-backend
+              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+              echo "Rolled back to previous version. Failing job for visibility."
+              exit 1
+            fi

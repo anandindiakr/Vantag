@@ -5,6 +5,12 @@ name: Deploy Frontend (Multi-Domain)
 # ../frontend/web/dist directly — so deploying the frontend is just:
 #   git pull -> npm ci -> npm run build:<region>  (rebuilds dist in place)
 # nginx picks up the new static files immediately, no container restart needed.
+#
+# Safety: dist/ is backed up before every build. After building, a local
+# health check (curl through nginx with the right Host header, so it works
+# even before DNS/SSL propagate) verifies the homepage responds with HTTP 200
+# and contains expected marker text. If the check fails, the previous dist/
+# is restored automatically and the job is marked failed.
 
 on:
   push:
@@ -33,9 +39,32 @@ jobs:
             set -e
             cd ${{ secrets.VPS_IN_REPO_PATH }}
             git pull origin main
+
             cd frontend/web
+            rm -rf dist.bak
+            [ -d dist ] && cp -r dist dist.bak || true
+
             npm ci
-            npm run build:in
+            if ! npm run build:in; then
+              echo "Build failed — restoring previous dist/"
+              rm -rf dist
+              mv dist.bak dist
+              exit 1
+            fi
+
+            echo "Waiting for nginx to pick up new files..."
+            sleep 3
+
+            HTTP_CODE=$(curl -s -o /tmp/health_body_in.html -w "%{http_code}" -H "Host: retailnazar.com" -k https://localhost/ || echo "000")
+            if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_in.html; then
+              echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
+              rm -rf dist
+              mv dist.bak dist
+              exit 1
+            fi
+
+            echo "Health check passed (HTTP $HTTP_CODE) — deploy successful"
+            rm -rf dist.bak
 
   deploy-sg:
     if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'sg') }}
@@ -51,9 +80,30 @@ jobs:
             set -e
             cd ${{ secrets.VPS_SG_REPO_PATH }}
             git pull origin main
+
             cd frontend/web
+            rm -rf dist.bak
+            [ -d dist ] && cp -r dist dist.bak || true
+
             npm ci
-            npm run build:sg
+            if ! npm run build:sg; then
+              echo "Build failed — restoring previous dist/"
+              rm -rf dist
+              mv dist.bak dist
+              exit 1
+            fi
+
+            sleep 3
+            HTTP_CODE=$(curl -s -o /tmp/health_body_sg.html -w "%{http_code}" -H "Host: retail-vantag.com" -k https://localhost/ || echo "000")
+            if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_sg.html; then
+              echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
+              rm -rf dist
+              mv dist.bak dist
+              exit 1
+            fi
+
+            echo "Health check passed (HTTP $HTTP_CODE) — deploy successful"
+            rm -rf dist.bak
 
   deploy-my:
     if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'my') }}
@@ -69,6 +119,27 @@ jobs:
             set -e
             cd ${{ secrets.VPS_MY_REPO_PATH }}
             git pull origin main
+
             cd frontend/web
+            rm -rf dist.bak
+            [ -d dist ] && cp -r dist dist.bak || true
+
             npm ci
-            npm run build:my
+            if ! npm run build:my; then
+              echo "Build failed — restoring previous dist/"
+              rm -rf dist
+              mv dist.bak dist
+              exit 1
+            fi
+
+            sleep 3
+            HTTP_CODE=$(curl -s -o /tmp/health_body_my.html -w "%{http_code}" -H "Host: jagajaga.my" -k https://localhost/ || echo "000")
+            if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_my.html; then
+              echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
+              rm -rf dist
+              mv dist.bak dist
+              exit 1
+            fi
+
+            echo "Health check passed (HTTP $HTTP_CODE) — deploy successful"
+            rm -rf dist.bak
