@@ -25,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       regions:
-        description: "Comma-separated regions to deploy (in,sg,my) or 'all'"
+        description: "Comma-separated regions to deploy (in,sg,my,ph) or 'all'"
         default: "all"
 
 jobs:
@@ -93,6 +93,56 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.VPS_SG_REPO_PATH }}
+            PREV_SHA=$(git rev-parse HEAD)
+            echo "Previous known-good commit: $PREV_SHA"
+            git pull origin main
+
+            deploy_and_check() {
+              docker compose -f docker/docker-compose.prod.yml build vantag-backend
+              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+
+              for i in $(seq 1 15); do
+                STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
+                if [ "$STATUS" = "healthy" ]; then
+                  break
+                fi
+                sleep 4
+              done
+
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+              if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
+                return 0
+              else
+                echo "Backend unhealthy (container status=$STATUS, /health HTTP=$HTTP_CODE)"
+                return 1
+              fi
+            }
+
+            if deploy_and_check; then
+              echo "Backend deploy successful and healthy."
+              docker image prune -f
+            else
+              echo "Deploy failed health check — rolling back to $PREV_SHA"
+              git checkout "$PREV_SHA" -- .
+              docker compose -f docker/docker-compose.prod.yml build vantag-backend
+              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+              echo "Rolled back to previous version. Failing job for visibility."
+              exit 1
+            fi
+
+  deploy-ph:
+    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'ph') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy backend to Philippines VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_PH_HOST }}
+          username: ${{ secrets.VPS_PH_USER }}
+          key: ${{ secrets.VPS_PH_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_PH_REPO_PATH }}
             PREV_SHA=$(git rev-parse HEAD)
             echo "Previous known-good commit: $PREV_SHA"
             git pull origin main

@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       regions:
-        description: "Comma-separated regions to deploy (in,sg,my) or 'all'"
+        description: "Comma-separated regions to deploy (in,sg,my,ph) or 'all'"
         default: "all"
 
 jobs:
@@ -96,6 +96,45 @@ jobs:
             sleep 3
             HTTP_CODE=$(curl -s -o /tmp/health_body_sg.html -w "%{http_code}" -H "Host: retail-vantag.com" -k https://localhost/ || echo "000")
             if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_sg.html; then
+              echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
+              rm -rf dist
+              mv dist.bak dist
+              exit 1
+            fi
+
+            echo "Health check passed (HTTP $HTTP_CODE) — deploy successful"
+            rm -rf dist.bak
+
+  deploy-ph:
+    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'ph') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy retailbantay.com (Philippines VPS)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_PH_HOST }}
+          username: ${{ secrets.VPS_PH_USER }}
+          key: ${{ secrets.VPS_PH_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_PH_REPO_PATH }}
+            git pull origin main
+
+            cd frontend/web
+            rm -rf dist.bak
+            [ -d dist ] && cp -r dist dist.bak || true
+
+            npm ci
+            if ! npm run build:ph; then
+              echo "Build failed — restoring previous dist/"
+              rm -rf dist
+              mv dist.bak dist
+              exit 1
+            fi
+
+            sleep 3
+            HTTP_CODE=$(curl -s -o /tmp/health_body_ph.html -w "%{http_code}" -H "Host: retailbantay.com" -k https://localhost/ || echo "000")
+            if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_ph.html; then
               echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
               rm -rf dist
               mv dist.bak dist

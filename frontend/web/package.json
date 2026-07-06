@@ -9,6 +9,7 @@
     "build:in": "cross-env PRERENDER_BASE_URL=https://retailnazar.com npm run build",
     "build:sg": "cross-env PRERENDER_BASE_URL=https://retail-vantag.com npm run build",
     "build:my": "cross-env PRERENDER_BASE_URL=https://jagajaga.my npm run build",
+    "build:ph": "cross-env PRERENDER_BASE_URL=https://retailbantay.com npm run build",
     "preview": "vite preview"
   },
   "dependencies": {
