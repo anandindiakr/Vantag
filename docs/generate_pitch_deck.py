@@ -656,7 +656,7 @@ def slide_traction():
     roadmap = [
         (ORANGE, "Q3 2026", "Android & iOS mobile app launch"),
         (BLUE,   "Q3 2026", "Linux Edge Agent for Raspberry Pi"),
-        (TEAL,   "Q3 2026", "Stripe payment for Malaysia / SGD"),
+        (TEAL,   "Q3 2026", "Expanded regional payment coverage (MY/SG)"),
         (GOLD,   "Q4 2026", "NVR/DVR direct integration (no PC needed)"),
         (ORANGE, "Q4 2026", "Facial recognition optional add-on"),
         (BLUE,   "Q1 2027", "POS integration — link sales to theft events"),
