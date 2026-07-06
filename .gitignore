@@ -117,3 +117,6 @@ yarn-error.log*
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+
+# Prevent accidental nested full-repo duplicate copies (see 2026-06-24 incident)
+/vantag/
