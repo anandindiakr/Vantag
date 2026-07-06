@@ -86,7 +86,7 @@ services:
   vantag-backend:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.edge
+      dockerfile: docker/Dockerfile
     container_name: vantag-backend
     restart: unless-stopped
     expose:
