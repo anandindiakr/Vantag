@@ -968,6 +968,46 @@ function CameraRow({
   const [editName, setEditName] = useState(cam.name);
   const [editLocation, setEditLocation] = useState(cam.location ?? '');
   const [editRtsp, setEditRtsp] = useState('');
+  const [testingEdit, setTestingEdit] = useState(false);
+  const [editTestResult, setEditTestResult] = useState<TestResult | null>(null);
+
+  // Parse a full rtsp:// URL into its parts so we can reuse the existing
+  // /cameras/test endpoint (which expects ip/port/username/password/rtsp_path).
+  const parseRtspUrl = (url: string) => {
+    const m = url.trim().match(
+      /^rtsp:\/\/(?:([^:@/]+)(?::([^@/]*))?@)?([^:/]+)(?::(\d+))?(\/.*)?$/,
+    );
+    if (!m) return null;
+    const [, username, password, ip, port, path] = m;
+    return {
+      ip,
+      port: port ? Number(port) : 554,
+      username: username ? decodeURIComponent(username) : undefined,
+      password: password ? decodeURIComponent(password) : undefined,
+      rtsp_path: path || '/',
+    };
+  };
+
+  const handleTestEdit = async () => {
+    if (!editRtsp.trim()) { toast.error('Enter a New RTSP URL first to test it.'); return; }
+    const parsed = parseRtspUrl(editRtsp);
+    if (!parsed) { toast.error('Could not parse that RTSP URL. Expected format: rtsp://user:pass@ip:port/path'); return; }
+    setTestingEdit(true);
+    setEditTestResult(null);
+    try {
+      const res = await api.post<TestResult>('/cameras/test', parsed);
+      setEditTestResult(res.data);
+      if (res.data.success) toast.success('Connection successful!');
+      else if (res.data.lan_unreachable)
+        toast.success('LAN camera — click "Save Changes" and your Edge Agent will validate it locally.');
+      else toast.error(res.data.error ?? 'Connection failed.');
+    } catch (err: unknown) {
+      setEditTestResult({ success: false, error: (err as Error).message });
+      toast.error((err as Error).message ?? 'Test failed.');
+    } finally {
+      setTestingEdit(false);
+    }
+  };
 
   const handleEditSave = async () => {
     if (!editName.trim()) { toast.error('Camera name cannot be empty.'); return; }
@@ -1041,6 +1081,7 @@ function CameraRow({
               setEditName(cam.name);
               setEditLocation(cam.location ?? '');
               setEditRtsp('');
+              setEditTestResult(null);
               setEditing((e) => !e);
             }}
             className={clsx(
@@ -1094,8 +1135,39 @@ function CameraRow({
                   onChange={setEditRtsp}
                   placeholder="rtsp://admin:password@192.168.1.100:554/Streaming/Channels/101"
                 />
+                {editTestResult && (
+                  <div
+                    className={clsx(
+                      'mt-2 flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg',
+                      editTestResult.success
+                        ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                        : editTestResult.lan_unreachable
+                        ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                        : 'bg-red-500/10 text-red-300 border border-red-500/20',
+                    )}
+                  >
+                    {editTestResult.success
+                      ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      : <XCircle className="w-3.5 h-3.5 flex-shrink-0" />}
+                    <span>
+                      {editTestResult.success
+                        ? 'Connection successful.'
+                        : editTestResult.lan_unreachable
+                        ? 'LAN camera — will be validated by your Edge Agent after saving.'
+                        : editTestResult.error ?? 'Connection failed.'}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="sm:col-span-2 flex gap-2">
+                <button
+                  onClick={handleTestEdit}
+                  disabled={testingEdit || savingEdit}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-50 rounded-xl text-xs font-medium text-white/80 transition-all"
+                >
+                  {testingEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <TestTube2 className="w-3.5 h-3.5" />}
+                  {testingEdit ? 'Testing…' : 'Test Connection'}
+                </button>
                 <button
                   onClick={handleEditSave}
                   disabled={savingEdit}
