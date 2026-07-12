@@ -13,13 +13,21 @@ log = logging.getLogger("vantag.api")
 
 def _build_session(base_url: str) -> requests.Session:
     sess = requests.Session()
+    # Best-effort posts (events/frames) must NOT hog connections with long
+    # retry backoffs — that starves the pool when many cameras post at once.
     retry = Retry(
-        total=3,
-        backoff_factor=1.0,
-        status_forcelist=[500, 502, 503, 504],
+        total=1,
+        backoff_factor=0.3,
+        status_forcelist=[502, 503, 504],
         allowed_methods=["GET", "POST"],
     )
-    adapter = HTTPAdapter(max_retries=retry)
+    # An NVR with many channels means many CameraWorker threads each pushing
+    # frames every 0.2s over this single shared session. The default urllib3
+    # pool is only 10 connections, which gets exhausted under that load and
+    # silently drops frame pushes ("Connection pool is full"), which is why
+    # the dashboard can show the agent "online" (heartbeat gets a slot) but
+    # never receives a live frame. Give every worker headroom.
+    adapter = HTTPAdapter(max_retries=retry, pool_connections=32, pool_maxsize=32)
     sess.mount("http://", adapter)
     sess.mount("https://", adapter)
     sess.headers.update({
@@ -58,7 +66,7 @@ class VantagApiClient:
             resp = self._session.post(
                 f"{self.base_url}/api/edge/events",
                 json=event,
-                timeout=10,
+                timeout=(3.05, 5),
             )
             resp.raise_for_status()
             return True
@@ -121,7 +129,7 @@ class VantagApiClient:
             resp = self._session.post(
                 f"{self.base_url}/api/edge/frame",
                 json={"camera_id": camera_id, "frame_b64": frame_b64},
-                timeout=5,
+                timeout=(3.05, 5),
             )
             resp.raise_for_status()
             return True
