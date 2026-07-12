@@ -120,3 +120,6 @@ yarn-error.log*
 
 # Prevent accidental nested full-repo duplicate copies (see 2026-06-24 incident)
 /vantag/
+
+# Runtime camera config (per-region, mutated by app; must not be version-controlled)
+backend/config/cameras.production.yaml

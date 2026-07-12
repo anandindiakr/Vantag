@@ -107,6 +107,7 @@ services:
       VANTAG_SMTP_USER:     ${VANTAG_SMTP_USER}
       VANTAG_SMTP_PASS:     ${VANTAG_SMTP_PASS}
       VANTAG_EMAIL_FROM:    ${VANTAG_EMAIL_FROM:-Vantag <noreply@vantag.com>}
+      VANTAG_CAMERAS_YAML:    /app/backend/config/cameras.production.yaml
       RAZORPAY_KEY_ID_IN:   ${RAZORPAY_KEY_ID_IN}
       RAZORPAY_KEY_SECRET_IN: ${RAZORPAY_KEY_SECRET_IN}
       RAZORPAY_KEY_ID_SG:   ${RAZORPAY_KEY_ID_SG}
