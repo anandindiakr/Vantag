@@ -108,6 +108,27 @@ class VantagApiClient:
             log.warning(f"report_discovered failed: {e}")
             return None
 
+    def push_frame(self, camera_id: str, frame_b64: str) -> bool:
+        """Push a JPEG frame (base64) to the backend live-relay cache.
+
+        Best-effort, low-timeout, fire-and-forget style call used to keep the
+        cloud dashboard's live view working when the backend cannot reach the
+        camera's RTSP stream directly (e.g. camera on a private LAN behind
+        the customer's router). Failures are logged at debug level only —
+        this must never block or crash the capture loop.
+        """
+        try:
+            resp = self._session.post(
+                f"{self.base_url}/api/edge/frame",
+                json={"camera_id": camera_id, "frame_b64": frame_b64},
+                timeout=5,
+            )
+            resp.raise_for_status()
+            return True
+        except Exception as e:
+            log.debug(f"push_frame failed for {camera_id}: {e}")
+            return False
+
     def get_config(self) -> Optional[dict]:
         """Fetch latest config from backend."""
         try:

@@ -57,6 +57,36 @@ def set_pipeline(p) -> None:  # type: ignore[no-untyped-def]
     _pipeline = p
 
 
+# ---------------------------------------------------------------------------
+# Live frame relay — in-memory latest-frame cache
+# ---------------------------------------------------------------------------
+# Cameras are almost always on a private LAN the cloud backend cannot reach
+# directly (see cameras_router.test_camera_connection). The Edge Agent already
+# opens the RTSP stream locally, so it pushes a low-fps JPEG frame here and
+# cameras_router's /stream endpoint reads the latest one for that camera.
+#
+# Keyed by camera_id -> (jpeg_bytes, monotonic_timestamp, tenant_id).
+# In-memory only (per-process); fine for a single backend instance. If the
+# backend is ever scaled horizontally this should move to Redis.
+_latest_edge_frames: dict[str, tuple[bytes, float, str]] = {}
+_FRAME_STALE_SEC = 15.0  # treat a frame as unavailable if older than this
+
+
+def get_latest_edge_frame(tenant_id: str, camera_id: str) -> bytes | None:
+    """Return the most recent JPEG frame pushed by the Edge Agent for this
+    camera, or None if no frame has arrived recently (or it belongs to a
+    different tenant)."""
+    entry = _latest_edge_frames.get(camera_id)
+    if entry is None:
+        return None
+    jpeg_bytes, ts, frame_tenant_id = entry
+    if frame_tenant_id != tenant_id:
+        return None
+    if (time.monotonic() - ts) > _FRAME_STALE_SEC:
+        return None
+    return jpeg_bytes
+
+
 def _save_edge_snapshot(tenant_id: str, camera_id: str, b64: str) -> str | None:
     """Decode a base64 JPEG from the edge agent and persist it under the
     snapshots root so the JWT-scoped snapshots endpoint can serve it.
@@ -361,6 +391,37 @@ async def heartbeat(
         "scan_requested": consume_camera_scan(agent.tenant_id),
         "rtsp_probe_jobs": consume_rtsp_probes(agent.tenant_id),
     }
+
+
+class FramePushBody(BaseModel):
+    camera_id: str
+    frame_b64: str
+
+
+@edge_router.post("/frame")
+async def push_frame(
+    body: FramePushBody,
+    agent: EdgeAgent = Depends(_verify_agent),
+) -> dict:
+    """Receive a low-fps JPEG frame from the Edge Agent for live preview.
+
+    The cloud backend cannot reach camera RTSP URLs on a private LAN, so the
+    on-site Edge Agent (which already has the stream open locally) pushes a
+    frame every ~200ms. The most recent frame per camera is kept in memory
+    and served by cameras_router's ``/stream`` endpoint. This is best-effort
+    and intentionally lightweight — no retries, no persistence.
+    """
+    b64 = body.frame_b64
+    if not b64:
+        return {"ok": False}
+    try:
+        if "," in b64 and b64.strip().lower().startswith("data:"):
+            b64 = b64.split(",", 1)[1]
+        raw = base64.b64decode(b64)
+    except Exception:  # noqa: BLE001
+        return {"ok": False}
+    _latest_edge_frames[body.camera_id] = (raw, time.monotonic(), agent.tenant_id)
+    return {"ok": True}
 
 
 class RtspProbeResultBody(BaseModel):

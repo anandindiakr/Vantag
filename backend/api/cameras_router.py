@@ -354,39 +354,40 @@ async def get_snapshot(
     """
     # Verify camera exists for this tenant.
     await _get_db_camera(session, user.get("tenant_id"), camera_id)
+    tenant_id = user.get("tenant_id")
 
-    # Live frames are only available when an on-box inference pipeline is
-    # running. For SaaS/edge deployments the camera streams on the agent, so
-    # there is no local frame -> report 503 (the UI shows an "offline" tile).
-    if _pipeline is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"No frame available for camera '{camera_id}'. Stream may be offline.",
-        )
-    pipeline = _pipeline
+    # 1) On-box inference pipeline (annotated snapshot, then raw frame).
+    if _pipeline is not None:
+        pipeline = _pipeline
+        cached: Optional[bytes] = pipeline.latest_snapshots.get(camera_id)
+        if cached:
+            return Response(content=cached, media_type="image/jpeg")
+        frame = pipeline.stream_manager.get_frame(camera_id)
+        if frame is not None:
+            try:
+                jpeg_bytes = _encode_jpeg(frame)
+                return Response(content=jpeg_bytes, media_type="image/jpeg")
+            except Exception as exc:  # noqa: BLE001
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Frame encoding failed: {exc}",
+                ) from exc
 
-    # Prefer a cached annotated snapshot over a raw frame.
-    cached: Optional[bytes] = pipeline.latest_snapshots.get(camera_id)
-    if cached:
-        return Response(content=cached, media_type="image/jpeg")
-
-    # Fall back to raw frame from the stream manager.
-    frame = pipeline.stream_manager.get_frame(camera_id)
-    if frame is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"No frame available for camera '{camera_id}'. Stream may be offline.",
-        )
-
+    # 2) Edge Agent relay — for the common SaaS deployment where the camera
+    # sits on a private LAN the cloud backend cannot reach directly, the
+    # on-site Edge Agent pushes frames to POST /api/edge/frame instead.
     try:
-        jpeg_bytes = _encode_jpeg(frame)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Frame encoding failed: {exc}",
-        ) from exc
+        from .edge_router import get_latest_edge_frame
+        edge_frame = get_latest_edge_frame(tenant_id, camera_id)
+    except Exception:  # noqa: BLE001
+        edge_frame = None
+    if edge_frame:
+        return Response(content=edge_frame, media_type="image/jpeg")
 
-    return Response(content=jpeg_bytes, media_type="image/jpeg")
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"No frame available for camera '{camera_id}'. Stream may be offline.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -566,39 +567,62 @@ async def update_camera(
     summary="MJPEG live stream",
     responses={200: {"content": {"multipart/x-mixed-replace; boundary=frame": {}}}},
 )
-async def mjpeg_stream(camera_id: str, request: Request, user: dict = Depends(get_current_user_id)) -> StreamingResponse:
+async def mjpeg_stream(
+    camera_id: str,
+    request: Request,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> StreamingResponse:
     """
     Stream live MJPEG video from a camera.
 
     Uses ``multipart/x-mixed-replace`` so compatible browsers can display
-    the stream directly.  Frames are pulled from the ``StreamManager`` at
-    the camera's configured FPS target (capped at 30 fps for API stability).
+    the stream directly. Frames come from one of two sources, tried in
+    order:
+
+    1. An on-box inference pipeline (``StreamManager`` / ``latest_snapshots``)
+       — used when the backend itself has direct RTSP access.
+    2. The Edge Agent live-frame relay (``edge_router.get_latest_edge_frame``)
+       — used for the common SaaS deployment where cameras sit on a private
+       LAN the cloud backend cannot reach; the on-site Edge Agent pushes
+       frames to ``POST /api/edge/frame`` instead.
 
     The stream ends when the client disconnects.
     """
-    pipeline = _get_pipeline()
-    try:
-        cam = pipeline.registry.get_camera(camera_id)
-    except KeyError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Camera '{camera_id}' not found.",
-        )
+    # Verify the camera exists for this tenant. This uses the DB-backed
+    # CameraConfig table (source of truth for all cameras added via the
+    # dashboard), not the on-box registry, so cameras that only stream via
+    # an Edge Agent are not incorrectly 404'd.
+    row = await _get_db_camera(session, user.get("tenant_id"), camera_id)
+    tenant_id = user.get("tenant_id")
 
-    fps = min(cam.fps_target, 30)
+    fps = min(int(row.fps_target or 15), 30)
     frame_interval = 1.0 / fps
+
+    pipeline = _pipeline
 
     async def generate() -> AsyncGenerator[bytes, None]:
         while not await request.is_disconnected():
-            # Prefer annotated snapshot, fall back to raw frame.
-            jpeg_bytes: Optional[bytes] = pipeline.latest_snapshots.get(camera_id)
+            jpeg_bytes: Optional[bytes] = None
+
+            # 1) On-box pipeline (annotated snapshot, then raw frame).
+            if pipeline is not None:
+                jpeg_bytes = pipeline.latest_snapshots.get(camera_id)
+                if jpeg_bytes is None:
+                    frame = pipeline.stream_manager.get_frame(camera_id)
+                    if frame is not None:
+                        try:
+                            jpeg_bytes = _encode_jpeg(frame)
+                        except Exception:  # noqa: BLE001
+                            pass
+
+            # 2) Edge Agent relay — frame pushed from the store's LAN.
             if jpeg_bytes is None:
-                frame = pipeline.stream_manager.get_frame(camera_id)
-                if frame is not None:
-                    try:
-                        jpeg_bytes = _encode_jpeg(frame)
-                    except Exception:  # noqa: BLE001
-                        pass
+                try:
+                    from .edge_router import get_latest_edge_frame
+                    jpeg_bytes = get_latest_edge_frame(tenant_id, camera_id)
+                except Exception:  # noqa: BLE001
+                    jpeg_bytes = None
 
             if jpeg_bytes:
                 yield (

@@ -15,6 +15,7 @@ import collections
 import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Optional
 
 import cv2
@@ -25,6 +26,12 @@ from .api_client import VantagApiClient
 from .inference import YoloInference, RETAIL_CLASSES
 
 log = logging.getLogger("vantag.camera")
+
+# Shared executor for fire-and-forget live-frame pushes to the backend relay.
+# Bounded worker count so a slow/unreachable backend can't spawn unbounded
+# threads across many cameras; a full queue simply drops the newest push
+# (handled per-camera via the in-flight flag below), never blocking capture.
+_FRAME_PUSH_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="frame-push")
 
 # ---------------------------------------------------------------------------
 # Fall Detector
@@ -524,6 +531,13 @@ class CameraWorker:
         self.error_msg: str = ""
         self.consecutive_failures: int = 0
 
+        # Live-frame relay: push a downsized JPEG to the backend every
+        # ~200ms so the cloud dashboard can display live view even when the
+        # camera is on a private LAN unreachable from the backend directly.
+        self._last_frame_push: float = 0.0
+        self._frame_push_interval: float = 0.2
+        self._frame_push_inflight = threading.Event()
+
     def start(self):
         if self._thread and self._thread.is_alive():
             return
@@ -591,6 +605,8 @@ class CameraWorker:
                                 self._on_event(event)
                             self._api.post_event(event)
 
+                    self._maybe_push_frame(frame)
+
                     sleep_time = frame_interval - (time.time() - t_start)
                     if sleep_time > 0:
                         time.sleep(sleep_time)
@@ -612,3 +628,34 @@ class CameraWorker:
             finally:
                 if cap:
                     cap.release()
+
+    def _maybe_push_frame(self, frame: np.ndarray) -> None:
+        """Throttled, non-blocking push of the current frame to the backend
+        live-relay endpoint (``POST /api/edge/frame``).
+
+        Runs at most every ``self._frame_push_interval`` seconds and skips
+        entirely if a previous push is still in flight, so a slow/unreachable
+        backend never stalls the capture loop.
+        """
+        now = time.time()
+        if now - self._last_frame_push < self._frame_push_interval:
+            return
+        if self._frame_push_inflight.is_set():
+            return  # previous push hasn't completed yet — drop this frame
+
+        self._last_frame_push = now
+        small = cv2.resize(frame, (640, 360))
+        ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        if not ok:
+            return
+        frame_b64 = base64.b64encode(buf.tobytes()).decode()
+
+        self._frame_push_inflight.set()
+
+        def _do_push():
+            try:
+                self._api.push_frame(self.config.id, frame_b64)
+            finally:
+                self._frame_push_inflight.clear()
+
+        _FRAME_PUSH_EXECUTOR.submit(_do_push)
