@@ -51,8 +51,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ---------------------------------------------------------------------------
 # Application source
 # ---------------------------------------------------------------------------
-COPY backend/  ./backend/
-COPY models/   ./models/
+COPY backend/       ./backend/
+COPY models/        ./models/
+COPY windows_agent/ ./windows_agent/
 
 # Mosquitto configuration (TCP + WebSocket listeners).
 COPY docker/mosquitto.conf /etc/mosquitto/mosquitto.conf
