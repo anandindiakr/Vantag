@@ -349,7 +349,7 @@ async def register_agent(
         "cameras": [
             {
                 "camera_id": c.camera_id,
-                "rtsp_url": c.rtsp_url,
+                "rtsp_url": c.get_rtsp_url() if hasattr(c, "get_rtsp_url") else c.rtsp_url,
                 "name": c.name,
                 "location": c.location,
                 "fps_target": c.fps_target,
@@ -654,7 +654,7 @@ async def get_config(
         "cameras": [
             {
                 "camera_id": c.camera_id,
-                "rtsp_url": c.rtsp_url,
+                "rtsp_url": c.get_rtsp_url() if hasattr(c, "get_rtsp_url") else c.rtsp_url,
                 "name": c.name,
                 "location": c.location,
                 "fps_target": c.fps_target,

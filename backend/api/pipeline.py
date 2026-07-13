@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 import uuid
 from collections import defaultdict, deque
@@ -170,9 +171,19 @@ class VantagPipeline:
         if mqtt_client is not None:
             self._mqtt = mqtt_client
         else:
+            # NOTE: uvicorn runs multiple worker processes (--workers N). Each
+            # worker constructs its own Pipeline -> MQTTClient. Using the
+            # same static client_id across processes causes Mosquitto to
+            # continuously kick the previous connection ("Client
+            # vantag-backend already connected, closing old connection"),
+            # producing an endless connect/disconnect storm that prevents
+            # any MQTT status (door locks, camera health, etc.) from ever
+            # being reliably received. Make the client_id unique per
+            # process so each worker keeps its own stable connection.
             self._mqtt = MQTTClient(
                 broker=global_cfg.get("mqtt_broker", "localhost"),
                 port=int(global_cfg.get("mqtt_port", 1883)),
+                client_id=f"vantag-backend-{os.getpid()}",
             )
         self._mqtt_owned = mqtt_client is None  # we own it if we created it
 

@@ -11,15 +11,21 @@ Smart AI support chat endpoint backed by OpenAI GPT-4o.
 """
 from __future__ import annotations
 
+import logging
 import os
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 support_router = APIRouter(prefix="/api/support", tags=["support"])
 
+logger = logging.getLogger("vantag.support")
+
 SUPPORT_EMAIL = "support@retail-vantag.com"
+
+_bearer = HTTPBearer(auto_error=False)
 
 # ─── Vantag Knowledge Base (burned into the system prompt) ─────────────────
 VANTAG_SYSTEM_PROMPT = """You are Vantag Assistant — the official AI support agent for Vantag
@@ -121,6 +127,32 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     escalate_to_email: bool = False
+
+
+class FeedbackRequest(BaseModel):
+    page: str
+    helpful: bool
+    topic: str = "Not specified"
+    message: str = ""
+
+
+class FeedbackResponse(BaseModel):
+    received: bool = True
+
+
+async def _optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+) -> Optional[dict]:
+    """Best-effort auth: feedback should never fail just because the token
+    is missing or expired — we still want to capture anonymous feedback."""
+    if not credentials:
+        return None
+    try:
+        from ..middleware.tenant_middleware import _decode_token  # lazy import
+
+        return _decode_token(credentials.credentials)
+    except HTTPException:
+        return None
 
 
 # ─── Fallback canned answers (if OpenAI is not configured) ─────────────────
@@ -229,6 +261,27 @@ async def support_chat(req: ChatRequest) -> ChatResponse:
             ),
             escalate_to_email=True,
         )
+
+
+@support_router.post("/feedback", response_model=FeedbackResponse)
+async def submit_feedback(
+    body: FeedbackRequest,
+    user: Optional[dict] = Depends(_optional_user),
+) -> FeedbackResponse:
+    """Accepts help-page feedback ("was this helpful?"). Best-effort: logs
+    the feedback for review — does not require an active subscription or
+    even a valid token, since users hitting subscription/auth errors are
+    exactly the ones who may need to leave feedback."""
+    logger.info(
+        "support_feedback page=%s helpful=%s topic=%s tenant_id=%s user_id=%s message=%s",
+        body.page,
+        body.helpful,
+        body.topic,
+        (user or {}).get("tenant_id"),
+        (user or {}).get("sub"),
+        body.message[:500],
+    )
+    return FeedbackResponse(received=True)
 
 
 @support_router.get("/faq")
