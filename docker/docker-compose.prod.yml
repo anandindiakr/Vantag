@@ -89,6 +89,7 @@ services:
       dockerfile: docker/Dockerfile
     container_name: vantag-backend
     restart: unless-stopped
+    ports: !reset []
     expose:
       - "8800"
     volumes:
@@ -142,8 +143,8 @@ services:
     container_name: vantag-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:8095:80"
+      - "127.0.0.1:8446:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
