@@ -23,10 +23,12 @@ import base64
 import io
 import ipaddress
 import logging
+import re
 import socket
 import uuid
 from datetime import datetime, timezone
 from typing import AsyncGenerator, List, Optional
+from urllib.parse import quote, unquote
 
 import cv2
 import numpy as np
@@ -116,9 +118,31 @@ def _build_camera_response(cam, health_entry: Optional[dict]) -> CameraResponse:
     )
 
 
+# Matches rtsp://user:pass@host... and captures the userinfo portion so it
+# can be safely percent-encoded. Mirrors the same helper in the Windows Edge
+# Agent's camera_worker.py — kept in sync since both parse RTSP URLs with
+# FFmpeg/OpenCV, which treats an un-encoded '#' (or other reserved chars) in
+# the password as a URI fragment delimiter and silently truncates the URL.
+_RTSP_CREDS_RE = re.compile(r"^(rtsp://)([^:@/]+):([^@]*)@(.+)$")
+
+
+def sanitize_rtsp_url(url: str) -> str:
+    """Percent-encode the username/password of a full RTSP URL so reserved
+    URI characters (e.g. '#') don't break FFmpeg/OpenCV parsing. Idempotent —
+    unquotes first so already-encoded URLs pass through unchanged."""
+    if not url:
+        return url
+    m = _RTSP_CREDS_RE.match(url.strip())
+    if not m:
+        return url
+    scheme, user, pwd, rest = m.groups()
+    safe_user = quote(unquote(user), safe="")
+    safe_pwd = quote(unquote(pwd), safe="")
+    return f"{scheme}{safe_user}:{safe_pwd}@{rest}"
+
+
 def _mask_rtsp(url: str) -> str:
     """Replace credentials in RTSP URL with asterisks for security."""
-    import re
     return re.sub(r"(rtsp://)([^@]+)@", r"\1***@", url)
 
 
@@ -539,7 +563,10 @@ async def update_camera(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="RTSP URL must start with rtsp://",
                 )
-            row.set_rtsp_url(url)
+            # Percent-encode credentials in case the user pasted a raw
+            # password containing reserved URI characters (e.g. '#'), which
+            # would otherwise truncate the URL for FFmpeg/OpenCV.
+            row.set_rtsp_url(sanitize_rtsp_url(url))
         if body.enabled is not None:
             row.enabled = body.enabled
         await session.commit()
@@ -796,7 +823,13 @@ async def test_camera_connection(
     # Build RTSP URL
     path = body.rtsp_path if body.rtsp_path.startswith("/") else f"/{body.rtsp_path}"
     if body.username and body.password:
-        rtsp_url = f"rtsp://{body.username}:{body.password}@{body.ip}:{body.port}{path}"
+        # Percent-encode credentials: many NVR/IP-camera passwords contain
+        # reserved URI characters (most commonly '#'), which FFmpeg/OpenCV
+        # otherwise treat as a fragment delimiter, truncating the URL and
+        # producing "Port missing in uri" even with correct credentials.
+        safe_user = quote(body.username, safe="")
+        safe_pass = quote(body.password, safe="")
+        rtsp_url = f"rtsp://{safe_user}:{safe_pass}@{body.ip}:{body.port}{path}"
     else:
         rtsp_url = f"rtsp://{body.ip}:{body.port}{path}"
 
@@ -898,7 +931,13 @@ async def create_camera(
     # Build RTSP URL
     path = body.rtsp_path if body.rtsp_path.startswith("/") else f"/{body.rtsp_path}"
     if body.username and body.password:
-        rtsp_url = f"rtsp://{body.username}:{body.password}@{body.ip}:{body.port}{path}"
+        # Percent-encode credentials: many NVR/IP-camera passwords contain
+        # reserved URI characters (most commonly '#'), which FFmpeg/OpenCV
+        # otherwise treat as a fragment delimiter, truncating the URL and
+        # producing "Port missing in uri" even with correct credentials.
+        safe_user = quote(body.username, safe="")
+        safe_pass = quote(body.password, safe="")
+        rtsp_url = f"rtsp://{safe_user}:{safe_pass}@{body.ip}:{body.port}{path}"
     else:
         rtsp_url = f"rtsp://{body.ip}:{body.port}{path}"
 
@@ -1061,7 +1100,12 @@ def _try_rtsp_path(ip: str, port: int, path: str, username: Optional[str], passw
     """
     path = path if path.startswith("/") else f"/{path}"
     if username and password:
-        rtsp_url = f"rtsp://{username}:{password}@{ip}:{port}{path}"
+        # See test_camera_connection() above: percent-encode credentials so
+        # reserved URI characters (e.g. '#') in the password don't truncate
+        # the RTSP URL when FFmpeg/OpenCV parse it.
+        safe_user = quote(username, safe="")
+        safe_pass = quote(password, safe="")
+        rtsp_url = f"rtsp://{safe_user}:{safe_pass}@{ip}:{port}{path}"
     else:
         rtsp_url = f"rtsp://{ip}:{port}{path}"
 
@@ -1349,7 +1393,10 @@ async def confirm_discovered_camera(
 
     # Build the final RTSP URL: prefer user credentials, else any stored URL.
     if body.username and body.password and row.ip_address:
-        rtsp_url = f"rtsp://{body.username}:{body.password}@{row.ip_address}:{port}{path}"
+        # Percent-encode credentials: see test_camera_connection() above.
+        safe_user = quote(body.username, safe="")
+        safe_pass = quote(body.password, safe="")
+        rtsp_url = f"rtsp://{safe_user}:{safe_pass}@{row.ip_address}:{port}{path}"
     else:
         rtsp_url = row.get_rtsp_url() or (
             f"rtsp://{row.ip_address}:{port}{path}" if row.ip_address else None

@@ -13,10 +13,12 @@ Analyzers implemented
 import base64
 import collections
 import logging
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Optional
+from urllib.parse import quote, unquote
 
 import cv2
 import numpy as np
@@ -26,6 +28,35 @@ from .api_client import VantagApiClient
 from .inference import YoloInference, RETAIL_CLASSES
 
 log = logging.getLogger("vantag.camera")
+
+# Matches rtsp://user:pass@host... and captures the userinfo portion so it
+# can be safely percent-encoded before handing the URL to FFmpeg.
+_RTSP_CREDS_RE = re.compile(r"^(rtsp://)([^:@/]+):([^@]*)@(.+)$")
+
+
+def sanitize_rtsp_url(url: str) -> str:
+    """
+    Many NVR/IP-camera passwords contain characters (most commonly '#')
+    that are reserved in URIs. FFmpeg/OpenCV parse the RTSP URL as a
+    standard URI, so an un-encoded '#' is treated as a fragment delimiter
+    and silently truncates everything after it (e.g. the port/path),
+    producing "Port missing in uri" even though the credentials are
+    otherwise correct.
+
+    This normalizes the username/password by unquoting first (a no-op if
+    they were already raw) and then re-quoting with safe='' , so both
+    already-encoded and raw values converge on the same, correctly
+    escaped URL. Idempotent — safe to call every time a stream is opened.
+    """
+    if not url:
+        return url
+    m = _RTSP_CREDS_RE.match(url.strip())
+    if not m:
+        return url
+    scheme, user, pwd, rest = m.groups()
+    safe_user = quote(unquote(user), safe="")
+    safe_pwd = quote(unquote(pwd), safe="")
+    return f"{scheme}{safe_user}:{safe_pwd}@{rest}"
 
 # Shared executor for fire-and-forget live-frame pushes to the backend relay.
 # Bounded worker count so a slow/unreachable backend can't spawn unbounded
@@ -563,7 +594,8 @@ class CameraWorker:
         while not self._stop_event.is_set():
             cap = None
             try:
-                cap = cv2.VideoCapture(self.config.rtsp_url, cv2.CAP_FFMPEG)
+                stream_url = sanitize_rtsp_url(self.config.rtsp_url)
+                cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
                 if not cap.isOpened():
