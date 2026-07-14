@@ -132,7 +132,7 @@ async def get_optional_tenant_id(
 
 
 async def require_active_tenant(
-    user: dict = Depends(get_current_user_id),
+    user: dict = Depends(get_current_user_id_img),
 ) -> dict:
     """
     Blocks API access when the tenant's subscription is inactive or expired.
