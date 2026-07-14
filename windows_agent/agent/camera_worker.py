@@ -62,7 +62,7 @@ def sanitize_rtsp_url(url: str) -> str:
 # Bounded worker count so a slow/unreachable backend can't spawn unbounded
 # threads across many cameras; a full queue simply drops the newest push
 # (handled per-camera via the in-flight flag below), never blocking capture.
-_FRAME_PUSH_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="frame-push")
+_FRAME_PUSH_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="frame-push")
 
 # ---------------------------------------------------------------------------
 # Fall Detector
@@ -562,11 +562,18 @@ class CameraWorker:
         self.error_msg: str = ""
         self.consecutive_failures: int = 0
 
-        # Live-frame relay: push a downsized JPEG to the backend every
-        # ~200ms so the cloud dashboard can display live view even when the
-        # camera is on a private LAN unreachable from the backend directly.
+        # Live-frame relay: push a downsized JPEG to the backend so the cloud
+        # dashboard can display live view even when the camera is on a private
+        # LAN unreachable from the backend directly.
+        #
+        # Interval is 0.5s (~2 fps). The previous 0.2s (5 fps) at 640x360 q70
+        # meant 6 cameras pushed ~12 Mbps of continuous upload, which saturated
+        # typical store uplinks — pushes timed out, frames aged past the
+        # backend's staleness window, and live tiles went blank one by one.
+        # 2 fps at 480x270 q65 is ~1.5 Mbps total for 6 cameras and still
+        # looks live on the dashboard.
         self._last_frame_push: float = 0.0
-        self._frame_push_interval: float = 0.2
+        self._frame_push_interval: float = 0.5
         self._frame_push_inflight = threading.Event()
 
     def start(self):
@@ -676,8 +683,8 @@ class CameraWorker:
             return  # previous push hasn't completed yet — drop this frame
 
         self._last_frame_push = now
-        small = cv2.resize(frame, (640, 360))
-        ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        small = cv2.resize(frame, (480, 270))
+        ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 65])
         if not ok:
             return
         frame_b64 = base64.b64encode(buf.tobytes()).decode()

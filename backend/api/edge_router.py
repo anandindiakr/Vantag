@@ -69,7 +69,10 @@ def set_pipeline(p) -> None:  # type: ignore[no-untyped-def]
 # In-memory only (per-process); fine for a single backend instance. If the
 # backend is ever scaled horizontally this should move to Redis.
 _latest_edge_frames: dict[str, tuple[bytes, float, str]] = {}
-_FRAME_STALE_SEC = 15.0  # treat a frame as unavailable if older than this
+# Treat a frame as unavailable if older than this. Generous window (45s) so a
+# brief uplink hiccup on the store's network degrades to a slightly stale
+# preview instead of blanking the live tile entirely.
+_FRAME_STALE_SEC = 45.0
 
 
 def get_latest_edge_frame(tenant_id: str, camera_id: str) -> bytes | None:
