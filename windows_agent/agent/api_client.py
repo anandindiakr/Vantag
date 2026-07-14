@@ -5,10 +5,37 @@ Uses requests with retry logic and connection pooling.
 import logging
 import time
 from typing import Optional
+from urllib.parse import urlsplit, urlunsplit
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
 log = logging.getLogger("vantag.api")
+
+
+def _normalize_base_url(base_url: str) -> str:
+    """Normalize a (possibly stale) backend_url so every request hits the
+    canonical host/scheme directly, never a redirect.
+
+    Nginx 301-redirects "www.<domain>" -> "<domain>" and plain "http://" ->
+    "https://" for canonicalization/TLS. ``requests`` (and most HTTP
+    clients) downgrade POST -> GET when following a 301/302, so any request
+    built from a stale config.json containing "www." or "http://" silently
+    turns into a GET on arrival and gets rejected with 405 Method Not
+    Allowed — the agent looks "online" (nothing crashes) but heartbeats,
+    frame pushes, and events never actually reach the backend. Normalizing
+    here means even an old/stale local config self-heals on every restart.
+    """
+    parts = urlsplit(base_url.rstrip("/"))
+    host = parts.netloc
+    if host.lower().startswith("www."):
+        host = host[4:]
+    scheme = parts.scheme
+    # Only force https for real hostnames; leave localhost/127.0.0.1/LAN IPs
+    # (used for local/dev testing) on whatever scheme was configured.
+    hostname_only = host.split(":")[0].lower()
+    if scheme == "http" and hostname_only not in ("localhost", "127.0.0.1") and not hostname_only.startswith("192.168.") and not hostname_only.startswith("10."):
+        scheme = "https"
+    return urlunsplit((scheme, host, parts.path, "", ""))
 
 
 def _build_session(base_url: str) -> requests.Session:
@@ -39,9 +66,15 @@ def _build_session(base_url: str) -> requests.Session:
 
 class VantagApiClient:
     def __init__(self, base_url: str, api_key: str):
-        self.base_url = base_url.rstrip("/")
+        normalized = _normalize_base_url(base_url)
+        if normalized != base_url.rstrip("/"):
+            log.warning(
+                f"backend_url normalized from stale config value '{base_url}' "
+                f"to '{normalized}' (avoids POST->GET downgrade on nginx redirect)"
+            )
+        self.base_url = normalized
         self.api_key = api_key
-        self._session = _build_session(base_url)
+        self._session = _build_session(self.base_url)
         self._session.headers["X-API-Key"] = api_key
 
     def register(self, device_type: str = "windows") -> dict:

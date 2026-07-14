@@ -120,3 +120,5 @@ yarn-error.log*
 
 # Runtime camera config (per-region, mutated by app; must not be version-controlled)
 backend/config/cameras.production.yaml
+_zip_check/ 
+__pycache__/ 
