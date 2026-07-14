@@ -20,6 +20,7 @@ PLANS: dict[str, dict] = {
             "SGD": 19,
             "MYR": 29,
             "PHP": 2499,
+            "IDR": 149000,
         },
         "razorpay_plan_ids": {
             "INR": "plan_T7W6SUeTnVoAyL",
@@ -28,6 +29,7 @@ PLANS: dict[str, dict] = {
             "PHP": "",   # fill after Xendit approval
             "SGD": "",
             "MYR": "",
+            "IDR": "",
         },
         "trial_days": 3,
     },
@@ -50,6 +52,7 @@ PLANS: dict[str, dict] = {
             "SGD": 39,
             "MYR": 59,
             "PHP": 5499,
+            "IDR": 349000,
         },
         "razorpay_plan_ids": {
             "INR": "plan_T7WAyWwxVE1XKH",
@@ -58,6 +61,7 @@ PLANS: dict[str, dict] = {
             "PHP": "",
             "SGD": "",
             "MYR": "",
+            "IDR": "",
         },
         "trial_days": 3,
     },
@@ -79,6 +83,7 @@ PLANS: dict[str, dict] = {
             "SGD": 99,
             "MYR": 149,
             "PHP": 11999,
+            "IDR": 749000,
         },
         "razorpay_plan_ids": {
             "INR": "plan_T7WCJ5OfbMU10W",
@@ -87,6 +92,7 @@ PLANS: dict[str, dict] = {
             "PHP": "",
             "SGD": "",
             "MYR": "",
+            "IDR": "",
         },
         "trial_days": 3,
     },
@@ -107,6 +113,7 @@ PLANS: dict[str, dict] = {
             "SGD": 189,
             "MYR": 299,
             "PHP": 17999,
+            "IDR": 1199000,
         },
         "razorpay_plan_ids": {
             "INR": "plan_T7WEQBukuWrPczi",
@@ -115,6 +122,7 @@ PLANS: dict[str, dict] = {
             "PHP": "",
             "SGD": "",
             "MYR": "",
+            "IDR": "",
         },
         "trial_days": 3,
     },

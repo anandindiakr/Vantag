@@ -1,4 +1,4 @@
-"""Regional configuration — India, Singapore, Malaysia, Philippines."""
+"""Regional configuration — India, Singapore, Malaysia, Philippines, Indonesia."""
 from __future__ import annotations
 
 import os
@@ -59,9 +59,23 @@ REGIONS: dict[str, dict] = {
         "domain": "retailbantay.com",
         "support_email": "support@retailbantay.com",
     },
+    "ID": {
+        "name": "Indonesia",
+        "app_name": "Vantag - Retail Pantau",
+        "currency": "IDR",
+        "symbol": "Rp",
+        "language": "id",
+        "languages": ["id", "en"],
+        "payment_gateway": "xendit",
+        "xendit_public_key": os.getenv("XENDIT_PUBLIC_KEY_ID", ""),
+        "xendit_secret_key": os.getenv("XENDIT_SECRET_KEY_ID", ""),
+        "xendit_webhook_token": os.getenv("XENDIT_WEBHOOK_TOKEN_ID", ""),
+        "domain": "retailpantau.com",
+        "support_email": "support@retailpantau.com",
+    },
 }
 
-SUPPORTED_COUNTRIES = list(REGIONS.keys())
+SUPPORTED_COUNTRIES = list(REGIONS.keys())  # ["IN", "SG", "MY", "PH", "ID"]
 
 
 def get_region(country: str) -> dict:

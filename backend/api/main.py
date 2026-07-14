@@ -96,6 +96,7 @@ _IS_PROD = os.getenv("VANTAG_ENV", "").lower() in ("prod", "production")
 _PROD_DEFAULT_ORIGINS = (
     "https://retailnazar.com,https://www.retailnazar.com,"
     "https://retailbantay.com,https://www.retailbantay.com,"
+    "https://retailpantau.com,https://www.retailpantau.com,"
     "https://retail-vantag.com,https://www.retail-vantag.com"
 )
 _raw_origins = os.getenv(

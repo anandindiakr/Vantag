@@ -1,4 +1,4 @@
-export type Region = 'IN' | 'MY' | 'SG' | 'PH';
+export type Region = 'IN' | 'MY' | 'SG' | 'PH' | 'ID';
 
 export interface PricingTier {
   name: string;
@@ -270,6 +270,62 @@ const REGIONS: Record<Region, RegionConfig> = {
       },
     ],
   },
+
+  ID: {
+    region: 'ID',
+    brand: 'Vantag — Retail Pantau',
+    brandShort: 'Retail Pantau',
+    domains: ['retailpantau.com'],
+    languages: [
+      { code: 'id', label: 'Bahasa Indonesia' },
+      { code: 'en', label: 'English' },
+    ],
+    defaultLang: 'id',
+    currency: 'IDR',
+    symbol: 'Rp',
+    country: 'Indonesia',
+    paymentCurrency: 'IDR',
+    paymentGateway: 'xendit',
+    plans: [
+      {
+        name: 'Starter',
+        key: 'starter',
+        cameras: 4,
+        monthlyPrice: 149000,
+        annualPrice: 124167,
+        currency: 'IDR',
+        symbol: 'Rp',
+      },
+      {
+        name: 'Growth',
+        key: 'growth',
+        cameras: 10,
+        monthlyPrice: 349000,
+        annualPrice: 290833,
+        currency: 'IDR',
+        symbol: 'Rp',
+        popular: true,
+      },
+      {
+        name: 'Pro',
+        key: 'pro',
+        cameras: 20,
+        monthlyPrice: 749000,
+        annualPrice: 624167,
+        currency: 'IDR',
+        symbol: 'Rp',
+      },
+      {
+        name: 'Pro Plus',
+        key: 'proplus',
+        cameras: 30,
+        monthlyPrice: 1199000,
+        annualPrice: 999167,
+        currency: 'IDR',
+        symbol: 'Rp',
+      },
+    ],
+  },
 };
 
 /** Detect region from hostname. Falls back to SG for localhost / unknown hosts. */
@@ -290,6 +346,10 @@ export function detectRegion(): RegionConfig {
 
   if (host.includes('retailbantay') || host.includes('bantay')) {
     return REGIONS.PH;
+  }
+
+  if (host.includes('retailpantau') || host.includes('pantau')) {
+    return REGIONS.ID;
   }
 
   // retail-vantag.com → SG, or localhost (dev default)

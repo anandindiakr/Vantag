@@ -15,6 +15,7 @@ const DOMAINS = {
   in: 'https://retailnazar.com',
   sg: 'https://retail-vantag.com',
   my: 'https://jagajaga.my',
+  id: 'https://retailpantau.com',
 };
 
 function currentOrigin(): string {
@@ -50,6 +51,7 @@ export default function Seo({ title, description, path, image, jsonLd, noindex }
       <link rel="alternate" hrefLang="en-IN" href={`${DOMAINS.in}${path}`} />
       <link rel="alternate" hrefLang="en-SG" href={`${DOMAINS.sg}${path}`} />
       <link rel="alternate" hrefLang="ms-MY" href={`${DOMAINS.my}${path}`} />
+      <link rel="alternate" hrefLang="id-ID" href={`${DOMAINS.id}${path}`} />
       <link rel="alternate" hrefLang="x-default" href={`${DOMAINS.in}${path}`} />
 
       {/* Open Graph */}

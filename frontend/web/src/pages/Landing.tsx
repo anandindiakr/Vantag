@@ -26,6 +26,7 @@ const REGION_SWITCHER = [
   { code: 'SG' as const, name: 'Singapore',   app: 'Vantag',        flag: '🇸🇬', lang: 'en', url: 'https://retail-vantag.com' },
   { code: 'MY' as const, name: 'Malaysia',    app: 'JagaJaga',      flag: '🇲🇾', lang: 'ms', url: 'https://jagajaga.my' },
   { code: 'PH' as const, name: 'Philippines', app: 'Retail Bantay', flag: '🇵🇭', lang: 'en', url: 'https://retailbantay.com' },
+  { code: 'ID' as const, name: 'Indonesia',   app: 'Retail Pantau', flag: '🇮🇩', lang: 'id', url: 'https://retailpantau.com' },
 ];
 
 /* ── 11 AI Feature detectors ── */
@@ -281,7 +282,7 @@ export default function Landing() {
   const domainRegion = useRegion();
 
   // On localhost dev, allow switching between regions to preview prices/branding
-  const [activeCode, setActiveCode] = useState<'IN' | 'SG' | 'MY' | 'PH'>(domainRegion.region);
+  const [activeCode, setActiveCode] = useState<'IN' | 'SG' | 'MY' | 'PH' | 'ID'>(domainRegion.region);
   const [annual, setAnnual] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -837,7 +838,7 @@ export default function Landing() {
               </div>
               <h2 className="font-syne text-3xl sm:text-4xl font-black text-white mb-4">Ready to Protect Your Store?</h2>
               <p className="text-white/45 text-lg font-body-alt mb-8 max-w-xl mx-auto">
-                Join retailers across India, Singapore, Malaysia and the Philippines using Vantag to stop theft before it happens.
+                Join retailers across India, Singapore, Malaysia, the Philippines and Indonesia using Vantag to stop theft before it happens.
               </p>
               <div className="flex flex-wrap justify-center gap-4">
                 <Link
@@ -868,7 +869,7 @@ export default function Landing() {
                 <span className="font-syne text-lg font-bold">Vantag</span>
               </div>
               <p className="text-sm text-white/35 font-body-alt leading-relaxed mb-4">
-                AI-powered retail security platform for shops across India, Singapore, Malaysia and the Philippines.
+                AI-powered retail security platform for shops across India, Singapore, Malaysia, the Philippines and Indonesia.
               </p>
               <div className="flex gap-2 flex-wrap">
                 {REGION_SWITCHER.map(r => (
@@ -909,7 +910,7 @@ export default function Landing() {
                 <Link to="/privacy" className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">Privacy Policy</Link>
                 <Link to="/terms" className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">Terms of Service</Link>
                 <Link to="/faq" className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">FAQ</Link>
-                <a href={`mailto:${region.region === 'IN' ? 'support@retailnazar.com' : 'support@retail-vantag.com'}`} className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">Contact Us</a>
+                <a href={`mailto:${region.region === 'IN' ? 'support@retailnazar.com' : region.region === 'PH' ? 'support@retailbantay.com' : region.region === 'ID' ? 'support@retailpantau.com' : 'support@retail-vantag.com'}`} className="block text-white/40 hover:text-white/80 transition-colors font-body-alt">Contact Us</a>
               </div>
               {/* ── Cross-region links ── */}
               <div className="space-y-3">
@@ -945,6 +946,14 @@ export default function Landing() {
                 >
                   🇵🇭 <span>Retail Bantay</span>
                   <span className="font-mono-alt text-[10px] text-white/20">Philippines</span>
+                </a>
+                <a
+                  href="https://retailpantau.com"
+                  target="_blank" rel="noopener noreferrer"
+                  className={`flex items-center gap-2 font-body-alt transition-colors ${region.region === 'ID' ? 'text-cyan-400 font-semibold' : 'text-white/40 hover:text-white/80'}`}
+                >
+                  🇮🇩 <span>Retail Pantau</span>
+                  <span className="font-mono-alt text-[10px] text-white/20">Indonesia</span>
                 </a>
                 <a
                   href="https://retailnazar.in"

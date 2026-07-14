@@ -8,7 +8,7 @@ export default function PrivacyPolicy() {
     <div className="min-h-screen bg-[#0a0a0f] text-slate-200">
       <Seo
         title="Privacy Policy | Retail Nazar"
-        description="Retail Nazar Privacy Policy — how we collect, use, store and protect CCTV and personal data under GDPR, DPDP Act (India), PDPA (Singapore) and PDPA (Malaysia)."
+        description="Retail Nazar Privacy Policy — how we collect, use, store and protect CCTV and personal data under GDPR, DPDP Act (India), PDPA (Singapore), PDPA (Malaysia) and UU PDP (Indonesia)."
         path="/privacy"
       />
       <header className="border-b border-white/10 px-6 py-4">
@@ -63,6 +63,7 @@ export default function PrivacyPolicy() {
           <li><strong>India (DPDP Act 2023)</strong>: you are the Data Principal; we are the Data Fiduciary.</li>
           <li><strong>Singapore (PDPA 2012)</strong>: access + correction rights under sections 21 &amp; 22.</li>
           <li><strong>Malaysia (PDPA 2010)</strong>: access + correction rights under sections 30 &amp; 34.</li>
+          <li><strong>Indonesia (UU PDP No. 27/2022)</strong>: access, correction, deletion and objection rights as a Data Subject.</li>
           <li><strong>EU/UK (GDPR/UK-GDPR)</strong>: all Articles 15–22 rights apply.</li>
         </ul>
 

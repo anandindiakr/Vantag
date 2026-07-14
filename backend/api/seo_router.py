@@ -33,6 +33,7 @@ ALTERNATE_DOMAINS = {
     "en-IN": "https://retailnazar.com",
     "en-MY": "https://retailjagajaga.com",
     "ms-MY": "https://jagajaga.my",
+    "id-ID": "https://retailpantau.com",
 }
 
 
