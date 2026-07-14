@@ -655,12 +655,16 @@ class CameraWorker:
                 self.consecutive_failures += 1
                 self.error_msg = str(e)
                 log.warning(f"[{self.config.name}] Error: {e} (failures={self.consecutive_failures})")
-                if self.consecutive_failures >= self.MAX_FAILURES:
+                # NEVER permanently give up: NVRs limit concurrent RTSP sessions,
+                # so 6 cameras hitting the same NVR at startup often fail a few
+                # times before slots free up. A permanent stop after 3 failures
+                # left cameras offline forever until an agent restart. Instead,
+                # keep retrying with capped exponential backoff (max 60s).
+                if self.consecutive_failures == self.MAX_FAILURES:
                     log.error(
-                        f"[{self.config.name}] Giving up after {self.MAX_FAILURES} "
-                        f"consecutive failures — no valid RTSP stream. Worker stopping."
+                        f"[{self.config.name}] {self.MAX_FAILURES} consecutive failures — "
+                        f"will keep retrying every ≤60s (check RTSP URL/NVR session limits)."
                     )
-                    break
                 backoff = min(2 ** self.consecutive_failures, 60)
                 log.info(f"[{self.config.name}] Reconnecting in {backoff}s...")
                 self._stop_event.wait(timeout=backoff)

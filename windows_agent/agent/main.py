@@ -221,6 +221,20 @@ def reconcile_cameras():
         c.id: c for c in cams
         if c.enabled and (c.rtsp_url or "").strip()
     }
+    # Drop workers whose thread has died (e.g. crashed) so they are treated
+    # as "not running" below and get restarted automatically.
+    for w in list(_workers):
+        t = getattr(w, "_thread", None)
+        if t is not None and not t.is_alive():
+            log.warning(
+                f"Worker for camera {w.config.id} is dead — scheduling restart"
+            )
+            try:
+                w.stop()
+            except Exception:  # noqa: BLE001
+                pass
+            _workers.remove(w)
+
     running = {w.config.id: w for w in _workers}
 
     # Stop workers whose camera was removed/disabled or whose stream/sensitivity changed.
@@ -295,6 +309,9 @@ def start_monitoring():
         )
         worker.start()
         _workers.append(worker)
+        # Stagger connects: all cameras share one NVR, which caps concurrent
+        # RTSP session setups — simultaneous opens make several fail at once.
+        time.sleep(1.0)
 
     log.info(f"Started {len(_workers)} camera workers")
 
@@ -425,13 +442,22 @@ def main():
     # Auto-start monitoring
     start_monitoring()
 
-    # First-boot convenience: run one LAN camera discovery scan in the background
-    threading.Thread(
-        target=run_discovery_and_report,
-        args=("startup",),
-        daemon=True,
-        name="discovery-startup",
-    ).start()
+    # First-boot convenience: run one LAN camera discovery scan in the background.
+    # Skipped when cameras are already configured — the scan probes the NVR with
+    # default credentials, which eats its limited RTSP session slots right when
+    # the real workers are trying to connect (and creates disc-* duplicates).
+    if not _config.cameras:
+        threading.Thread(
+            target=run_discovery_and_report,
+            args=("startup",),
+            daemon=True,
+            name="discovery-startup",
+        ).start()
+    else:
+        log.info(
+            f"{len(_config.cameras)} camera(s) already configured — "
+            "skipping startup discovery scan (use dashboard Auto-Scan if needed)."
+        )
 
     # System tray
     tray = VantagTrayIcon(
