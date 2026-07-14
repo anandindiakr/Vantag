@@ -707,7 +707,7 @@ class ScanRequest(BaseModel):
     subnet: Optional[str] = None  # e.g. "192.168.1.0/24"
 
 
-class DiscoveredCamera(BaseModel):
+class ScannedCamera(BaseModel):
     ip: str
     port: int
     vendor_hint: Optional[str] = None
@@ -715,13 +715,13 @@ class DiscoveredCamera(BaseModel):
 
 @router.post(
     "/scan",
-    response_model=List[DiscoveredCamera],
+    response_model=List[ScannedCamera],
     summary="Scan LAN for RTSP cameras (port 554)",
 )
 async def scan_cameras(
     body: ScanRequest,
     user: dict = Depends(get_current_user_id),
-) -> List[DiscoveredCamera]:
+) -> List[ScannedCamera]:
     """
     Probe every host in a /24 subnet on port 554 (RTSP) using asyncio
     socket connects with a 0.5 s timeout per host.  Runs up to 50 probes
@@ -750,7 +750,7 @@ async def scan_cameras(
     hosts = list(network.hosts())
 
     semaphore = asyncio.Semaphore(_SCAN_SEMAPHORE_SIZE)
-    results: List[DiscoveredCamera] = []
+    results: List[ScannedCamera] = []
     lock = asyncio.Lock()
 
     async def probe_host(ip: str) -> None:
@@ -776,7 +776,7 @@ async def scan_cameras(
                     vendor = "Hikvision"
 
                 async with lock:
-                    results.append(DiscoveredCamera(ip=ip, port=_RTSP_PORT, vendor_hint=vendor))
+                    results.append(ScannedCamera(ip=ip, port=_RTSP_PORT, vendor_hint=vendor))
             except (asyncio.TimeoutError, ConnectionRefusedError, OSError):
                 pass
 
