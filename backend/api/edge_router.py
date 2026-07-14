@@ -992,6 +992,14 @@ async def download_agent(
     # downloaded config.json points the store-LAN agent at the real domain.
     proto = request.headers.get("X-Forwarded-Proto", "https")
     host = request.headers.get("Host", request.url.netloc)
+    # Nginx 301-redirects "www.<domain>" -> "<domain>" for canonicalization.
+    # HTTP clients downgrade POST->GET on a 301, so if the agent's baked-in
+    # backend_url uses the "www." host, every heartbeat/frame-push POST the
+    # agent sends gets silently turned into a GET and never reaches the
+    # backend. Always strip "www." here so the agent talks to the bare
+    # canonical domain directly and never hits that redirect.
+    if host.startswith("www."):
+        host = host[4:]
     backend_url = f"{proto}://{host}"
     # MQTT broker is on the same VPS — strip the port from the Host header to
     # get just the hostname (retail-vantag.com / retailnazar.com / etc.)
