@@ -40,7 +40,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import CameraResponse, CameraStatus, ZonePolygon, ZoneUpdateRequest, SensitivityUpdateRequest
-from ..middleware.tenant_middleware import get_current_user_id
+from ..middleware.tenant_middleware import get_current_user_id, get_current_user_id_img
 from ..db.database import get_session
 from ..db.models.camera import CameraConfig
 
@@ -367,7 +367,7 @@ async def _get_db_camera(session: AsyncSession, tenant_id, camera_id: str):  # n
 )
 async def get_snapshot(
     camera_id: str,
-    user: dict = Depends(get_current_user_id),
+    user: dict = Depends(get_current_user_id_img),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
     """
@@ -597,7 +597,7 @@ async def update_camera(
 async def mjpeg_stream(
     camera_id: str,
     request: Request,
-    user: dict = Depends(get_current_user_id),
+    user: dict = Depends(get_current_user_id_img),
     session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
     """

@@ -28,7 +28,9 @@ function CameraCard({ cam }: { cam: ReturnType<typeof useCameras>['data'] extend
     s.recentEvents.filter((e) => e.cameraId === cam.id).slice(0, 3)
   );
 
-  const snapshotUrl = `/api/cameras/${cam.id}/snapshot?t=${tick}`;
+  // JWT via query param — <img> tags can't send Authorization headers.
+  const authToken   = localStorage.getItem('vantag_token') ?? '';
+  const snapshotUrl = `/api/cameras/${cam.id}/snapshot?t=${tick}&token=${encodeURIComponent(authToken)}`;
   const hasAlert    = recentEvents.some((e) => e.severity === 'HIGH' || e.severity === 'CRITICAL');
 
   return (

@@ -105,7 +105,10 @@ export default function CameraView() {
     );
   }
 
-  const streamSrc = `/api/cameras/${cameraId}/stream`;
+  // Browsers can't attach Authorization headers to <img> requests, so the
+  // JWT is passed as a query param (backend accepts ?token= on image routes).
+  const authToken = localStorage.getItem('vantag_token') ?? '';
+  const streamSrc = `/api/cameras/${cameraId}/stream?token=${encodeURIComponent(authToken)}`;
 
   return (
     <div className="min-h-screen bg-vantag-dark pb-10">

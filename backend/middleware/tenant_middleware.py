@@ -7,7 +7,7 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,12 +50,8 @@ async def get_current_tenant_id(
     return tenant_id
 
 
-async def get_current_user_id(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
-) -> dict:
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    payload = _decode_token(credentials.credentials)
+async def _user_from_token(token: str) -> dict:
+    payload = _decode_token(token)
     user_id = payload.get("sub")
 
     # Session-epoch enforcement: if the token carries a version claim, it must
@@ -82,6 +78,32 @@ async def get_current_user_id(
         "email": payload.get("email"),
         "is_super_admin": bool(payload.get("is_super_admin", False)),
     }
+
+
+async def get_current_user_id(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+) -> dict:
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return await _user_from_token(credentials.credentials)
+
+
+async def get_current_user_id_img(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+) -> dict:
+    """Auth dependency for image/stream endpoints consumed by <img> tags.
+
+    Browsers cannot attach an Authorization header to <img src=...> requests,
+    so these endpoints also accept the JWT via a ``?token=`` query parameter.
+    Header auth (if present) still takes precedence.
+    """
+    token: Optional[str] = credentials.credentials if credentials else None
+    if not token:
+        token = request.query_params.get("token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return await _user_from_token(token)
 
 
 async def require_admin(user: dict = Depends(get_current_user_id)) -> dict:

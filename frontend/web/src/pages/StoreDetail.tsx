@@ -185,7 +185,7 @@ export default function StoreDetail() {
                 >
                   {/* MJPEG stream */}
                   <img
-                    src={`/api/cameras/${cam.id}/stream`}
+                    src={`/api/cameras/${cam.id}/stream?token=${encodeURIComponent(localStorage.getItem('vantag_token') ?? '')}`}
                     alt={cam.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {
