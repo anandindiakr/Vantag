@@ -97,7 +97,11 @@ try:
         return _bcrypt.hashpw(pw.encode("utf-8"), _bcrypt.gensalt(rounds=12)).decode("utf-8")
 
     def verify_password(pw: str, h: str) -> bool:
-        return _bcrypt.checkpw(pw.encode("utf-8"), h.encode("utf-8"))
+        try:
+            return _bcrypt.checkpw(pw.encode("utf-8"), h.encode("utf-8"))
+        except (ValueError, TypeError):
+            # Malformed/corrupted stored hash — treat as auth failure, not a 500/503
+            return False
 
 except ImportError as _bcrypt_err:
     raise RuntimeError(
