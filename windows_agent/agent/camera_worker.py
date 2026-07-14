@@ -13,12 +13,20 @@ Analyzers implemented
 import base64
 import collections
 import logging
+import os
 import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Optional
 from urllib.parse import quote, unquote
+
+# Must be set BEFORE cv2 opens any capture: force TCP (no packet loss
+# artifacts) and disable FFMPEG-side buffering so live view stays realtime.
+os.environ.setdefault(
+    "OPENCV_FFMPEG_CAPTURE_OPTIONS",
+    "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|max_delay;500000",
+)
 
 import cv2
 import numpy as np
@@ -596,7 +604,6 @@ class CameraWorker:
 
     def _run(self):
         frame_interval = 1.0 / self._target_fps
-        inference_every = 2   # run AI every 2nd captured frame
 
         while not self._stop_event.is_set():
             cap = None
@@ -616,9 +623,15 @@ class CameraWorker:
                 frame_count = 0
                 fps_t0 = time.time()
                 fps_frames = 0
+                last_infer = 0.0
 
+                # LOW-LATENCY LOOP: read every frame at the camera's native
+                # rate (cap.read() blocks until the next frame, so this loop
+                # self-paces). Never sleep between reads — sleeping lets
+                # FFMPEG's internal buffer fill with stale frames, which is
+                # what caused the multi-second live-view lag. AI inference is
+                # gated by wall-clock time instead of a frame counter.
                 while not self._stop_event.is_set():
-                    t_start = time.time()
                     ret, frame = cap.read()
                     if not ret:
                         raise ConnectionError("Frame read failed — stream ended")
@@ -632,7 +645,9 @@ class CameraWorker:
                         fps_frames = 0
                         fps_t0 = time.time()
 
-                    if frame_count % inference_every == 0:
+                    now = time.time()
+                    if now - last_infer >= frame_interval:
+                        last_infer = now
                         boxes = self._inference.detect(frame, conf_threshold=self._conf)
                         events = self._analyzer.analyse(boxes, frame)
                         for event in events:
@@ -645,10 +660,6 @@ class CameraWorker:
                             self._api.post_event(event)
 
                     self._maybe_push_frame(frame)
-
-                    sleep_time = frame_interval - (time.time() - t_start)
-                    if sleep_time > 0:
-                        time.sleep(sleep_time)
 
             except Exception as e:
                 self.is_connected = False
@@ -687,8 +698,8 @@ class CameraWorker:
             return  # previous push hasn't completed yet — drop this frame
 
         self._last_frame_push = now
-        small = cv2.resize(frame, (480, 270))
-        ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 65])
+        small = cv2.resize(frame, (640, 360))
+        ok, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 70])
         if not ok:
             return
         frame_b64 = base64.b64encode(buf.tobytes()).decode()
