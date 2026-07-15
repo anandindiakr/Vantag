@@ -3,23 +3,36 @@
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Download, MessageCircle, Mail, ShieldCheck } from 'lucide-react';
+import {
+  BookOpen, Download, MessageCircle, Mail, ShieldCheck,
+  Rocket, Wifi, HardDrive, Bell, AlertTriangle, Brain, CreditCard, HelpCircle,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useRegion } from '../hooks/useRegion';
 
-interface Faq { q: string; a: string; }
+interface FaqItem { q: string; a: string; }
+interface FaqCategory { id: string; title: string; icon: string; diagram?: string; items: FaqItem[]; }
+
+const ICONS: Record<string, typeof HelpCircle> = {
+  Rocket, Wifi, HardDrive, Bell, AlertTriangle, Brain, CreditCard, Shield: ShieldCheck,
+};
+
+function CategoryIcon({ name, className }: { name: string; className?: string }) {
+  const Cmp = ICONS[name] || HelpCircle;
+  return <Cmp className={className} />;
+}
 
 export default function HelpCenter() {
   const { t } = useTranslation();
   const region = useRegion();
   const supportEmail = region.region === 'IN' ? 'support@retailnazar.com' : region.region === 'PH' ? 'support@retailbantay.com' : region.region === 'ID' ? 'support@retailpantau.com' : 'support@retail-vantag.com';
-  const [faqs, setFaqs] = useState<Faq[]>([]);
+  const [categories, setCategories] = useState<FaqCategory[]>([]);
 
   useEffect(() => {
     fetch('/api/support/faq')
       .then((r) => r.json())
-      .then((d) => setFaqs(d.faqs || []))
-      .catch(() => setFaqs([]));
+      .then((d) => setCategories(d.categories || []))
+      .catch(() => setCategories([]));
   }, []);
 
   const quicklinks = [
@@ -62,16 +75,39 @@ export default function HelpCenter() {
       </div>
 
       {/* FAQ */}
-      <h2 className="text-2xl font-bold mb-4">{t('help.faq_title', 'Frequently asked questions')}</h2>
-      <div className="space-y-3 mb-10">
-        {faqs.map((f, i) => (
-          <details key={i} className="bg-white/5 border border-white/10 rounded-xl p-5 group">
-            <summary className="cursor-pointer font-bold flex items-center justify-between">
-              {f.q}
-              <span className="text-violet-400 group-open:rotate-180 transition-transform">▾</span>
-            </summary>
-            <p className="mt-3 text-white/70 whitespace-pre-wrap">{f.a}</p>
-          </details>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold">{t('help.faq_title', 'Frequently asked questions')}</h2>
+        <Link to="/help/faq" className="text-sm text-violet-400 hover:text-violet-300">
+          {t('help.faq_view_all', 'View full FAQ →')}
+        </Link>
+      </div>
+      <div className="space-y-8 mb-10">
+        {categories.length === 0 && (
+          <div className="text-white/50 text-center py-8">Loading FAQs…</div>
+        )}
+        {categories.map((cat) => (
+          <div key={cat.id}>
+            <div className="flex items-center gap-2 mb-3">
+              <CategoryIcon name={cat.icon} className="w-5 h-5 text-violet-400" />
+              <h3 className="font-bold text-lg">{cat.title}</h3>
+            </div>
+            {cat.diagram && (
+              <div className="mb-4 rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                <img src={cat.diagram} alt={`${cat.title} diagram`} className="w-full h-auto" loading="lazy" />
+              </div>
+            )}
+            <div className="space-y-3">
+              {cat.items.map((f, i) => (
+                <details key={i} className="bg-white/5 border border-white/10 rounded-xl p-5 group">
+                  <summary className="cursor-pointer font-bold flex items-center justify-between gap-4">
+                    <span>{f.q}</span>
+                    <span className="text-violet-400 group-open:rotate-180 transition-transform shrink-0">▾</span>
+                  </summary>
+                  <p className="mt-3 text-white/70 whitespace-pre-wrap">{f.a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 

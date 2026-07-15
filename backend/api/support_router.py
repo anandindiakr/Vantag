@@ -29,7 +29,8 @@ _bearer = HTTPBearer(auto_error=False)
 
 # ─── Vantag Knowledge Base (burned into the system prompt) ─────────────────
 VANTAG_SYSTEM_PROMPT = """You are Vantag Assistant — the official AI support agent for Vantag
-(also branded as "Retail Nazar" in India, "JagaJaga" in Malaysia, and "Retail Bantay" in the Philippines).
+(also branded as "Retail Nazar" in India, "JagaJaga" in Malaysia, "Retail Bantay" in the
+Philippines, and "RetailPantau" in Indonesia).
 
 # What Vantag is
 Vantag is a hardware-agnostic Retail Security & Predictive Analytics SaaS platform
@@ -63,23 +64,26 @@ snapshots to the Vantag cloud dashboard.
 - Singapore: Starter S$29/mo, Growth S$69/mo, Pro S$129/mo
 - Malaysia: Starter RM49/mo, Growth RM129/mo, Pro RM249/mo
 - Philippines: Starter ₱1,299/mo (2 cam), Growth ₱2,999/mo (10 cam), Pro ₱5,999/mo (30 cam)
-- Payment: Razorpay (India), Xendit (Singapore, Malaysia, Philippines — supports GCash, Maya, GrabPay)
+- Indonesia: Starter Rp450.000/mo (2 cam), Growth Rp1.200.000/mo (10 cam), Pro Rp2.500.000/mo (30 cam)
+- Payment: Razorpay (India), Xendit (Singapore, Malaysia, Philippines, Indonesia — supports GCash, Maya, GrabPay, OVO, DANA)
 
 # Domains & branding
 - India: retailnazar.com, retailnazar.in, retailnazar.info (brand: "Retail Nazar")
 - Singapore: retail-vantag.com (brand: "Vantag — Retail Intelligence")
 - Malaysia: retailjagajaga.com, jagajaga.my (brand: "JagaJaga")
 - Philippines: retailbantay.com (brand: "Retail Bantay")
+- Indonesia: retailpantau.com (brand: "RetailPantau")
 
 # Setup (Plug & Play, under 30 minutes)
 1. Register on the web portal or mobile (email, phone, store name, country)
-2. Pick a plan; pay via Razorpay
+2. Pick a plan; pay via Razorpay/Xendit
 3. From dashboard, click "Install Edge Agent" → download for Windows/Linux/Mac
 4. Run install.ps1 (Win) or install.sh (Linux/Mac) on a local PC/Pi
 5. Paste Cloud URL + Tenant ID (shown in dashboard)
 6. Agent auto-scans LAN for RTSP cameras (192.168.x.x port 554)
 7. Confirm cameras in dashboard, draw zones (drag boxes on snapshot)
-8. Live alerts start flowing
+8. Wait ~2 minutes for the agent to finish loading its AI libraries and
+   connect each camera — live alerts start flowing after that
 
 # CCTV & networking knowledge
 - Most IP cameras speak RTSP on port 554. URL pattern: rtsp://user:pass@ip:554/stream1
@@ -102,14 +106,94 @@ snapshots to the Vantag cloud dashboard.
 - Video stays on-premise; only events leave the LAN
 - Multi-tenant isolation at DB row level (tenant_id)
 
+# NVR / DVR limitations (important — answer honestly, do not overstate)
+- Cameras and NVR/DVR channels connect via RTSP the same way individual IP
+  cameras do. Hikvision NVR channel URL pattern:
+  rtsp://user:pass@NVR-IP:554/Streaming/Channels/101 (channel 1, main stream)
+  or /102 for channel 1 sub-stream. Dahua/CP Plus pattern:
+  rtsp://user:pass@NVR-IP:554/cam/realmonitor?channel=1&subtype=0
+  (subtype=0 main, subtype=1 sub).
+- If the camera/NVR password contains special characters (# @ % : / etc.)
+  they MUST be URL-encoded in the RTSP string (e.g. # becomes %23, @ becomes
+  %40) or the connection will silently fail.
+- Pulling many simultaneous RTSP streams from one NVR is CPU/bandwidth
+  limited — both on the NVR itself and on the PC running the Edge Agent.
+  Symptom: some cameras load fine, others go blank or "offline" after a
+  minute. Fix: use the NVR's SUB-stream (lower resolution) for live preview
+  channels instead of the main stream, and make sure the Edge Agent PC has
+  a wired (not WiFi) connection to the NVR when running many channels.
+- Some older NVR firmware only allows a limited number of concurrent RTSP
+  client connections (commonly 4–8) system-wide across ALL apps/viewers
+  combined — if VLC or another NVR viewer app is also open at the same time,
+  it competes for that same limited slot pool.
+- H.265 (HEVC) streams may not decode on older Edge Agent versions — if a
+  channel won't load, try switching that channel's encoding to H.264 in the
+  NVR's video settings, or use the sub-stream (usually H.264 by default).
+
+# Alert delivery (WhatsApp / SMS / Email)
+- Vantag can push real-time alerts via WhatsApp, SMS, Slack, Microsoft Teams,
+  and email/generic webhook when a HIGH-severity event is detected (theft/
+  sweeping, tamper, fall, restricted-zone entry, watchlist match, accident).
+- These channels are configured server-side (backend/webhooks/webhooks.yaml)
+  by the Vantag/Retail Nazar team during onboarding — connecting a phone
+  number or Slack/Teams webhook URL is not a self-service toggle in the
+  dashboard today. Direct users who want this enabled to email support with
+  their phone number (in international format, e.g. +91XXXXXXXXXX) and
+  preferred channel (WhatsApp or SMS).
+- WhatsApp alerts require the recipient number to have joined the Twilio
+  WhatsApp sandbox (or use an approved WhatsApp Business sender in
+  production) before messages will deliver.
+- If a user says "I detected an event but got no alert", the likely causes
+  are: (1) the event's severity was below the configured threshold (most
+  SMS/WhatsApp routes are HIGH-only to avoid alert fatigue), (2) the phone
+  number/webhook URL is still a placeholder and hasn't been configured yet,
+  or (3) for WhatsApp, the recipient hasn't joined the sandbox.
+
+# Common installation mistakes (mention proactively when relevant)
+1. Edge Agent PC and cameras on DIFFERENT networks/WiFi — the #1 cause of
+   "cameras not found" or "offline" issues. Both must be on the exact same
+   router/LAN, not just "the same building."
+2. Using the WiFi guest network — guest networks isolate devices from each
+   other by design, so the Edge Agent PC won't be able to see the cameras
+   even though both show as "connected to WiFi."
+3. Closing the Edge Agent terminal/window — the agent must keep running in
+   the background for cameras to stay online and stream.
+4. Not waiting long enough after starting the Edge Agent — after launch, the
+   agent needs about 1–2 minutes to initialize, load its AI libraries, and
+   connect to each configured camera one by one. Cameras will appear
+   "connecting" then flip to "online" individually — this is normal, not a
+   bug. Always advise users to wait ~2 minutes before assuming something
+   is broken.
+5. Windows Firewall or antivirus silently blocking the agent's network
+   access — if cameras never come online despite being on the same network,
+   check Windows Defender Firewall settings and allow the Edge Agent /
+   python.exe through.
+6. Running two copies of the Edge Agent at once (e.g. after a restart the
+   old process wasn't closed) — causes port conflicts and flaky camera
+   status.
+7. Changing camera video settings (resolution/codec) without power-cycling
+   the camera afterward — some cameras need a reboot for new settings to
+   take effect.
+
 # When to escalate
 If the user's question is outside your knowledge, or they need account-specific
 action (refund, password reset via a human, custom integration, enterprise
-pricing), direct them to email support@retail-vantag.com.
+pricing, enabling WhatsApp/SMS/Slack alerts), direct them to email
+support@retail-vantag.com.
 
-# Tone
-Be concise, friendly, confident, and technical where needed. Never make up
-features that don't exist. If unsure, say so and point to support email.
+# Tone & grounding rules (critical)
+- Be concise, friendly, confident, and technical where needed.
+- NEVER invent features, prices, timelines, or behavior that isn't described
+  in this knowledge base. If you don't know something, say so plainly and
+  point to the support email instead of guessing.
+- Stay strictly on the topic the user actually asked about — do not pad
+  answers with unrelated information "just in case."
+- If a user's message is ambiguous, ask a short clarifying question rather
+  than assuming and answering the wrong thing.
+- When troubleshooting camera/network issues, always ask or check: (a) is
+  the Edge Agent PC on the exact same network as the cameras, (b) has the
+  user waited ~2 minutes after starting the agent, (c) is the RTSP
+  URL/credentials correct. These three cover the majority of real issues.
 """
 
 
@@ -168,6 +252,7 @@ _FALLBACK_KEYWORDS = {
         "• Singapore: S$29–S$129/mo\n"
         "• Malaysia: RM49–RM249/mo\n"
         "• Philippines: ₱1,299–₱5,999/mo\n"
+        "• Indonesia: Rp450.000–Rp2.500.000/mo\n"
         "Each plan tier covers more cameras. See our Pricing section for details."
     ),
     "setup": (
@@ -177,13 +262,27 @@ _FALLBACK_KEYWORDS = {
         "3. Run installer on local PC/Pi\n"
         "4. Paste Cloud URL + Tenant ID\n"
         "5. Agent auto-scans your LAN for cameras\n"
-        "6. Confirm in dashboard and draw zones"
+        "6. Confirm in dashboard and draw zones\n"
+        "7. Wait ~2 minutes for the agent to finish loading before checking live feed"
     ),
     "camera": (
         "Vantag works with any IP camera that speaks RTSP (port 554). "
         "The Edge Agent auto-discovers cameras on your LAN. "
-        "If cameras show offline, check they're powered, on the same LAN as the "
-        "Edge Agent, and reachable at rtsp://ip:554."
+        "If cameras show offline, check they're powered, on the SAME LAN as the "
+        "Edge Agent PC (not a guest WiFi network), and reachable at rtsp://ip:554."
+    ),
+    "nvr": (
+        "NVR/DVR channels work over RTSP too. Hikvision pattern: "
+        "rtsp://user:pass@NVR-IP:554/Streaming/Channels/101. Dahua/CP Plus: "
+        "rtsp://user:pass@NVR-IP:554/cam/realmonitor?channel=1&subtype=0. "
+        "If several channels drop out, use the NVR's sub-stream instead of "
+        "main stream, and use a wired connection for the Edge Agent PC."
+    ),
+    "alert": (
+        "Vantag can send WhatsApp, SMS, Slack, Teams, or email alerts on "
+        "HIGH-severity events (theft, tamper, fall, restricted zone entry). "
+        "These channels are configured by our team during onboarding — email "
+        f"{SUPPORT_EMAIL} with your phone number and preferred channel to enable them."
     ),
     "mqtt": (
         "MQTT is used for door-lock commands and edge telemetry. "
@@ -286,210 +385,400 @@ async def submit_feedback(
 
 @support_router.get("/faq")
 async def get_faq() -> dict:
-    """Static FAQ content served from backend (easy to update without rebuild)."""
+    """Categorized FAQ content served from backend (easy to update without
+    rebuild). Each category may include a `diagram` image path (served from
+    frontend/public/images/faq/) that the UI can render alongside the items."""
     return {
-        "faqs": [
+        "categories": [
             {
-                "q": "What is Vantag?",
-                "a": "Vantag is a SaaS retail security platform that uses AI on any IP "
-                     "camera to detect theft, loitering, empty shelves, falls, and more.",
+                "id": "getting-started",
+                "title": "Getting Started",
+                "icon": "Rocket",
+                "diagram": "/images/faq/edge-agent-install-flow.png",
+                "items": [
+                    {
+                        "q": "What is Vantag?",
+                        "a": "Vantag is a SaaS retail security platform that uses AI on any IP "
+                             "camera to detect theft, loitering, empty shelves, falls, and more.",
+                    },
+                    {
+                        "q": "Do I need special hardware?",
+                        "a": "No. Vantag works with any generic IP camera that supports RTSP. "
+                             "You only need a PC, tablet, or Raspberry Pi to run the Edge Agent.",
+                    },
+                    {
+                        "q": "How long does setup take?",
+                        "a": "Under 30 minutes for most retailers: register → pay → download "
+                             "Edge Agent → run installer → auto-scan cameras → confirm zones. "
+                             "After the agent starts, allow about 2 minutes for it to finish "
+                             "loading its AI libraries and connect each camera before checking "
+                             "the live feed.",
+                    },
+                    {
+                        "q": "What if I don't have a PC?",
+                        "a": "A Raspberry Pi 4 or an old Android tablet runs the Edge Agent "
+                             "fine. We also sell a pre-configured Vantag Edge Box.",
+                    },
+                    {
+                        "q": "Can I cancel anytime?",
+                        "a": "Yes. Month-to-month, cancel in one click from the billing page.",
+                    },
+                    {
+                        "q": "Do you support my language?",
+                        "a": "We support 12 languages: English, Hindi, Tamil, Telugu, Kannada, "
+                             "Malayalam, Marathi, Gujarati, Bengali, Punjabi, Malay, and "
+                             "Mandarin. Switch from the top-right language picker.",
+                    },
+                ],
             },
             {
-                "q": "Do I need special hardware?",
-                "a": "No. Vantag works with any generic IP camera that supports RTSP. "
-                     "You only need a PC, tablet, or Raspberry Pi to run the Edge Agent.",
+                "id": "network-camera",
+                "title": "Finding Your Camera & Network Setup",
+                "icon": "Wifi",
+                "diagram": "/images/faq/network-same-lan.png",
+                "items": [
+                    {
+                        "q": "Does my PC (the one running the Edge Agent) need to be on the same WiFi as the cameras?",
+                        "a": "Yes — the PC running the Edge Agent must be connected to the same "
+                             "network (WiFi or LAN cable) as your cameras. The cameras and the "
+                             "PC need to be able to \"talk\" to each other directly inside your "
+                             "store's network. A cloud VPS can never reach camera IPs like "
+                             "192.168.x.x directly — that's basic IP routing, not a bug.",
+                    },
+                    {
+                        "q": "I don't know the IP address of my camera. How do I find it?",
+                        "a": "The easiest way is to log into your WiFi router (usually by typing "
+                             "192.168.1.1 or 192.168.0.1 into your browser). Look for a section "
+                             "called \"Connected Devices\", \"DHCP Clients\", or \"Device List\" — "
+                             "your camera will appear there with its IP address. It usually looks "
+                             "like 192.168.1.xx.",
+                    },
+                    {
+                        "q": "Can I find my camera's IP address from the camera's own app?",
+                        "a": "Yes! Most camera brands have a phone app (Hikvision uses iVMS-4500, "
+                             "Dahua uses DMSS). Open the app, go to your camera's settings, and "
+                             "look for \"Network Settings\" or \"Device Info\" — the IP address is "
+                             "listed there.",
+                    },
+                    {
+                        "q": "My camera came with a CD or a tool — can I use that to find the IP?",
+                        "a": "Absolutely. Most brands include a \"search tool\" or \"IP scanner\" "
+                             "on their CD or available for free download (e.g. Hikvision's \"SADP "
+                             "Tool\", Dahua's \"ConfigTool\"). Install it on any Windows PC on the "
+                             "same network, run it, and it will automatically find all cameras and "
+                             "display their IP addresses.",
+                    },
+                    {
+                        "q": "I don't have a router login. Can I still find my camera's IP?",
+                        "a": "Yes. Download a free app called \"Fing\" on your phone (iOS or "
+                             "Android). Connect your phone to the same WiFi as your cameras, open "
+                             "Fing, and tap \"Scan Network.\" It lists every device connected to "
+                             "your network, including cameras, along with their IP addresses.",
+                    },
+                    {
+                        "q": "What is an RTSP link and where do I get it?",
+                        "a": "RTSP is just the address your camera uses to share its video. It "
+                             "looks like: rtsp://username:password@192.168.1.64:554/stream. The IP "
+                             "address part (192.168.1.64) is your camera's IP. The username and "
+                             "password are your camera's login. The /stream part varies by brand.",
+                    },
+                    {
+                        "q": "I don't know the username and password for my camera. What should I try?",
+                        "a": "Most cameras come with default credentials. Common ones are: admin / "
+                             "admin, admin / 12345, admin / (blank). Check the sticker on the back "
+                             "or bottom of your camera — it often shows the default login. If "
+                             "someone changed it and you don't know it, you can factory reset the "
+                             "camera (usually a small reset button held for 10 seconds).",
+                    },
+                    {
+                        "q": "My RTSP link isn't working. What could be wrong?",
+                        "a": "The three most common reasons are: (1) wrong IP address — double-check "
+                             "it with the steps above, (2) wrong username/password — try the "
+                             "defaults listed above, (3) the camera and your PC are on different "
+                             "networks — they must both be connected to the same router. If the "
+                             "password contains special characters (# @ % etc.) they must be "
+                             "URL-encoded (# → %23, @ → %40) or the connection will silently fail.",
+                    },
+                    {
+                        "q": "Can I use wireless (WiFi) cameras, or do they need to be wired?",
+                        "a": "Both work fine. WiFi cameras and wired (PoE/LAN) cameras are both "
+                             "supported, as long as they support the RTSP protocol. Wired cameras "
+                             "tend to be more reliable and are recommended for stores with 4+ cameras.",
+                    },
+                    {
+                        "q": "Do I need a fast internet connection?",
+                        "a": "The Edge Agent processes video locally on your PC — it does NOT "
+                             "upload video to the internet. You only need internet to send small "
+                             "alert snapshots and event data to the cloud. A basic 10 Mbps upload "
+                             "connection is more than enough even for 10+ cameras.",
+                    },
+                    {
+                        "q": "What happens if my internet goes down?",
+                        "a": "Your cameras keep recording and the Edge Agent keeps detecting "
+                             "incidents locally. Events are stored on your PC and automatically "
+                             "sync to the cloud once the internet comes back. You won't lose any "
+                             "detections.",
+                    },
+                    {
+                        "q": "Does my PC need to be on 24 hours a day?",
+                        "a": "Yes — for continuous monitoring, the PC running the Edge Agent "
+                             "should stay on. You can set Windows to never sleep (Control Panel → "
+                             "Power Options → \"Never\" sleep). Many stores use a small, "
+                             "low-power mini-PC for this purpose.",
+                    },
+                ],
             },
             {
-                "q": "How long does setup take?",
-                "a": "Under 30 minutes for most retailers. Register → pay → download "
-                     "Edge Agent → auto-scan cameras → confirm zones. Done.",
+                "id": "nvr",
+                "title": "NVR / DVR Compatibility & Limitations",
+                "icon": "HardDrive",
+                "items": [
+                    {
+                        "q": "I have a DVR/NVR. Can I connect it instead of individual cameras?",
+                        "a": "Yes. Most modern DVRs and NVRs (Hikvision, Dahua, CP Plus) support "
+                             "RTSP streaming per channel. Point the Edge Agent to the NVR's IP "
+                             "with a channel-specific RTSP URL instead of each camera's own IP. "
+                             "Hikvision: rtsp://user:pass@NVR-IP:554/Streaming/Channels/101 "
+                             "(channel 1 main stream, 102 = sub-stream). Dahua/CP Plus: "
+                             "rtsp://user:pass@NVR-IP:554/cam/realmonitor?channel=1&subtype=0.",
+                    },
+                    {
+                        "q": "Some NVR channels load fine but others go blank or offline after a minute. Why?",
+                        "a": "This is almost always an NVR/network bandwidth limitation, not a "
+                             "software bug — pulling many simultaneous main-stream RTSP feeds from "
+                             "one NVR is CPU and bandwidth heavy. Fix: switch the affected "
+                             "channels to the NVR's SUB-stream (lower resolution) for live "
+                             "preview, and use a wired (not WiFi) connection between the Edge "
+                             "Agent PC and the NVR.",
+                    },
+                    {
+                        "q": "Is there a limit on how many concurrent RTSP connections an NVR allows?",
+                        "a": "Yes — many NVR models, especially older firmware, cap concurrent "
+                             "RTSP client connections (commonly 4–8) across ALL apps combined. If "
+                             "you have VLC or another viewer open at the same time as the Edge "
+                             "Agent, they compete for that same limited pool. Close other viewers "
+                             "before testing.",
+                    },
+                    {
+                        "q": "A channel won't load at all even though others work. What should I check?",
+                        "a": "Check if that channel is set to H.265 (HEVC) — older Edge Agent "
+                             "versions may not decode H.265. Switch that channel's encoding to "
+                             "H.264 in the NVR's video settings, or use the sub-stream (usually "
+                             "H.264 by default).",
+                    },
+                    {
+                        "q": "My NVR password has special characters like # or @ — the RTSP link fails.",
+                        "a": "Special characters in the password must be URL-encoded in the RTSP "
+                             "string or the connection silently fails. Common encodings: # → %23, "
+                             "@ → %40, % → %25. Example: a password Pass#1 becomes Pass%231 in the "
+                             "RTSP URL.",
+                    },
+                ],
             },
             {
-                "q": "Is my video uploaded to the cloud?",
-                "a": "No. Video processing happens locally on your Edge Agent. Only "
-                     "events (e.g., 'theft detected at 14:32') and evidence snapshots "
-                     "are uploaded — saving bandwidth and keeping video private.",
+                "id": "alerts",
+                "title": "Setting Up Alerts (WhatsApp, SMS, Email)",
+                "icon": "Bell",
+                "diagram": "/images/faq/alert-setup-flow.png",
+                "items": [
+                    {
+                        "q": "Can I get an alert via SMS, WhatsApp, or email when theft is detected?",
+                        "a": "Yes. Vantag can push real-time alerts via WhatsApp, SMS, Slack, "
+                             "Microsoft Teams, or email/webhook whenever a HIGH-severity event "
+                             "fires — theft/sweeping, camera tampering, a fall, someone entering a "
+                             "restricted zone, or a watchlist match.",
+                    },
+                    {
+                        "q": "How do I turn on WhatsApp or SMS alerts for my store?",
+                        "a": f"These channels are configured by our team during onboarding — it "
+                             f"isn't yet a self-service toggle in the dashboard. Email "
+                             f"{SUPPORT_EMAIL} with your phone number in international format "
+                             f"(e.g. +91XXXXXXXXXX) and your preferred channel (WhatsApp or SMS), "
+                             f"and we'll enable it for your account.",
+                    },
+                    {
+                        "q": "I detected an event but didn't get an alert. Why?",
+                        "a": "Three common causes: (1) the event's severity was below the "
+                             "configured alert threshold — most SMS/WhatsApp routes are HIGH-only "
+                             "to avoid alert fatigue, (2) your phone number or webhook URL hasn't "
+                             "been configured yet, or (3) for WhatsApp specifically, the recipient "
+                             "number hasn't joined the WhatsApp sandbox/business sender yet.",
+                    },
+                    {
+                        "q": "Do I need to do anything special to receive WhatsApp alerts?",
+                        "a": "Yes — the recipient's WhatsApp number needs to join the sandbox (or "
+                             "be an approved production sender) before messages will deliver. If "
+                             "you set up WhatsApp alerts and see nothing arrive, this is the first "
+                             "thing to check.",
+                    },
+                    {
+                        "q": "Can I also connect alerts to Slack or Microsoft Teams?",
+                        "a": f"Yes, Vantag supports Slack and Microsoft Teams webhook alerts in "
+                             f"addition to WhatsApp/SMS/email. Email {SUPPORT_EMAIL} with your "
+                             f"webhook URL to enable it.",
+                    },
+                ],
             },
             {
-                "q": "What cameras are supported?",
-                "a": "Any IP camera with RTSP support: Dahua, Hikvision, CP Plus, "
-                     "Reolink, Uniview, TP-Link Tapo, and hundreds of generic brands.",
+                "id": "install-mistakes",
+                "title": "Mistakes to Avoid During Installation",
+                "icon": "AlertTriangle",
+                "items": [
+                    {
+                        "q": "What is the #1 mistake people make when installing the Edge Agent?",
+                        "a": "Running the Edge Agent PC on a DIFFERENT network/WiFi than the "
+                             "cameras. Both must be connected to the exact same router/LAN — not "
+                             "just \"the same building\" or \"the same office WiFi name\" if that "
+                             "name maps to two different networks (e.g. a guest network).",
+                    },
+                    {
+                        "q": "I connected to the WiFi guest network — is that a problem?",
+                        "a": "Yes. Guest WiFi networks isolate devices from each other by design, "
+                             "so even though the Edge Agent PC and cameras both show \"Connected\" "
+                             "to WiFi, they can't actually see each other. Always use the main "
+                             "(non-guest) network for both the PC and the cameras.",
+                    },
+                    {
+                        "q": "How long should I wait after starting the Edge Agent before checking the live feed?",
+                        "a": "Please wait about 2 minutes. After launch, the agent needs time to "
+                             "initialize, load its AI libraries, and connect to each configured "
+                             "camera one at a time. Cameras will show \"connecting\" and then flip "
+                             "to \"online\" individually — this is expected behavior, not a fault.",
+                    },
+                    {
+                        "q": "Can I close the Edge Agent window after it starts?",
+                        "a": "No — the Edge Agent must keep running in the background the entire "
+                             "time you want cameras online. Closing its terminal/window stops all "
+                             "camera connections immediately.",
+                    },
+                    {
+                        "q": "Cameras are on the same network but still won't connect. What else could block it?",
+                        "a": "Check Windows Firewall or antivirus — they can silently block the "
+                             "Edge Agent's network access even when everything else is correct. "
+                             "Allow the Edge Agent (python.exe) through Windows Defender Firewall.",
+                    },
+                    {
+                        "q": "I restarted the Edge Agent but camera status looks inconsistent/flaky.",
+                        "a": "Make sure only ONE copy of the Edge Agent is running. If the old "
+                             "process wasn't fully closed before restarting, you can end up with "
+                             "two instances competing for the same ports, causing flaky status.",
+                    },
+                    {
+                        "q": "I changed my camera's resolution/codec setting but nothing changed.",
+                        "a": "Some cameras require a power cycle (unplug and replug, or reboot "
+                             "from their web interface) before new video settings take effect.",
+                    },
+                ],
             },
             {
-                "q": "What if I don't have a PC?",
-                "a": "A Raspberry Pi 4 or an old Android tablet runs the Edge Agent "
-                     "fine. We also sell a pre-configured Vantag Edge Box.",
+                "id": "ai-features",
+                "title": "AI Detection Features & Accuracy",
+                "icon": "Brain",
+                "items": [
+                    {
+                        "q": "What cameras are supported?",
+                        "a": "Any IP camera with RTSP support: Dahua, Hikvision, CP Plus, "
+                             "Reolink, Uniview, TP-Link Tapo, and hundreds of generic brands. It "
+                             "does NOT work with old analog CCTV cameras unless you have a "
+                             "DVR/NVR that supports RTSP output.",
+                    },
+                    {
+                        "q": "Is my video uploaded to the cloud?",
+                        "a": "No. Video processing happens locally on your Edge Agent. Only "
+                             "events (e.g., 'theft detected at 14:32') and evidence snapshots "
+                             "are uploaded — saving bandwidth and keeping video private.",
+                    },
+                    {
+                        "q": "How accurate is the AI?",
+                        "a": "Typical accuracy: 92–95% on theft/sweeping, 88% on loitering, "
+                             "95%+ on empty shelves. Accuracy improves as you tune zones.",
+                    },
+                    {
+                        "q": "I bought cameras from a local shop with no brand name. Will they work?",
+                        "a": "Likely yes — most generic IP cameras sold locally use standard "
+                             "RTSP. Try the RTSP URL format: rtsp://admin:admin@[camera-IP]:554/"
+                             "stream1. If that doesn't work, check the camera's web interface "
+                             "(open the camera IP in a browser) and look for \"Video Stream\" or "
+                             "\"RTSP\" settings.",
+                    },
+                    {
+                        "q": "The app says \"Connection Failed\" for my camera. What do I do?",
+                        "a": "Check these in order: (1) Can you open the camera's IP in a browser "
+                             "from the same PC? If not, the camera and PC are not on the same "
+                             "network. (2) Is the username/password correct? (3) Try pinging the "
+                             "camera: open Command Prompt and type ping 192.168.1.xx (replace "
+                             "with your camera's IP). If it says \"Request timed out,\" the camera "
+                             "is not reachable.",
+                    },
+                    {
+                        "q": "I can see my camera but the video is blurry or choppy.",
+                        "a": "This usually means the camera is set to a high resolution that the "
+                             "network can't handle smoothly. Log into your camera's web interface, "
+                             "go to Video Settings, and lower the main stream resolution to 1080p "
+                             "or 720p, and the bitrate to 2048–4096 Kbps. This gives a clear "
+                             "picture without overloading the network.",
+                    },
+                    {
+                        "q": "I want to monitor my store remotely from my phone. Do I need extra setup?",
+                        "a": "No extra setup needed. The Edge Agent automatically sends live "
+                             "previews and alerts to the cloud, which you can view from the "
+                             "dashboard on any phone or browser. You do not need to set up port "
+                             "forwarding or expose your cameras to the internet.",
+                    },
+                ],
             },
             {
-                "q": "Can I cancel anytime?",
-                "a": "Yes. Month-to-month, cancel in one click from the billing page.",
+                "id": "billing",
+                "title": "Billing & Plans",
+                "icon": "CreditCard",
+                "items": [
+                    {
+                        "q": "How much does Vantag cost?",
+                        "a": "Pricing varies by region and camera count:\n"
+                             "• India: ₹999–₹4,999/mo\n"
+                             "• Singapore: S$29–S$129/mo\n"
+                             "• Malaysia: RM49–RM249/mo\n"
+                             "• Philippines: ₱1,299–₱5,999/mo\n"
+                             "• Indonesia: Rp450.000–Rp2.500.000/mo",
+                    },
+                    {
+                        "q": "Can I cancel anytime?",
+                        "a": "Yes. Month-to-month, cancel in one click from the billing page.",
+                    },
+                    {
+                        "q": "What payment methods are supported?",
+                        "a": "Razorpay for India. Xendit for Singapore, Malaysia, Philippines, "
+                             "and Indonesia — supporting GCash, Maya, GrabPay, OVO, and DANA in "
+                             "addition to cards.",
+                    },
+                ],
             },
             {
-                "q": "Do you support my language?",
-                "a": "We support 12 languages: English, Hindi, Tamil, Telugu, Kannada, "
-                     "Malayalam, Marathi, Gujarati, Bengali, Punjabi, Malay, and "
-                     "Mandarin. Switch from the top-right language picker.",
-            },
-            {
-                "q": "What happens if internet goes down?",
-                "a": "The Edge Agent continues detecting events locally and queues "
-                     "them. When connectivity returns, queued events sync to the cloud.",
-            },
-            {
-                "q": "How accurate is the AI?",
-                "a": "Typical accuracy: 92–95% on theft/sweeping, 88% on loitering, "
-                     "95%+ on empty shelves. Accuracy improves as you tune zones.",
-            },
-
-            # ── Finding Your Camera's IP Address ──
-            {
-                "q": "I don't know the IP address of my camera. How do I find it?",
-                "a": "The easiest way is to log into your WiFi router (usually by typing "
-                     "192.168.1.1 or 192.168.0.1 into your browser). Look for a section "
-                     "called \"Connected Devices\", \"DHCP Clients\", or \"Device List\" — "
-                     "your camera will appear there with its IP address. It usually looks "
-                     "like 192.168.1.xx.",
-            },
-            {
-                "q": "Can I find my camera's IP address from the camera's own app?",
-                "a": "Yes! Most camera brands have a phone app (Hikvision uses iVMS-4500, "
-                     "Dahua uses DMSS). Open the app, go to your camera's settings, and "
-                     "look for \"Network Settings\" or \"Device Info\" — the IP address is "
-                     "listed there.",
-            },
-            {
-                "q": "My camera came with a CD or a tool — can I use that to find the IP?",
-                "a": "Absolutely. Most brands include a \"search tool\" or \"IP scanner\" "
-                     "on their CD or available for free download (e.g. Hikvision's \"SADP "
-                     "Tool\", Dahua's \"ConfigTool\"). Install it on any Windows PC on the "
-                     "same network, run it, and it will automatically find all cameras and "
-                     "display their IP addresses.",
-            },
-            {
-                "q": "I don't have a router login. Can I still find my camera's IP?",
-                "a": "Yes. Download a free app called \"Fing\" on your phone (iOS or "
-                     "Android). Connect your phone to the same WiFi as your cameras, open "
-                     "Fing, and tap \"Scan Network.\" It lists every device connected to "
-                     "your network, including cameras, along with their IP addresses.",
-            },
-
-            # ── RTSP & Camera Streams ──
-            {
-                "q": "What is an RTSP link and where do I get it?",
-                "a": "RTSP is just the address your camera uses to share its video. It "
-                     "looks like: rtsp://username:password@192.168.1.64:554/stream. The IP "
-                     "address part (192.168.1.64) is your camera's IP. The username and "
-                     "password are your camera's login. The /stream part varies by brand — "
-                     "we have a list of common formats in our camera compatibility guide.",
-            },
-            {
-                "q": "I don't know the username and password for my camera. What should I try?",
-                "a": "Most cameras come with default credentials. Common ones are: admin / "
-                     "admin, admin / 12345, admin / (blank). Check the sticker on the back "
-                     "or bottom of your camera — it often shows the default login. If "
-                     "someone changed it and you don't know it, you can factory reset the "
-                     "camera (usually a small reset button held for 10 seconds).",
-            },
-            {
-                "q": "My RTSP link isn't working. What could be wrong?",
-                "a": "The three most common reasons are: (1) wrong IP address — double-check "
-                     "it with the steps above, (2) wrong username/password — try the "
-                     "defaults listed above, (3) the camera and your PC are on different "
-                     "networks — they must both be connected to the same router.",
-            },
-
-            # ── Network & PC Setup ──
-            {
-                "q": "Does my PC (the one running Nazar) need to be on the same WiFi as the cameras?",
-                "a": "Yes — the PC running the Nazar agent must be connected to the same "
-                     "network (WiFi or LAN cable) as your cameras. The cameras and the PC "
-                     "need to be able to \"talk\" to each other directly inside your "
-                     "store's network.",
-            },
-            {
-                "q": "Can I use wireless (WiFi) cameras, or do they need to be wired?",
-                "a": "Both work fine. WiFi cameras and wired (PoE/LAN) cameras are both "
-                     "supported, as long as they support the RTSP protocol. Wired cameras "
-                     "tend to be more reliable and are recommended for stores with 4+ cameras.",
-            },
-            {
-                "q": "Do I need a fast internet connection?",
-                "a": "Nazar processes video locally on your PC — it does NOT upload video to "
-                     "the internet. You only need internet to send small alert snapshots and "
-                     "event data to the cloud. A basic 10 Mbps upload connection is more "
-                     "than enough even for 10+ cameras.",
-            },
-            {
-                "q": "What happens if my internet goes down?",
-                "a": "Your cameras keep recording and Nazar keeps detecting incidents "
-                     "locally. Events are stored on your PC and automatically sync to the "
-                     "cloud once the internet comes back. You won't lose any detections.",
-            },
-            {
-                "q": "Does my PC need to be on 24 hours a day?",
-                "a": "Yes — for continuous monitoring, the PC running Nazar should stay on. "
-                     "You can set Windows to never sleep (Control Panel → Power Options → "
-                     "\"Never\" sleep). Many stores use a small, low-power mini-PC for this "
-                     "purpose.",
-            },
-
-            # ── Camera Compatibility ──
-            {
-                "q": "Will my existing cameras work with Nazar?",
-                "a": "Nazar works with any IP camera that supports RTSP streaming — this "
-                     "includes most cameras from Hikvision, Dahua, CP Plus, Godrej, Axis, "
-                     "Reolink, and most generic Chinese IP cameras. It does NOT work with "
-                     "old analog CCTV cameras unless you have a DVR/NVR that supports RTSP "
-                     "output.",
-            },
-            {
-                "q": "I have a DVR/NVR. Can I connect Nazar to it?",
-                "a": "Yes! Most modern DVRs and NVRs (Hikvision, Dahua, CP Plus) support "
-                     "RTSP streaming for each channel. You can point Nazar to the NVR's "
-                     "RTSP stream instead of individual cameras. The IP address will be "
-                     "your NVR's IP, and each camera has a channel number in the stream URL "
-                     "(e.g. channel=1, channel=2).",
-            },
-            {
-                "q": "I bought cameras from a local shop and they have no brand name. Will they work?",
-                "a": "Likely yes — most generic IP cameras sold in India use standard RTSP. "
-                     "Try the RTSP URL format: rtsp://admin:admin@[camera-IP]:554/stream1. "
-                     "If that doesn't work, check the camera's web interface (open the "
-                     "camera IP in a browser) and look for \"Video Stream\" or \"RTSP\" "
-                     "settings.",
-            },
-
-            # ── Installation & Troubleshooting ──
-            {
-                "q": "The Nazar app says \"Connection Failed\" for my camera. What do I do?",
-                "a": "Check these in order: (1) Can you open the camera's IP in a browser "
-                     "from the same PC? If not, the camera and PC are not on the same "
-                     "network. (2) Is the username/password correct? (3) Try pinging the "
-                     "camera: open Command Prompt and type ping 192.168.1.xx (replace with "
-                     "your camera's IP). If it says \"Request timed out,\" the camera is "
-                     "not reachable.",
-            },
-            {
-                "q": "I can see my camera in the Nazar app but the video is blurry or choppy.",
-                "a": "This usually means the camera is set to a high resolution that the "
-                     "network can't handle smoothly. Log into your camera's web interface, "
-                     "go to Video Settings, and lower the main stream resolution to 1080p "
-                     "or 720p, and the bitrate to 2048–4096 Kbps. This gives a clear "
-                     "picture without overloading the network.",
-            },
-            {
-                "q": "My camera has a static IP (doesn't change) — do I need to do anything differently?",
-                "a": "No — static IPs are actually better for Nazar because the camera "
-                     "address never changes. Just enter the static IP when adding the "
-                     "camera. No extra steps needed.",
-            },
-            {
-                "q": "I want to monitor my store remotely from my phone. Do I need to do anything extra?",
-                "a": "No extra setup needed on your end. Nazar automatically sends live "
-                     "previews and alerts to the cloud, which you can view from the Nazar "
-                     "dashboard on any phone or browser. You do not need to set up port "
-                     "forwarding or expose your cameras to the internet — the Nazar agent "
-                     "handles it securely.",
+                "id": "security",
+                "title": "Security & Privacy",
+                "icon": "Shield",
+                "items": [
+                    {
+                        "q": "Is my video uploaded anywhere?",
+                        "a": "No. Video processing happens entirely on your local Edge Agent. "
+                             "Only event metadata and evidence snapshots (small images) are sent "
+                             "to the cloud — saving bandwidth and keeping full video private to "
+                             "your store.",
+                    },
+                    {
+                        "q": "How is my data secured?",
+                        "a": "All traffic uses TLS 1.2+ (auto-renewed Let's Encrypt certificates), "
+                             "passwords are hashed with bcrypt, and every tenant's data is "
+                             "isolated at the database row level (tenant_id) so one store can "
+                             "never see another's data.",
+                    },
+                    {
+                        "q": "Does my camera footage ever leave my network?",
+                        "a": "No — full video stays on-premise on your Edge Agent PC. Only "
+                             "compressed event snapshots and metadata leave your local network "
+                             "when an alert fires.",
+                    },
+                ],
             },
         ]
     }
