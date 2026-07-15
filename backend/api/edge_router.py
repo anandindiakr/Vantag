@@ -47,6 +47,11 @@ logger = logging.getLogger("vantag.edge")
 # demo_router / stores_router so edge incidents fan out to the live dashboard.
 _pipeline = None  # type: ignore[assignment]
 
+# Populated by main.py via set_webhook_engine() — same WebhookEngine instance
+# used by pos_router, so edge detection events (shoplifting, tamper, etc.)
+# can trigger outbound SMS/WhatsApp/Slack/Teams alerts.
+_webhook_engine = None  # type: ignore[assignment]
+
 # Snapshot root that snapshots_router serves at
 # /api/snapshots/{tenant_id}/{camera_id}/{filename}
 _SNAPSHOTS_ROOT = Path(__file__).resolve().parent.parent.parent / "snapshots"
@@ -55,6 +60,13 @@ _SNAPSHOTS_ROOT = Path(__file__).resolve().parent.parent.parent / "snapshots"
 def set_pipeline(p) -> None:  # type: ignore[no-untyped-def]
     global _pipeline  # noqa: PLW0603
     _pipeline = p
+
+
+def set_webhook_engine(engine) -> None:  # type: ignore[no-untyped-def]
+    """Inject the shared WebhookEngine so edge detection events can trigger
+    outbound alerts (SMS/WhatsApp via Twilio, Slack, Teams, generic HTTP)."""
+    global _webhook_engine  # noqa: PLW0603
+    _webhook_engine = engine
 
 
 # ---------------------------------------------------------------------------
@@ -620,6 +632,7 @@ async def ingest_event(
         else None
     ) or f"{body.event_type.replace('_', ' ').title()} detected on {body.camera_id}"
     incident = {
+        "id": event.id,
         "incident_id": event.id,
         "type": body.event_type,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -638,6 +651,15 @@ async def ingest_event(
         await _emit_edge_event(incident, store_id)
     except Exception:  # noqa: BLE001
         pass
+
+    # 5) Fan the incident out to any matching outbound alert subscriptions
+    #    (SMS/WhatsApp via Twilio, Slack, Teams, generic HTTP) — fire-and-forget
+    #    so a slow/unreachable webhook endpoint never delays the agent's response.
+    if _webhook_engine is not None:
+        try:
+            asyncio.create_task(_webhook_engine.dispatch(incident))
+        except Exception:  # noqa: BLE001
+            logger.exception("Failed to schedule webhook dispatch for event %s", event.id)
 
     return {"ok": True, "event_id": event.id}
 

@@ -247,10 +247,18 @@ class TeamsConnector(BaseConnector):
 
 class TwilioConnector(BaseConnector):
     """
-    Sends an SMS via the Twilio REST API.
+    Sends an SMS or WhatsApp message via the Twilio REST API.
 
     Required subscription keys:
       twilio_account_sid, twilio_auth_token, twilio_from, twilio_to
+
+    Optional:
+      twilio_channel: "sms" (default) or "whatsapp". When set to
+      "whatsapp", the from/to numbers are automatically prefixed with
+      "whatsapp:" as required by the Twilio WhatsApp API. The from
+      number must be a Twilio WhatsApp-enabled sender (e.g. the Twilio
+      Sandbox number +14155238886, or an approved WhatsApp Business
+      sender), and the to number must have opted in / joined the sandbox.
     """
 
     async def send(self, event: dict, client: httpx.AsyncClient) -> httpx.Response:
@@ -259,12 +267,19 @@ class TwilioConnector(BaseConnector):
         auth_token = sub.get("twilio_auth_token", "")
         from_number = sub.get("twilio_from", "")
         to_number = sub.get("twilio_to", "")
+        channel = str(sub.get("twilio_channel", "sms")).strip().lower()
 
         if not all([account_sid, auth_token, from_number, to_number]):
             raise ValueError(
                 "TwilioConnector: missing twilio_account_sid, twilio_auth_token, "
                 "twilio_from, or twilio_to in subscription config."
             )
+
+        if channel == "whatsapp":
+            if not from_number.startswith("whatsapp:"):
+                from_number = f"whatsapp:{from_number}"
+            if not to_number.startswith("whatsapp:"):
+                to_number = f"whatsapp:{to_number}"
 
         event_type = str(event.get("type", "event")).replace("_", " ").title()
         severity = str(event.get("severity", "UNKNOWN"))
@@ -277,7 +292,7 @@ class TwilioConnector(BaseConnector):
             f"Camera: {event.get('camera_id', 'N/A')}\n"
             f"Time: {timestamp}\n"
             f"{event.get('description', '')}"
-        )[:1600]  # Twilio SMS limit
+        )[:1600]  # Twilio SMS/WhatsApp body limit
 
         url = (
             f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"

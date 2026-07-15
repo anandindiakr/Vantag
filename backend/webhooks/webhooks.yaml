@@ -8,8 +8,16 @@
 #   Only events at or above the threshold are dispatched.
 #
 # Event types (use "*" to match all):
-#   sweeping, dwell, empty_shelf, watchlist_match, queue,
-#   accident, staff_alert, tamper, pos_anomaly
+#   sweeping, shoplifting, tamper, fall_detected, restricted_zone,
+#   loitering, watchlist_match, face_match, queue, inventory_movement,
+#   dwell, empty_shelf, accident, staff_alert, pos_anomaly
+#
+# Twilio connector options:
+#   twilio_channel: "sms" (default) or "whatsapp". For WhatsApp, set
+#   twilio_from to your Twilio WhatsApp-enabled sender (e.g. the sandbox
+#   number "+14155238886") and twilio_to to a number that has joined the
+#   sandbox / is an approved recipient. Both are auto-prefixed with
+#   "whatsapp:" — do not add the prefix yourself in the YAML.
 
 webhooks:
   - id: slack-high-alerts
@@ -18,8 +26,11 @@ webhooks:
     url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
     event_types:
       - sweeping
+      - shoplifting
       - watchlist_match
       - tamper
+      - fall_detected
+      - restricted_zone
     severity_threshold: HIGH
 
   - id: slack-pos-anomalies
@@ -38,15 +49,22 @@ webhooks:
       - accident
       - tamper
       - watchlist_match
+      - shoplifting
     severity_threshold: HIGH
 
   - id: sms-emergency
-    name: "SMS Emergency"
+    name: "SMS/WhatsApp Theft & Emergency Alerts"
     connector: twilio
     event_types:
-      - accident
+      - shoplifting
+      - sweeping
       - tamper
+      - fall_detected
+      - restricted_zone
+      - watchlist_match
+      - accident
     severity_threshold: HIGH
+    twilio_channel: "sms"   # change to "whatsapp" to send via WhatsApp instead
     twilio_account_sid: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     twilio_auth_token: "your_twilio_auth_token_here"
     twilio_from: "+15551234567"

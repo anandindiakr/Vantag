@@ -167,6 +167,33 @@ async def ingest_transaction(
     anomaly = _pos.ingest_transaction(raw)
 
     if anomaly is not None:
+        if _webhook_engine is not None:
+            try:
+                import asyncio
+
+                asyncio.create_task(
+                    _webhook_engine.dispatch(
+                        {
+                            "id": anomaly.transaction_id,
+                            "type": "pos_anomaly",
+                            "severity": (
+                                "HIGH" if anomaly.risk_score >= 0.7 else "MEDIUM"
+                            ),
+                            "store_id": anomaly.store_id,
+                            "camera_id": anomaly.camera_id,
+                            "timestamp": anomaly.timestamp.isoformat(),
+                            "description": (
+                                f"POS anomaly ({anomaly.anomaly_type}) — cashier "
+                                f"{anomaly.cashier_id}: {anomaly.notes}"
+                            ),
+                        }
+                    )
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "Failed to schedule webhook dispatch for POS anomaly %s",
+                    anomaly.transaction_id,
+                )
         return TransactionIngestResponse(
             transaction_id=body.transaction_id,
             anomaly_detected=True,

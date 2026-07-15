@@ -58,6 +58,7 @@ from .onboarding_router import onboarding_router
 from .tenants_router import tenants_router
 from .edge_router import edge_router, agent_download_router
 from .edge_router import set_pipeline as edge_set_pipeline
+from .edge_router import set_webhook_engine as edge_set_webhook_engine
 from .billing_router import billing_router
 from .camera_probe_router import camera_probe_router
 from .demo_router import router as demo_router
@@ -193,6 +194,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         config_path=str(Path(__file__).parent.parent / "webhooks" / "webhooks.yaml")
     )
     set_webhook_engine(_webhook_engine)
+    edge_set_webhook_engine(_webhook_engine)
 
     # ------------------------------------------------------------------
     # 4. Snapshot directories + SQLite incident store.

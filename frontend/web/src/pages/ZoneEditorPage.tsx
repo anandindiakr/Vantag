@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
-import { RefreshCw, Save, Trash2, CheckCircle, Loader2, AlertCircle, Undo2 } from 'lucide-react';
+import { RefreshCw, Save, Trash2, CheckCircle, Loader2, AlertCircle, Undo2, Pencil, X, Check } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { api } from '../hooks/useApi';
@@ -103,6 +103,11 @@ export default function ZoneEditorPage() {
 
   // Hover highlight
   const [hoveredId,   setHoveredId]   = useState<string | null>(null);
+
+  // Inline rename (edit) state
+  const [editingId,   setEditingId]   = useState<string | null>(null);
+  const [editValue,   setEditValue]   = useState('');
+  const [deletingId,  setDeletingId]  = useState<string | null>(null);
 
   // Guide animation
   const [guideTick,   setGuideTick]   = useState(0);
@@ -414,28 +419,41 @@ export default function ZoneEditorPage() {
 
   // ── Save zones ────────────────────────────────────────────────────────────
 
+  // Build the API request body from a given zone list (used by save, delete, and rename)
+  const buildZonesBody = (list: Zone[]) => ({
+    shelf_zones: list
+      .filter((z) => z.type === 'shelf')
+      .map((z) => ({ label: z.label, bbox: z.bbox, zone_type: 'shelf' })),
+    queue_zones: list
+      .filter((z) => z.type === 'queue')
+      .map((z) => ({ label: z.label, bbox: z.bbox, zone_type: 'queue', max_queue: z.maxQueue ?? 5 })),
+    restricted_zones: list
+      .filter((z) => z.type === 'restricted')
+      .map((z) => {
+        // Store as 4-corner polygon (backend accepts both formats)
+        const [x1, y1, x2, y2] = z.bbox;
+        return { name: z.label, polygon: [[x1,y1],[x2,y1],[x2,y2],[x1,y2]], severity: 'critical' };
+      }),
+  });
+
+  // Shared persistence helper — PUTs the given zone list to the backend.
+  // Returns true on success, false on failure (and surfaces the real error message).
+  const persistZones = async (list: Zone[], successMsg?: string): Promise<boolean> => {
+    try {
+      await api.put(`/zones/cameras/${camId}`, buildZonesBody(list));
+      if (successMsg) toast.success(successMsg);
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save zones.';
+      toast.error(message);
+      return false;
+    }
+  };
+
   const saveZones = async () => {
     setSaving(true);
     try {
-      const body = {
-        shelf_zones: zones
-          .filter((z) => z.type === 'shelf')
-          .map((z) => ({ label: z.label, bbox: z.bbox, zone_type: 'shelf' })),
-        queue_zones: zones
-          .filter((z) => z.type === 'queue')
-          .map((z) => ({ label: z.label, bbox: z.bbox, zone_type: 'queue', max_queue: z.maxQueue ?? 5 })),
-        restricted_zones: zones
-          .filter((z) => z.type === 'restricted')
-          .map((z) => {
-            // Store as 4-corner polygon (backend accepts both formats)
-            const [x1, y1, x2, y2] = z.bbox;
-            return { name: z.label, polygon: [[x1,y1],[x2,y1],[x2,y2],[x1,y2]], severity: 'critical' };
-          }),
-      };
-      await api.put(`/zones/cameras/${camId}`, body);
-      toast.success('Zones saved! AI pipeline reloads within 5 seconds.');
-    } catch {
-      toast.error('Failed to save zones.');
+      await persistZones(zones, 'Zones saved! AI pipeline reloads within 5 seconds.');
     } finally {
       setSaving(false);
     }
@@ -474,7 +492,44 @@ export default function ZoneEditorPage() {
     }
   };
 
-  const deleteZone = (id: string) => setZones((z) => z.filter((zz) => zz.id !== id));
+  const deleteZone = async (id: string) => {
+    const previous = zones;
+    const next = zones.filter((zz) => zz.id !== id);
+    setDeletingId(id);
+    setZones(next);
+    const ok = await persistZones(next, 'Zone deleted.');
+    if (!ok) setZones(previous); // roll back on failure
+    setDeletingId(null);
+  };
+
+  // ── Rename a zone ─────────────────────────────────────────────────────────
+
+  const startEditZone = (zone: Zone) => {
+    setEditingId(zone.id);
+    setEditValue(zone.label);
+  };
+
+  const cancelEditZone = () => {
+    setEditingId(null);
+    setEditValue('');
+  };
+
+  const confirmEditZone = async (id: string) => {
+    const trimmed = editValue.trim();
+    if (!trimmed) { cancelEditZone(); return; }
+    const previous = zones;
+    const next = zones.map((zz) => (zz.id === id ? { ...zz, label: trimmed } : zz));
+    setZones(next);
+    setEditingId(null);
+    setEditValue('');
+    const ok = await persistZones(next, 'Zone renamed.');
+    if (!ok) setZones(previous); // roll back on failure
+  };
+
+  const onEditKeyDown = (e: KeyboardEvent<HTMLInputElement>, id: string) => {
+    if (e.key === 'Enter') confirmEditZone(id);
+    if (e.key === 'Escape') cancelEditZone();
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -713,19 +768,50 @@ export default function ZoneEditorPage() {
                       onMouseLeave={() => setHoveredId(null)}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           <span
                             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                             style={{ background: meta.hex }}
                           />
-                          <span className="text-sm font-medium text-slate-200 truncate">{zone.label}</span>
+                          {editingId === zone.id ? (
+                            <input
+                              autoFocus
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => onEditKeyDown(e, zone.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="min-w-0 flex-1 bg-slate-800 border border-slate-600 rounded px-2 py-0.5 text-sm text-slate-100 focus:outline-none focus:ring-1"
+                              style={{ '--tw-ring-color': meta.hex } as React.CSSProperties}
+                            />
+                          ) : (
+                            <span className="text-sm font-medium text-slate-200 truncate">{zone.label}</span>
+                          )}
                         </div>
-                        <span
-                          className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-                          style={{ background: `${meta.hex}22`, color: meta.hex, border: `1px solid ${meta.hex}44` }}
-                        >
-                          {meta.label}
-                        </span>
+                        {editingId === zone.id ? (
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => confirmEditZone(zone.id)}
+                              className="p-1 rounded text-green-400 hover:bg-green-500/10"
+                              title="Confirm rename (Enter)"
+                            >
+                              <Check size={13} />
+                            </button>
+                            <button
+                              onClick={cancelEditZone}
+                              className="p-1 rounded text-slate-400 hover:bg-slate-700"
+                              title="Cancel rename (Esc)"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ) : (
+                          <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: `${meta.hex}22`, color: meta.hex, border: `1px solid ${meta.hex}44` }}
+                          >
+                            {meta.label}
+                          </span>
+                        )}
                       </div>
 
                       <p className="text-[10px] text-slate-600 font-mono">
@@ -735,7 +821,7 @@ export default function ZoneEditorPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => testZone(zone)}
-                          disabled={testing === zone.id}
+                          disabled={testing === zone.id || deletingId === zone.id}
                           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs hover:bg-blue-500/20 transition-colors disabled:opacity-50"
                         >
                           {testing === zone.id
@@ -744,11 +830,22 @@ export default function ZoneEditorPage() {
                           Test Event
                         </button>
                         <button
+                          onClick={() => startEditZone(zone)}
+                          disabled={deletingId === zone.id}
+                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-500/10 border border-slate-500/30 text-slate-300 text-xs hover:bg-slate-500/20 transition-colors disabled:opacity-50"
+                          title="Rename zone"
+                        >
+                          <Pencil size={11} />
+                        </button>
+                        <button
                           onClick={() => deleteZone(zone.id)}
-                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs hover:bg-red-500/20 transition-colors"
+                          disabled={deletingId === zone.id}
+                          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs hover:bg-red-500/20 transition-colors disabled:opacity-50"
                           title="Delete zone"
                         >
-                          <Trash2 size={11} />
+                          {deletingId === zone.id
+                            ? <Loader2 size={11} className="animate-spin" />
+                            : <Trash2 size={11} />}
                         </button>
                       </div>
                     </div>
