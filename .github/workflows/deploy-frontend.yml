@@ -51,22 +51,10 @@ jobs:
             # devDependencies like cross-env. Force a full dev install.
             export NODE_ENV=development
 
-            # The VPS filesystem sometimes keeps directories locked, so node_modules
-            # deletion needs to be forced and retried. Move it aside first (instant),
-            # then delete in the background so it cannot block the install.
-            set +e
-            if [ -d node_modules ]; then
-              OLD=node_modules.old.$$
-              mv node_modules "$OLD" || true
-              (nohup rm -rf "$OLD" >/dev/null 2>&1 &) || true
-            fi
-            npm cache clean --force >/dev/null 2>&1 || true
-            set -e
+            # Avoid npm ci which aggressively re-creates node_modules and can fail
+            # on this VPS filesystem (ENOTEMPTY). npm install repairs in place.
+            npm install
 
-            if ! npm ci; then
-              echo "npm ci failed — falling back to npm install"
-              npm install
-            fi
             if ! npm run build:in; then
               echo "Build failed — restoring previous dist/"
               rm -rf dist
