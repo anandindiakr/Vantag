@@ -15,6 +15,7 @@ from ..db.models.tenant import Tenant, EdgeAgent
 from ..db.models.camera import CameraConfig
 from ..db.models.event import DetectionEvent
 from ..middleware.tenant_middleware import get_current_user_id
+from ..services.tenant_alerts import send_test_alert
 
 tenants_router = APIRouter(prefix="/api/tenants", tags=["tenants"])
 
@@ -68,6 +69,79 @@ async def update_settings(
         )
         await session.commit()
     return {"updated": True, **updates}
+
+
+@tenants_router.get("/me/alert-settings")
+async def get_alert_settings(
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    result = await session.execute(select(Tenant).where(Tenant.id == user["tenant_id"]))
+    tenant = result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    settings = getattr(tenant, "alert_settings", None) or {}
+    # Never echo back auth tokens in full — mask for display, keep functional on save (user resubmits changed fields only if edited).
+    return {"alert_settings": settings}
+
+
+class AlertSettingsBody(BaseModel):
+    min_severity: str | None = None  # LOW | MEDIUM | HIGH | CRITICAL
+    sms: dict | None = None
+    whatsapp: dict | None = None
+    email: dict | None = None
+
+
+@tenants_router.patch("/me/alert-settings")
+async def update_alert_settings(
+    body: AlertSettingsBody,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    result = await session.execute(select(Tenant).where(Tenant.id == user["tenant_id"]))
+    tenant = result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    current = dict(getattr(tenant, "alert_settings", None) or {})
+    updates = body.model_dump(exclude_unset=True)
+    for key, value in updates.items():
+        if value is not None and isinstance(current.get(key), dict) and isinstance(value, dict):
+            merged = dict(current[key])
+            merged.update(value)
+            current[key] = merged
+        else:
+            current[key] = value
+
+    await session.execute(
+        update(Tenant).where(Tenant.id == user["tenant_id"]).values(alert_settings=current)
+    )
+    await session.commit()
+    return {"updated": True, "alert_settings": current}
+
+
+class TestAlertBody(BaseModel):
+    channel: str  # sms | whatsapp | email
+    alert_settings: dict | None = None  # optional unsaved override for test-before-save
+
+
+@tenants_router.post("/me/alert-settings/test")
+async def test_alert_settings(
+    body: TestAlertBody,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if body.alert_settings is not None:
+        settings = body.alert_settings
+    else:
+        result = await session.execute(select(Tenant).where(Tenant.id == user["tenant_id"]))
+        tenant = result.scalar_one_or_none()
+        if not tenant:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        settings = getattr(tenant, "alert_settings", None) or {}
+
+    outcome = await send_test_alert(settings, body.channel)
+    return outcome
 
 
 @tenants_router.get("/me/cameras")

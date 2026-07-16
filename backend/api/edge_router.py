@@ -34,6 +34,7 @@ from ..db.models.tenant import EdgeAgent, Tenant
 from ..db.models.camera import CameraConfig
 from ..db.models.event import DetectionEvent
 from ..middleware.tenant_middleware import get_current_user_id
+from ..services.tenant_alerts import dispatch_tenant_alert
 
 edge_router = APIRouter(prefix="/api/edge", tags=["edge-agent"])
 
@@ -660,6 +661,18 @@ async def ingest_event(
             asyncio.create_task(_webhook_engine.dispatch(incident))
         except Exception:  # noqa: BLE001
             logger.exception("Failed to schedule webhook dispatch for event %s", event.id)
+
+    # 6) Fan the incident out to the tenant's own Alert Dispatch settings
+    #    (SMS/WhatsApp via their own Twilio creds, Email) — configured from
+    #    Account > Alert Dispatch. Independent of the platform webhooks.yaml.
+    try:
+        tenant_alert_settings = (
+            await session.execute(select(Tenant.alert_settings).where(Tenant.id == agent.tenant_id))
+        ).scalar_one_or_none()
+        if tenant_alert_settings:
+            asyncio.create_task(dispatch_tenant_alert(tenant_alert_settings, incident))
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to schedule tenant alert dispatch for event %s", event.id)
 
     return {"ok": True, "event_id": event.id}
 

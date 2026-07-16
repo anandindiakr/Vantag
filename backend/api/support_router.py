@@ -130,24 +130,34 @@ snapshots to the Vantag cloud dashboard.
   channel won't load, try switching that channel's encoding to H.264 in the
   NVR's video settings, or use the sub-stream (usually H.264 by default).
 
-# Alert delivery (WhatsApp / SMS / Email)
-- Vantag can push real-time alerts via WhatsApp, SMS, Slack, Microsoft Teams,
-  and email/generic webhook when a HIGH-severity event is detected (theft/
-  sweeping, tamper, fall, restricted-zone entry, watchlist match, accident).
-- These channels are configured server-side (backend/webhooks/webhooks.yaml)
-  by the Vantag/Retail Nazar team during onboarding — connecting a phone
-  number or Slack/Teams webhook URL is not a self-service toggle in the
-  dashboard today. Direct users who want this enabled to email support with
-  their phone number (in international format, e.g. +91XXXXXXXXXX) and
-  preferred channel (WhatsApp or SMS).
+# Alert delivery (WhatsApp / SMS / Email) — SELF-SERVICE
+- Vantag can push real-time alerts via SMS, WhatsApp, and Email whenever an
+  event at or above a chosen severity threshold is detected (theft/sweeping,
+  tamper, fall, restricted-zone entry, watchlist match, accident).
+- This is fully self-service: go to Account → Alert Dispatch tab in the
+  dashboard. Each channel (SMS, WhatsApp, Email) has its own enable toggle,
+  a "Min. severity" threshold selector (LOW/MEDIUM/HIGH/CRITICAL), and a
+  "Test" button to verify the configuration before relying on it.
+- SMS and WhatsApp use Twilio. The user needs their own Twilio Account SID,
+  Auth Token, a Twilio From-number (or WhatsApp sender), and the To-number
+  that should receive alerts (international format, e.g. +91XXXXXXXXXX).
+  Free Twilio trial accounts work for testing.
+- Email alerts only need a "To email" address — no extra credentials
+  required, it uses the platform's own email sending.
+- Click "Test" on any channel to fire an instant test alert without waiting
+  for a real incident — the result (success or the exact error, e.g. wrong
+  Twilio credentials) is shown immediately in the dashboard.
 - WhatsApp alerts require the recipient number to have joined the Twilio
   WhatsApp sandbox (or use an approved WhatsApp Business sender in
   production) before messages will deliver.
 - If a user says "I detected an event but got no alert", the likely causes
-  are: (1) the event's severity was below the configured threshold (most
-  SMS/WhatsApp routes are HIGH-only to avoid alert fatigue), (2) the phone
-  number/webhook URL is still a placeholder and hasn't been configured yet,
-  or (3) for WhatsApp, the recipient hasn't joined the sandbox.
+  are: (1) the channel toggle isn't enabled, (2) the event's severity was
+  below the configured "Min. severity" threshold, (3) Twilio credentials are
+  wrong/expired — use the Test button to confirm, or (4) for WhatsApp, the
+  recipient hasn't joined the sandbox yet.
+- This is a newer capability than the old "email support to enable alerts"
+  process — if a user has an older impression that alerts require emailing
+  support, correct them: it's now self-service from Account → Alert Dispatch.
 
 # Common installation mistakes (mention proactively when relevant)
 1. Edge Agent PC and cameras on DIFFERENT networks/WiFi — the #1 cause of
@@ -279,10 +289,11 @@ _FALLBACK_KEYWORDS = {
         "main stream, and use a wired connection for the Edge Agent PC."
     ),
     "alert": (
-        "Vantag can send WhatsApp, SMS, Slack, Teams, or email alerts on "
-        "HIGH-severity events (theft, tamper, fall, restricted zone entry). "
-        "These channels are configured by our team during onboarding — email "
-        f"{SUPPORT_EMAIL} with your phone number and preferred channel to enable them."
+        "Vantag sends SMS, WhatsApp, and Email alerts on theft, tamper, fall, "
+        "and restricted-zone events. Configure them yourself: go to Account → "
+        "Alert Dispatch tab, enable each channel, enter your Twilio credentials "
+        "(for SMS/WhatsApp) or a To-email address, set the minimum severity, "
+        "then press the Test button on each channel to verify delivery."
     ),
     "mqtt": (
         "MQTT is used for door-lock commands and edge telemetry. "
@@ -583,39 +594,61 @@ async def get_faq() -> dict:
                 "items": [
                     {
                         "q": "Can I get an alert via SMS, WhatsApp, or email when theft is detected?",
-                        "a": "Yes. Vantag can push real-time alerts via WhatsApp, SMS, Slack, "
-                             "Microsoft Teams, or email/webhook whenever a HIGH-severity event "
-                             "fires — theft/sweeping, camera tampering, a fall, someone entering a "
-                             "restricted zone, or a watchlist match.",
+                        "a": "Yes. Vantag can push real-time alerts via SMS, WhatsApp, or Email "
+                             "whenever an event at or above your chosen severity fires — "
+                             "theft/sweeping, camera tampering, a fall, someone entering a "
+                             "restricted zone, or a watchlist match. You configure this yourself "
+                             "in the dashboard under Account → Alert Dispatch.",
                     },
                     {
                         "q": "How do I turn on WhatsApp or SMS alerts for my store?",
-                        "a": f"These channels are configured by our team during onboarding — it "
-                             f"isn't yet a self-service toggle in the dashboard. Email "
-                             f"{SUPPORT_EMAIL} with your phone number in international format "
-                             f"(e.g. +91XXXXXXXXXX) and your preferred channel (WhatsApp or SMS), "
-                             f"and we'll enable it for your account.",
+                        "a": "Go to Account → Alert Dispatch in the dashboard. Enable the SMS or "
+                             "WhatsApp toggle and fill in your Twilio Account SID, Auth Token, "
+                             "From-number (or WhatsApp sender), and the To-number that should "
+                             "receive alerts in international format (e.g. +91XXXXXXXXXX). A free "
+                             "Twilio trial account works for testing. Pick a minimum severity "
+                             "(most stores use HIGH to avoid alert fatigue), press Save, then "
+                             "press the Test button — a test message is sent immediately so you "
+                             "can confirm everything works before a real incident.",
+                    },
+                    {
+                        "q": "How do I set up Email alerts?",
+                        "a": "Email is the simplest channel: in Account → Alert Dispatch, enable "
+                             "the Email toggle, enter the To-email address, choose a minimum "
+                             "severity, save, and press Test. No Twilio or other credentials are "
+                             "needed — it uses the platform's own email sending.",
                     },
                     {
                         "q": "I detected an event but didn't get an alert. Why?",
-                        "a": "Three common causes: (1) the event's severity was below the "
-                             "configured alert threshold — most SMS/WhatsApp routes are HIGH-only "
-                             "to avoid alert fatigue, (2) your phone number or webhook URL hasn't "
-                             "been configured yet, or (3) for WhatsApp specifically, the recipient "
-                             "number hasn't joined the WhatsApp sandbox/business sender yet.",
+                        "a": "Check these in order: (1) the channel toggle in Account → Alert "
+                             "Dispatch is actually enabled, (2) the event's severity was at or "
+                             "above your configured minimum severity (e.g. a MEDIUM event won't "
+                             "trigger a HIGH-only route), (3) your Twilio credentials are correct "
+                             "— press the Test button, which shows the exact error if they're "
+                             "wrong or expired, and (4) for WhatsApp specifically, the recipient "
+                             "number must have joined the Twilio WhatsApp sandbox (or use an "
+                             "approved business sender).",
                     },
                     {
                         "q": "Do I need to do anything special to receive WhatsApp alerts?",
-                        "a": "Yes — the recipient's WhatsApp number needs to join the sandbox (or "
-                             "be an approved production sender) before messages will deliver. If "
-                             "you set up WhatsApp alerts and see nothing arrive, this is the first "
-                             "thing to check.",
+                        "a": "Yes — the recipient's WhatsApp number needs to join the Twilio "
+                             "WhatsApp sandbox (or be an approved production sender) before "
+                             "messages will deliver. If the Test button reports success on SMS "
+                             "but WhatsApp shows nothing, this is the first thing to check.",
+                    },
+                    {
+                        "q": "What does the Test button do?",
+                        "a": "It fires an instant test alert through that channel using your "
+                             "saved settings — no real incident needed. The result appears "
+                             "immediately in the dashboard: a success confirmation, or the exact "
+                             "error (e.g. invalid Twilio credentials, unverified number) so you "
+                             "can troubleshoot before relying on the channel.",
                     },
                     {
                         "q": "Can I also connect alerts to Slack or Microsoft Teams?",
-                        "a": f"Yes, Vantag supports Slack and Microsoft Teams webhook alerts in "
-                             f"addition to WhatsApp/SMS/email. Email {SUPPORT_EMAIL} with your "
-                             f"webhook URL to enable it.",
+                        "a": f"Slack and Microsoft Teams webhook routes are supported at the "
+                             f"platform level but are not yet self-service in the dashboard. "
+                             f"Email {SUPPORT_EMAIL} with your webhook URL to enable them.",
                     },
                 ],
             },

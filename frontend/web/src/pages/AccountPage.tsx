@@ -12,7 +12,7 @@ import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
   User, Building2, Network, Download, Copy,
-  CheckCircle2, Loader2, RefreshCw, Cpu,
+  CheckCircle2, Loader2, RefreshCw, Cpu, Bell, Send, XCircle,
 } from 'lucide-react';
 import { api } from '../hooks/useApi';
 
@@ -44,6 +44,26 @@ interface AgentKeyInfo {
   agent_id: string;
   device_type: string;
   device_name: string;
+}
+
+interface TwilioChannelSettings {
+  enabled?: boolean;
+  account_sid?: string;
+  auth_token?: string;
+  from_number?: string;
+  to_number?: string;
+}
+
+interface EmailChannelSettings {
+  enabled?: boolean;
+  to_email?: string;
+}
+
+interface AlertSettings {
+  min_severity?: string;
+  sms?: TwilioChannelSettings;
+  whatsapp?: TwilioChannelSettings;
+  email?: EmailChannelSettings;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -111,13 +131,25 @@ export default function AccountPage() {
   const [nvrBrand, setNvrBrand] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Alert Dispatch form state
+  const [alertSettings, setAlertSettings] = useState<AlertSettings>({
+    min_severity: 'MEDIUM',
+    sms: { enabled: false, account_sid: '', auth_token: '', from_number: '', to_number: '' },
+    whatsapp: { enabled: false, account_sid: '', auth_token: '', from_number: '', to_number: '' },
+    email: { enabled: false, to_email: '' },
+  });
+  const [savingAlerts, setSavingAlerts] = useState(false);
+  const [testingChannel, setTestingChannel] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<Record<string, { ok: boolean; message: string }>>({});
+
   useEffect(() => {
     setLoadingProfile(true);
     // Load profile + agent key in parallel
     Promise.allSettled([
       api.get<TenantProfile>('/tenants/me'),
       api.get<AgentKeyInfo>('/tenants/me/api-key'),
-    ]).then(([profileRes, agentRes]) => {
+      api.get<{ alert_settings: AlertSettings }>('/tenants/me/alert-settings'),
+    ]).then(([profileRes, agentRes, alertRes]) => {
       if (profileRes.status === 'fulfilled') {
         // api.get returns AxiosResponse; actual payload is in .data
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,6 +165,17 @@ export default function AccountPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const k: AgentKeyInfo = (agentRes.value as any).data ?? agentRes.value;
         setAgentKey(k);
+      }
+      if (alertRes.status === 'fulfilled') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const payload = (alertRes.value as any).data ?? alertRes.value;
+        const loaded: AlertSettings = payload?.alert_settings ?? {};
+        setAlertSettings((prev) => ({
+          min_severity: loaded.min_severity ?? prev.min_severity,
+          sms: { ...prev.sms, ...loaded.sms },
+          whatsapp: { ...prev.whatsapp, ...loaded.whatsapp },
+          email: { ...prev.email, ...loaded.email },
+        }));
       }
     }).finally(() => setLoadingProfile(false));
   }, []);
@@ -156,6 +199,56 @@ export default function AccountPage() {
       toast.error('Failed to save settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateChannel = (
+    channel: 'sms' | 'whatsapp' | 'email',
+    patch: Partial<TwilioChannelSettings & EmailChannelSettings>,
+  ) => {
+    setAlertSettings((prev) => ({
+      ...prev,
+      [channel]: { ...(prev[channel] as object), ...patch },
+    }));
+  };
+
+  const saveAlertSettings = async () => {
+    setSavingAlerts(true);
+    try {
+      await api.patch('/tenants/me/alert-settings', alertSettings);
+      toast.success('Alert dispatch settings saved');
+    } catch {
+      toast.error('Failed to save alert settings');
+    } finally {
+      setSavingAlerts(false);
+    }
+  };
+
+  const testChannel = async (channel: 'sms' | 'whatsapp' | 'email') => {
+    setTestingChannel(channel);
+    setTestResult((prev) => ({ ...prev, [channel]: undefined as unknown as { ok: boolean; message: string } }));
+    try {
+      const res = await api.post('/tenants/me/alert-settings/test', {
+        channel,
+        alert_settings: alertSettings,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const payload = (res as any).data ?? res;
+      const ok = payload?.success ?? payload?.ok ?? true;
+      const message = payload?.message ?? payload?.detail ?? (ok ? 'Test alert sent successfully' : 'Test failed');
+      setTestResult((prev) => ({ ...prev, [channel]: { ok, message } }));
+      if (ok) {
+        toast.success(`${channel.toUpperCase()} test alert sent`);
+      } else {
+        toast.error(message);
+      }
+    } catch (err) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const message = (err as any)?.response?.data?.detail ?? (err as any)?.message ?? 'Test failed — check credentials';
+      setTestResult((prev) => ({ ...prev, [channel]: { ok: false, message } }));
+      toast.error(message);
+    } finally {
+      setTestingChannel(null);
     }
   };
 
@@ -299,6 +392,197 @@ export default function AccountPage() {
             Save Network Settings
           </button>
         </div>
+      </SectionCard>
+
+      {/* ── Alert Dispatch ── */}
+      <SectionCard icon={Bell} title="Alert Dispatch">
+        <p className="text-xs text-white/40 mb-4">
+          Configure how you get notified when a theft, POS anomaly, or other security
+          event is detected. Enable SMS and/or WhatsApp (via Twilio) and/or Email, then
+          use <strong className="text-white/70">Test</strong> to verify each channel
+          before saving. See <strong className="text-white/70">Help Center → Alert Dispatch Setup</strong> for
+          a full walkthrough on getting Twilio credentials.
+        </p>
+
+        <div className="mb-5">
+          <label className="block text-xs font-medium text-white/60 mb-1.5">Minimum Severity to Alert</label>
+          <select
+            value={alertSettings.min_severity ?? 'MEDIUM'}
+            onChange={(e) => setAlertSettings((prev) => ({ ...prev, min_severity: e.target.value }))}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500/50 [&>option]:bg-gray-900"
+          >
+            <option value="LOW">LOW — alert on everything</option>
+            <option value="MEDIUM">MEDIUM — skip low-confidence events</option>
+            <option value="HIGH">HIGH — only confident detections</option>
+            <option value="CRITICAL">CRITICAL — only most severe events</option>
+          </select>
+        </div>
+
+        {/* SMS */}
+        <div className="p-4 bg-white/3 border border-white/8 rounded-xl mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-white">
+              <input
+                type="checkbox"
+                checked={!!alertSettings.sms?.enabled}
+                onChange={(e) => updateChannel('sms', { enabled: e.target.checked })}
+                className="w-4 h-4 accent-emerald-500"
+              />
+              SMS (via Twilio)
+            </label>
+            {testResult.sms && (
+              <span className={`flex items-center gap-1 text-xs ${testResult.sms.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                {testResult.sms.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                {testResult.sms.message}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              type="text"
+              placeholder="Twilio Account SID"
+              value={alertSettings.sms?.account_sid ?? ''}
+              onChange={(e) => updateChannel('sms', { account_sid: e.target.value })}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
+            />
+            <input
+              type="password"
+              placeholder="Twilio Auth Token"
+              value={alertSettings.sms?.auth_token ?? ''}
+              onChange={(e) => updateChannel('sms', { auth_token: e.target.value })}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
+            />
+            <input
+              type="text"
+              placeholder="From Number (e.g. +1415XXXXXXX)"
+              value={alertSettings.sms?.from_number ?? ''}
+              onChange={(e) => updateChannel('sms', { from_number: e.target.value })}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
+            />
+            <input
+              type="text"
+              placeholder="To Number (your phone, +91XXXXXXXXXX)"
+              value={alertSettings.sms?.to_number ?? ''}
+              onChange={(e) => updateChannel('sms', { to_number: e.target.value })}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
+            />
+          </div>
+          <button
+            onClick={() => testChannel('sms')}
+            disabled={testingChannel === 'sms'}
+            className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-40 rounded-lg text-xs font-medium text-white/70 hover:text-white transition-all"
+          >
+            {testingChannel === 'sms' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            Test SMS
+          </button>
+        </div>
+
+        {/* WhatsApp */}
+        <div className="p-4 bg-white/3 border border-white/8 rounded-xl mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-white">
+              <input
+                type="checkbox"
+                checked={!!alertSettings.whatsapp?.enabled}
+                onChange={(e) => updateChannel('whatsapp', { enabled: e.target.checked })}
+                className="w-4 h-4 accent-emerald-500"
+              />
+              WhatsApp (via Twilio)
+            </label>
+            {testResult.whatsapp && (
+              <span className={`flex items-center gap-1 text-xs ${testResult.whatsapp.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                {testResult.whatsapp.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                {testResult.whatsapp.message}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              type="text"
+              placeholder="Twilio Account SID"
+              value={alertSettings.whatsapp?.account_sid ?? ''}
+              onChange={(e) => updateChannel('whatsapp', { account_sid: e.target.value })}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
+            />
+            <input
+              type="password"
+              placeholder="Twilio Auth Token"
+              value={alertSettings.whatsapp?.auth_token ?? ''}
+              onChange={(e) => updateChannel('whatsapp', { auth_token: e.target.value })}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
+            />
+            <input
+              type="text"
+              placeholder="From Number (Twilio WhatsApp sandbox/number)"
+              value={alertSettings.whatsapp?.from_number ?? ''}
+              onChange={(e) => updateChannel('whatsapp', { from_number: e.target.value })}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
+            />
+            <input
+              type="text"
+              placeholder="To Number (your WhatsApp, +91XXXXXXXXXX)"
+              value={alertSettings.whatsapp?.to_number ?? ''}
+              onChange={(e) => updateChannel('whatsapp', { to_number: e.target.value })}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
+            />
+          </div>
+          <p className="text-[11px] text-white/25 mt-2">
+            The <code>whatsapp:</code> prefix is added automatically — enter plain phone numbers only.
+          </p>
+          <button
+            onClick={() => testChannel('whatsapp')}
+            disabled={testingChannel === 'whatsapp'}
+            className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-40 rounded-lg text-xs font-medium text-white/70 hover:text-white transition-all"
+          >
+            {testingChannel === 'whatsapp' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            Test WhatsApp
+          </button>
+        </div>
+
+        {/* Email */}
+        <div className="p-4 bg-white/3 border border-white/8 rounded-xl mb-5">
+          <div className="flex items-center justify-between mb-3">
+            <label className="flex items-center gap-2 text-sm font-semibold text-white">
+              <input
+                type="checkbox"
+                checked={!!alertSettings.email?.enabled}
+                onChange={(e) => updateChannel('email', { enabled: e.target.checked })}
+                className="w-4 h-4 accent-emerald-500"
+              />
+              Email
+            </label>
+            {testResult.email && (
+              <span className={`flex items-center gap-1 text-xs ${testResult.email.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                {testResult.email.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                {testResult.email.message}
+              </span>
+            )}
+          </div>
+          <input
+            type="email"
+            placeholder="Alert recipient email address"
+            value={alertSettings.email?.to_email ?? ''}
+            onChange={(e) => updateChannel('email', { to_email: e.target.value })}
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
+          />
+          <button
+            onClick={() => testChannel('email')}
+            disabled={testingChannel === 'email'}
+            className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-40 rounded-lg text-xs font-medium text-white/70 hover:text-white transition-all"
+          >
+            {testingChannel === 'email' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            Test Email
+          </button>
+        </div>
+
+        <button
+          onClick={saveAlertSettings}
+          disabled={savingAlerts}
+          className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 hover:border-emerald-500/50 disabled:opacity-40 rounded-xl text-sm font-semibold text-emerald-300 transition-all"
+        >
+          {savingAlerts ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          Save Alert Dispatch Settings
+        </button>
       </SectionCard>
 
       {/* ── Download config.json ── */}
