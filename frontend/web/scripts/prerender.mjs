@@ -21,7 +21,6 @@ import { mkdirSync, writeFileSync, existsSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const distDir = join(__dirname, '..', 'dist');
-const PORT = 4173;
 // Production origin to bake into canonical/OG/JSON-LD URLs. The prerender
 // browser only ever visits http://localhost:PORT, so any absolute URLs
 // captured from window.location.origin must be rewritten to the real
@@ -52,14 +51,18 @@ async function main() {
       rewrites: [{ source: '**', destination: '/index.html' }],
     })
   );
-  await new Promise((resolve) => server.listen(PORT, resolve));
-  console.log(`[prerender] static server on http://localhost:${PORT}`);
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const port = server.address().port;
+  console.log(`[prerender] static server on http://localhost:${port}`);
 
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
   for (const route of ROUTES) {
-    const url = `http://localhost:${PORT}${route}`;
+    const url = `http://127.0.0.1:${port}${route}`;
     try {
       await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
       // Give React a brief extra tick for any deferred effects (e.g. FAQ fetch).
@@ -68,7 +71,7 @@ async function main() {
       // Rewrite any localhost origin references (canonical, og:url, twitter:image,
       // JSON-LD @id/url fields set at runtime via window.location.origin) to the
       // real production domain.
-      html = html.split(`http://localhost:${PORT}`).join(BASE_URL);
+      html = html.split(`http://127.0.0.1:${port}`).join(BASE_URL);
 
       const outDir = route === '/' ? distDir : join(distDir, route.replace(/^\//, ''));
       mkdirSync(outDir, { recursive: true });
