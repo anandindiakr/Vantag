@@ -43,7 +43,13 @@ jobs:
 
             cd frontend/web
             rm -rf dist.bak
-            [ -d dist ] && cp -a dist dist.bak || true
+            if [ -d dist ]; then
+              cp -a dist dist.bak || true
+            fi
+
+            # The VPS environment may set NODE_ENV=production, which would skip
+            # devDependencies like cross-env. Force a full dev install.
+            export NODE_ENV=development
 
             # The VPS filesystem sometimes keeps directories locked, so node_modules
             # deletion needs to be forced and retried. Move it aside first (instant),
@@ -64,7 +70,11 @@ jobs:
             if ! npm run build:in; then
               echo "Build failed — restoring previous dist/"
               rm -rf dist
-              mv dist.bak dist
+              if [ -d dist.bak ]; then
+                mv dist.bak dist
+              else
+                echo "No dist.bak available to restore"
+              fi
               exit 1
             fi
 
@@ -100,7 +110,13 @@ jobs:
 
             cd frontend/web
             rm -rf dist.bak
-            [ -d dist ] && cp -a dist dist.bak || true
+            if [ -d dist ]; then
+              cp -a dist dist.bak || true
+            fi
+
+            # The VPS environment may set NODE_ENV=production, which would skip
+            # devDependencies like cross-env. Force a full dev install.
+            export NODE_ENV=development
 
             # The VPS filesystem sometimes keeps directories locked, so node_modules
             # deletion needs to be forced and retried. Move it aside first (instant),
@@ -121,7 +137,11 @@ jobs:
             if ! npm run build:sg; then
               echo "Build failed — restoring previous dist/"
               rm -rf dist
-              mv dist.bak dist
+              if [ -d dist.bak ]; then
+                mv dist.bak dist
+              else
+                echo "No dist.bak available to restore"
+              fi
               exit 1
             fi
 
@@ -155,7 +175,13 @@ jobs:
 
             cd frontend/web
             rm -rf dist.bak
-            [ -d dist ] && cp -a dist dist.bak || true
+            if [ -d dist ]; then
+              cp -a dist dist.bak || true
+            fi
+
+            # The VPS environment may set NODE_ENV=production, which would skip
+            # devDependencies like cross-env. Force a full dev install.
+            export NODE_ENV=development
 
             # The VPS filesystem sometimes keeps directories locked, so node_modules
             # deletion needs to be forced and retried. Move it aside first (instant),
@@ -176,7 +202,11 @@ jobs:
             if ! npm run build:ph; then
               echo "Build failed — restoring previous dist/"
               rm -rf dist
-              mv dist.bak dist
+              if [ -d dist.bak ]; then
+                mv dist.bak dist
+              else
+                echo "No dist.bak available to restore"
+              fi
               exit 1
             fi
 
@@ -210,7 +240,13 @@ jobs:
 
             cd frontend/web
             rm -rf dist.bak
-            [ -d dist ] && cp -a dist dist.bak || true
+            if [ -d dist ]; then
+              cp -a dist dist.bak || true
+            fi
+
+            # The VPS environment may set NODE_ENV=production, which would skip
+            # devDependencies like cross-env. Force a full dev install.
+            export NODE_ENV=development
 
             # The VPS filesystem sometimes keeps directories locked, so node_modules
             # deletion needs to be forced and retried. Move it aside first (instant),
@@ -231,7 +267,11 @@ jobs:
             if ! npm run build:my; then
               echo "Build failed — restoring previous dist/"
               rm -rf dist
-              mv dist.bak dist
+              if [ -d dist.bak ]; then
+                mv dist.bak dist
+              else
+                echo "No dist.bak available to restore"
+              fi
               exit 1
             fi
 
