@@ -46,23 +46,13 @@ jobs:
             [ -d dist ] && cp -a dist dist.bak || true
 
             # The VPS filesystem sometimes keeps directories locked, so node_modules
-            # deletion needs to be forced and retried. Stop any node process that may
-            # hold files open, then remove with retries.
+            # deletion needs to be forced and retried. Move it aside first (instant),
+            # then delete in the background so it cannot block the install.
             set +e
-            pkill -f "vite" 2>/dev/null
-            pkill -f "node.*frontend/web" 2>/dev/null
-            sleep 1
-            for i in 1 2 3; do
-              rm -rf node_modules
-              [ ! -d node_modules ] && break
-              echo "node_modules still present, retrying deletion ($i/3)..."
-              sync
-              sleep 2
-            done
             if [ -d node_modules ]; then
-              echo "rm -rf failed, falling back to find + rm"
-              find node_modules -mindepth 1 -delete 2>/dev/null
-              rm -rf node_modules
+              OLD=node_modules.old.$$
+              mv node_modules "$OLD" || true
+              (nohup rm -rf "$OLD" >/dev/null 2>&1 &) || true
             fi
             npm cache clean --force >/dev/null 2>&1 || true
             set -e
@@ -113,23 +103,13 @@ jobs:
             [ -d dist ] && cp -a dist dist.bak || true
 
             # The VPS filesystem sometimes keeps directories locked, so node_modules
-            # deletion needs to be forced and retried. Stop any node process that may
-            # hold files open, then remove with retries.
+            # deletion needs to be forced and retried. Move it aside first (instant),
+            # then delete in the background so it cannot block the install.
             set +e
-            pkill -f "vite" 2>/dev/null
-            pkill -f "node.*frontend/web" 2>/dev/null
-            sleep 1
-            for i in 1 2 3; do
-              rm -rf node_modules
-              [ ! -d node_modules ] && break
-              echo "node_modules still present, retrying deletion ($i/3)..."
-              sync
-              sleep 2
-            done
             if [ -d node_modules ]; then
-              echo "rm -rf failed, falling back to find + rm"
-              find node_modules -mindepth 1 -delete 2>/dev/null
-              rm -rf node_modules
+              OLD=node_modules.old.$$
+              mv node_modules "$OLD" || true
+              (nohup rm -rf "$OLD" >/dev/null 2>&1 &) || true
             fi
             npm cache clean --force >/dev/null 2>&1 || true
             set -e
@@ -178,23 +158,13 @@ jobs:
             [ -d dist ] && cp -a dist dist.bak || true
 
             # The VPS filesystem sometimes keeps directories locked, so node_modules
-            # deletion needs to be forced and retried. Stop any node process that may
-            # hold files open, then remove with retries.
+            # deletion needs to be forced and retried. Move it aside first (instant),
+            # then delete in the background so it cannot block the install.
             set +e
-            pkill -f "vite" 2>/dev/null
-            pkill -f "node.*frontend/web" 2>/dev/null
-            sleep 1
-            for i in 1 2 3; do
-              rm -rf node_modules
-              [ ! -d node_modules ] && break
-              echo "node_modules still present, retrying deletion ($i/3)..."
-              sync
-              sleep 2
-            done
             if [ -d node_modules ]; then
-              echo "rm -rf failed, falling back to find + rm"
-              find node_modules -mindepth 1 -delete 2>/dev/null
-              rm -rf node_modules
+              OLD=node_modules.old.$$
+              mv node_modules "$OLD" || true
+              (nohup rm -rf "$OLD" >/dev/null 2>&1 &) || true
             fi
             npm cache clean --force >/dev/null 2>&1 || true
             set -e
@@ -243,23 +213,13 @@ jobs:
             [ -d dist ] && cp -a dist dist.bak || true
 
             # The VPS filesystem sometimes keeps directories locked, so node_modules
-            # deletion needs to be forced and retried. Stop any node process that may
-            # hold files open, then remove with retries.
+            # deletion needs to be forced and retried. Move it aside first (instant),
+            # then delete in the background so it cannot block the install.
             set +e
-            pkill -f "vite" 2>/dev/null
-            pkill -f "node.*frontend/web" 2>/dev/null
-            sleep 1
-            for i in 1 2 3; do
-              rm -rf node_modules
-              [ ! -d node_modules ] && break
-              echo "node_modules still present, retrying deletion ($i/3)..."
-              sync
-              sleep 2
-            done
             if [ -d node_modules ]; then
-              echo "rm -rf failed, falling back to find + rm"
-              find node_modules -mindepth 1 -delete 2>/dev/null
-              rm -rf node_modules
+              OLD=node_modules.old.$$
+              mv node_modules "$OLD" || true
+              (nohup rm -rf "$OLD" >/dev/null 2>&1 &) || true
             fi
             npm cache clean --force >/dev/null 2>&1 || true
             set -e
