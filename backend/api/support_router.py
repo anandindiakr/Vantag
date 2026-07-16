@@ -138,10 +138,19 @@ snapshots to the Vantag cloud dashboard.
   dashboard. Each channel (SMS, WhatsApp, Email) has its own enable toggle,
   a "Min. severity" threshold selector (LOW/MEDIUM/HIGH/CRITICAL), and a
   "Test" button to verify the configuration before relying on it.
-- SMS and WhatsApp use Twilio. The user needs their own Twilio Account SID,
-  Auth Token, a Twilio From-number (or WhatsApp sender), and the To-number
-  that should receive alerts (international format, e.g. +91XXXXXXXXXX).
-  Free Twilio trial accounts work for testing.
+- SMS and WhatsApp support MULTIPLE providers (chosen via a provider dropdown
+  wizard in the Alert Dispatch tab — user is NOT forced to use Twilio):
+    SMS: Twilio (global), MSG91 (India), Textlocal (India), Vonage (global),
+         or a Generic HTTP Gateway for any local telecom that exposes an HTTP
+         API (use {to} and {message} placeholders in the URL/body).
+    WhatsApp: Twilio, Meta WhatsApp Business Cloud API (official, free tier),
+         Gupshup (India), or the same Generic HTTP Gateway.
+  Each provider shows step-by-step setup instructions in the dashboard wizard
+  with exactly the credential fields that provider needs. Free Twilio trial
+  accounts and Meta Cloud API test numbers work for testing.
+- Meta WhatsApp Cloud API note: free-form messages only deliver within an
+  open 24-hour session — the user should message their own business number
+  once from their phone before testing, or register a template.
 - Email alerts only need a "To email" address — no extra credentials
   required, it uses the platform's own email sending.
 - Click "Test" on any channel to fire an instant test alert without waiting
@@ -603,13 +612,33 @@ async def get_faq() -> dict:
                     {
                         "q": "How do I turn on WhatsApp or SMS alerts for my store?",
                         "a": "Go to Account → Alert Dispatch in the dashboard. Enable the SMS or "
-                             "WhatsApp toggle and fill in your Twilio Account SID, Auth Token, "
-                             "From-number (or WhatsApp sender), and the To-number that should "
-                             "receive alerts in international format (e.g. +91XXXXXXXXXX). A free "
-                             "Twilio trial account works for testing. Pick a minimum severity "
-                             "(most stores use HIGH to avoid alert fatigue), press Save, then "
-                             "press the Test button — a test message is sent immediately so you "
-                             "can confirm everything works before a real incident.",
+                             "WhatsApp channel and pick a provider from the dropdown — you are "
+                             "NOT limited to Twilio. A built-in step-by-step wizard shows exactly "
+                             "how to get credentials for the provider you pick, and the form only "
+                             "shows the fields that provider needs. Enter the To-number in "
+                             "international format (e.g. +91XXXXXXXXXX), pick a minimum severity "
+                             "(most stores use HIGH to avoid alert fatigue), press Send Test to "
+                             "confirm it works, then Save.",
+                    },
+                    {
+                        "q": "Which SMS and WhatsApp providers are supported? I don't want to use Twilio.",
+                        "a": "SMS: Twilio (global), MSG91 (India), Textlocal (India), Vonage "
+                             "(global), or a Generic HTTP Gateway that works with almost any "
+                             "local telecom exposing an HTTP send API. WhatsApp: Twilio, Meta "
+                             "WhatsApp Business Cloud API (the official Meta option — free tier "
+                             "available), Gupshup (popular in India), or the Generic HTTP "
+                             "Gateway. For the HTTP Gateway, paste your provider's send URL and "
+                             "use {to} and {message} placeholders — e.g. "
+                             "https://sms.myprovider.com/send?key=XXX&to={to}&text={message}.",
+                    },
+                    {
+                        "q": "How do I use my own local telecom / SMS provider that isn't listed?",
+                        "a": "Choose \"Generic HTTP Gateway\" as the provider. Ask your provider "
+                             "for their HTTP send API URL (almost all have one), paste it into "
+                             "the Gateway URL field using {to} and {message} placeholders where "
+                             "the phone number and text go, set the method (GET or POST), add "
+                             "any required headers or body template, then press Send Test. This "
+                             "works with virtually any SMS or WhatsApp gateway in any country.",
                     },
                     {
                         "q": "How do I set up Email alerts?",
@@ -631,10 +660,14 @@ async def get_faq() -> dict:
                     },
                     {
                         "q": "Do I need to do anything special to receive WhatsApp alerts?",
-                        "a": "Yes — the recipient's WhatsApp number needs to join the Twilio "
-                             "WhatsApp sandbox (or be an approved production sender) before "
-                             "messages will deliver. If the Test button reports success on SMS "
-                             "but WhatsApp shows nothing, this is the first thing to check.",
+                        "a": "Depends on the provider. Twilio: the recipient's WhatsApp number "
+                             "must join the Twilio sandbox (or use an approved business sender). "
+                             "Meta Cloud API: free-form messages only deliver within a 24-hour "
+                             "session — send one message from your phone to your business number "
+                             "first, or register a message template. Gupshup/HTTP Gateway: follow "
+                             "your provider's opt-in rules. If Send Test reports success but no "
+                             "message arrives, this opt-in/session rule is the first thing to "
+                             "check.",
                     },
                     {
                         "q": "What does the Test button do?",

@@ -46,12 +46,24 @@ interface AgentKeyInfo {
   device_name: string;
 }
 
-interface TwilioChannelSettings {
+interface ChannelSettings {
   enabled?: boolean;
+  provider?: string;
   account_sid?: string;
   auth_token?: string;
   from_number?: string;
   to_number?: string;
+  auth_key?: string;
+  api_key?: string;
+  api_secret?: string;
+  sender_id?: string;
+  phone_number_id?: string;
+  access_token?: string;
+  source_number?: string;
+  app_name?: string;
+  url?: string;
+  method?: string;
+  body_template?: string;
 }
 
 interface EmailChannelSettings {
@@ -61,10 +73,156 @@ interface EmailChannelSettings {
 
 interface AlertSettings {
   min_severity?: string;
-  sms?: TwilioChannelSettings;
-  whatsapp?: TwilioChannelSettings;
+  sms?: ChannelSettings;
+  whatsapp?: ChannelSettings;
   email?: EmailChannelSettings;
 }
+
+// ─── Alert provider catalog (wizard) ─────────────────────────────────────────
+
+interface ProviderField {
+  key: keyof ChannelSettings;
+  label: string;
+  placeholder: string;
+  secret?: boolean;
+}
+
+interface ProviderDef {
+  id: string;
+  label: string;
+  region: string;
+  steps: string[];
+  fields: ProviderField[];
+}
+
+const TO_FIELD: ProviderField = { key: 'to_number', label: 'Your phone (receives alerts)', placeholder: '+919876543210' };
+
+const SMS_PROVIDERS: ProviderDef[] = [
+  {
+    id: 'twilio', label: 'Twilio', region: 'Global',
+    steps: [
+      'Sign up at twilio.com and buy/claim a phone number',
+      'Copy Account SID and Auth Token from the Twilio Console dashboard',
+      'Enter them below with your Twilio number as "From"',
+    ],
+    fields: [
+      { key: 'account_sid', label: 'Account SID', placeholder: 'ACxxxxxxxxxxxxxxxx' },
+      { key: 'auth_token', label: 'Auth Token', placeholder: 'Twilio Auth Token', secret: true },
+      { key: 'from_number', label: 'From number (Twilio)', placeholder: '+1415XXXXXXX' },
+      TO_FIELD,
+    ],
+  },
+  {
+    id: 'msg91', label: 'MSG91', region: 'India',
+    steps: [
+      'Sign up at msg91.com (popular Indian SMS provider)',
+      'Go to Settings → API Keys and copy your Auth Key',
+      'Optionally register a 6-letter Sender ID (e.g. RTLNZR) under DLT',
+    ],
+    fields: [
+      { key: 'auth_key', label: 'Auth Key', placeholder: 'MSG91 Auth Key', secret: true },
+      { key: 'sender_id', label: 'Sender ID (6 letters)', placeholder: 'RTLNZR' },
+      TO_FIELD,
+    ],
+  },
+  {
+    id: 'textlocal', label: 'Textlocal', region: 'India',
+    steps: [
+      'Sign up at textlocal.in',
+      'Go to Settings → API Keys → Create API Key',
+      'Optionally set a 6-letter Sender ID',
+    ],
+    fields: [
+      { key: 'api_key', label: 'API Key', placeholder: 'Textlocal API Key', secret: true },
+      { key: 'sender_id', label: 'Sender ID (6 letters)', placeholder: 'TXTLCL' },
+      TO_FIELD,
+    ],
+  },
+  {
+    id: 'vonage', label: 'Vonage (Nexmo)', region: 'Global',
+    steps: [
+      'Sign up at vonage.com (API dashboard)',
+      'Copy API Key and API Secret from the dashboard homepage',
+    ],
+    fields: [
+      { key: 'api_key', label: 'API Key', placeholder: 'Vonage API Key' },
+      { key: 'api_secret', label: 'API Secret', placeholder: 'Vonage API Secret', secret: true },
+      { key: 'from_number', label: 'From / Sender name', placeholder: 'RetailNazar' },
+      TO_FIELD,
+    ],
+  },
+  {
+    id: 'http', label: 'My local telecom (HTTP gateway)', region: 'Any country',
+    steps: [
+      'Ask your local SMS provider for their "HTTP API" documentation',
+      'Paste their send URL below using {to} and {message} placeholders',
+      'Example: https://sms.provider.com/send?key=XXXX&to={to}&text={message}',
+    ],
+    fields: [
+      { key: 'url', label: 'Gateway URL (use {to} and {message})', placeholder: 'https://sms.provider.com/send?key=XX&to={to}&text={message}' },
+      { key: 'method', label: 'Method (GET or POST)', placeholder: 'GET' },
+      { key: 'body_template', label: 'POST body template (optional)', placeholder: '{"to":"{to}","text":"{message}"}' },
+      TO_FIELD,
+    ],
+  },
+];
+
+const WA_PROVIDERS: ProviderDef[] = [
+  {
+    id: 'twilio', label: 'Twilio WhatsApp', region: 'Global',
+    steps: [
+      'In Twilio Console, activate the WhatsApp Sandbox (Messaging → Try it out)',
+      'From your phone, send the join code to the sandbox number once',
+      'Enter Account SID, Auth Token, and the sandbox number as "From"',
+    ],
+    fields: [
+      { key: 'account_sid', label: 'Account SID', placeholder: 'ACxxxxxxxxxxxxxxxx' },
+      { key: 'auth_token', label: 'Auth Token', placeholder: 'Twilio Auth Token', secret: true },
+      { key: 'from_number', label: 'From (Twilio WhatsApp number)', placeholder: '+14155238886' },
+      { key: 'to_number', label: 'Your WhatsApp number', placeholder: '+919876543210' },
+    ],
+  },
+  {
+    id: 'meta', label: 'WhatsApp Cloud API (Meta — official, free)', region: 'Global',
+    steps: [
+      'Go to developers.facebook.com → Create App → type "Business"',
+      'Add the WhatsApp product; Meta gives you a free test number',
+      'Copy the Phone Number ID and a permanent Access Token',
+      'Important: message the business number once from your phone to open the 24-hour session, then test',
+    ],
+    fields: [
+      { key: 'phone_number_id', label: 'Phone Number ID', placeholder: '1065XXXXXXXXXXX' },
+      { key: 'access_token', label: 'Access Token', placeholder: 'EAAG…', secret: true },
+      { key: 'to_number', label: 'Your WhatsApp number', placeholder: '+919876543210' },
+    ],
+  },
+  {
+    id: 'gupshup', label: 'Gupshup', region: 'India',
+    steps: [
+      'Sign up at gupshup.io and create a WhatsApp app',
+      'Copy the API Key, your approved Source (business) number, and App name',
+    ],
+    fields: [
+      { key: 'api_key', label: 'API Key', placeholder: 'Gupshup API Key', secret: true },
+      { key: 'source_number', label: 'Source (business) number', placeholder: '91XXXXXXXXXX' },
+      { key: 'app_name', label: 'App name', placeholder: 'RetailNazarApp' },
+      { key: 'to_number', label: 'Your WhatsApp number', placeholder: '+919876543210' },
+    ],
+  },
+  {
+    id: 'http', label: 'My local provider (HTTP gateway)', region: 'Any country',
+    steps: [
+      'Ask your WhatsApp API provider for their HTTP send-message URL',
+      'Paste it below using {to} and {message} placeholders',
+    ],
+    fields: [
+      { key: 'url', label: 'Gateway URL (use {to} and {message})', placeholder: 'https://wa.provider.com/send?key=XX&to={to}&text={message}' },
+      { key: 'method', label: 'Method (GET or POST)', placeholder: 'POST' },
+      { key: 'body_template', label: 'POST body template (optional)', placeholder: '{"to":"{to}","text":"{message}"}' },
+      { key: 'to_number', label: 'Your WhatsApp number', placeholder: '+919876543210' },
+    ],
+  },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -118,6 +276,103 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function ChannelWizardCard({
+  title,
+  providers,
+  settings,
+  onChange,
+  onTest,
+  testing,
+  testResult,
+}: {
+  title: string;
+  providers: ProviderDef[];
+  settings: ChannelSettings;
+  onChange: (patch: Partial<ChannelSettings>) => void;
+  onTest: () => void;
+  testing: boolean;
+  testResult?: { ok: boolean; message: string };
+}) {
+  const provider = providers.find((p) => p.id === (settings.provider ?? 'twilio')) ?? providers[0];
+  return (
+    <div className="p-4 bg-white/3 border border-white/8 rounded-xl mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <label className="flex items-center gap-2 text-sm font-semibold text-white">
+          <input
+            type="checkbox"
+            checked={!!settings.enabled}
+            onChange={(e) => onChange({ enabled: e.target.checked })}
+            className="w-4 h-4 accent-emerald-500"
+          />
+          {title}
+        </label>
+        {testResult && (
+          <span className={`flex items-center gap-1 text-xs ${testResult.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+            {testResult.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+            {testResult.message}
+          </span>
+        )}
+      </div>
+
+      {/* Step 1: pick provider */}
+      <div className="mb-3">
+        <label className="block text-[11px] font-semibold text-emerald-300/80 mb-1">
+          Step 1 — Choose your provider
+        </label>
+        <select
+          value={provider.id}
+          onChange={(e) => onChange({ provider: e.target.value })}
+          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500/50 [&>option]:bg-gray-900"
+        >
+          {providers.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label} — {p.region}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Step 2: how to get credentials */}
+      <div className="mb-3 p-3 bg-blue-500/5 border border-blue-500/15 rounded-lg">
+        <p className="text-[11px] font-semibold text-blue-300 mb-1">Step 2 — Get your credentials</p>
+        <ol className="text-[11px] text-blue-200/60 space-y-0.5 list-decimal list-inside">
+          {provider.steps.map((s, i) => (
+            <li key={i}>{s}</li>
+          ))}
+        </ol>
+      </div>
+
+      {/* Step 3: fill fields */}
+      <p className="text-[11px] font-semibold text-emerald-300/80 mb-1">Step 3 — Enter the details</p>
+      <div className="grid grid-cols-2 gap-3">
+        {provider.fields.map((f) => (
+          <div key={f.key as string} className={f.key === 'url' || f.key === 'body_template' ? 'col-span-2' : ''}>
+            <label className="block text-[10px] text-white/40 mb-0.5">{f.label}</label>
+            <input
+              type={f.secret ? 'password' : 'text'}
+              placeholder={f.placeholder}
+              value={(settings[f.key] as string) ?? ''}
+              onChange={(e) => onChange({ [f.key]: e.target.value } as Partial<ChannelSettings>)}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Step 4: test */}
+      <p className="text-[11px] font-semibold text-emerald-300/80 mt-3 mb-1">Step 4 — Send a test message</p>
+      <button
+        onClick={onTest}
+        disabled={testing}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-40 rounded-lg text-xs font-medium text-white/70 hover:text-white transition-all"
+      >
+        {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+        Send Test {title}
+      </button>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AccountPage() {
@@ -134,8 +389,8 @@ export default function AccountPage() {
   // Alert Dispatch form state
   const [alertSettings, setAlertSettings] = useState<AlertSettings>({
     min_severity: 'MEDIUM',
-    sms: { enabled: false, account_sid: '', auth_token: '', from_number: '', to_number: '' },
-    whatsapp: { enabled: false, account_sid: '', auth_token: '', from_number: '', to_number: '' },
+    sms: { enabled: false, provider: 'twilio', account_sid: '', auth_token: '', from_number: '', to_number: '' },
+    whatsapp: { enabled: false, provider: 'twilio', account_sid: '', auth_token: '', from_number: '', to_number: '' },
     email: { enabled: false, to_email: '' },
   });
   const [savingAlerts, setSavingAlerts] = useState(false);
@@ -204,7 +459,7 @@ export default function AccountPage() {
 
   const updateChannel = (
     channel: 'sms' | 'whatsapp' | 'email',
-    patch: Partial<TwilioChannelSettings & EmailChannelSettings>,
+    patch: Partial<ChannelSettings & EmailChannelSettings>,
   ) => {
     setAlertSettings((prev) => ({
       ...prev,
@@ -398,10 +653,12 @@ export default function AccountPage() {
       <SectionCard icon={Bell} title="Alert Dispatch">
         <p className="text-xs text-white/40 mb-4">
           Configure how you get notified when a theft, POS anomaly, or other security
-          event is detected. Enable SMS and/or WhatsApp (via Twilio) and/or Email, then
-          use <strong className="text-white/70">Test</strong> to verify each channel
+          event is detected. Pick your SMS / WhatsApp provider (Twilio, MSG91, Textlocal,
+          Vonage, Meta WhatsApp Cloud API, Gupshup, or your own local telecom's HTTP
+          gateway), follow the built-in steps, then use{' '}
+          <strong className="text-white/70">Send Test</strong> to verify each channel
           before saving. See <strong className="text-white/70">Help Center → Alert Dispatch Setup</strong> for
-          a full walkthrough on getting Twilio credentials.
+          a full walkthrough.
         </p>
 
         <div className="mb-5">
@@ -419,125 +676,26 @@ export default function AccountPage() {
         </div>
 
         {/* SMS */}
-        <div className="p-4 bg-white/3 border border-white/8 rounded-xl mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <label className="flex items-center gap-2 text-sm font-semibold text-white">
-              <input
-                type="checkbox"
-                checked={!!alertSettings.sms?.enabled}
-                onChange={(e) => updateChannel('sms', { enabled: e.target.checked })}
-                className="w-4 h-4 accent-emerald-500"
-              />
-              SMS (via Twilio)
-            </label>
-            {testResult.sms && (
-              <span className={`flex items-center gap-1 text-xs ${testResult.sms.ok ? 'text-emerald-400' : 'text-red-400'}`}>
-                {testResult.sms.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                {testResult.sms.message}
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              type="text"
-              placeholder="Twilio Account SID"
-              value={alertSettings.sms?.account_sid ?? ''}
-              onChange={(e) => updateChannel('sms', { account_sid: e.target.value })}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
-            />
-            <input
-              type="password"
-              placeholder="Twilio Auth Token"
-              value={alertSettings.sms?.auth_token ?? ''}
-              onChange={(e) => updateChannel('sms', { auth_token: e.target.value })}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
-            />
-            <input
-              type="text"
-              placeholder="From Number (e.g. +1415XXXXXXX)"
-              value={alertSettings.sms?.from_number ?? ''}
-              onChange={(e) => updateChannel('sms', { from_number: e.target.value })}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
-            />
-            <input
-              type="text"
-              placeholder="To Number (your phone, +91XXXXXXXXXX)"
-              value={alertSettings.sms?.to_number ?? ''}
-              onChange={(e) => updateChannel('sms', { to_number: e.target.value })}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
-            />
-          </div>
-          <button
-            onClick={() => testChannel('sms')}
-            disabled={testingChannel === 'sms'}
-            className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-40 rounded-lg text-xs font-medium text-white/70 hover:text-white transition-all"
-          >
-            {testingChannel === 'sms' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-            Test SMS
-          </button>
-        </div>
+        <ChannelWizardCard
+          title="SMS Alerts"
+          providers={SMS_PROVIDERS}
+          settings={alertSettings.sms ?? {}}
+          onChange={(patch) => updateChannel('sms', patch)}
+          onTest={() => testChannel('sms')}
+          testing={testingChannel === 'sms'}
+          testResult={testResult.sms}
+        />
 
         {/* WhatsApp */}
-        <div className="p-4 bg-white/3 border border-white/8 rounded-xl mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <label className="flex items-center gap-2 text-sm font-semibold text-white">
-              <input
-                type="checkbox"
-                checked={!!alertSettings.whatsapp?.enabled}
-                onChange={(e) => updateChannel('whatsapp', { enabled: e.target.checked })}
-                className="w-4 h-4 accent-emerald-500"
-              />
-              WhatsApp (via Twilio)
-            </label>
-            {testResult.whatsapp && (
-              <span className={`flex items-center gap-1 text-xs ${testResult.whatsapp.ok ? 'text-emerald-400' : 'text-red-400'}`}>
-                {testResult.whatsapp.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
-                {testResult.whatsapp.message}
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              type="text"
-              placeholder="Twilio Account SID"
-              value={alertSettings.whatsapp?.account_sid ?? ''}
-              onChange={(e) => updateChannel('whatsapp', { account_sid: e.target.value })}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
-            />
-            <input
-              type="password"
-              placeholder="Twilio Auth Token"
-              value={alertSettings.whatsapp?.auth_token ?? ''}
-              onChange={(e) => updateChannel('whatsapp', { auth_token: e.target.value })}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
-            />
-            <input
-              type="text"
-              placeholder="From Number (Twilio WhatsApp sandbox/number)"
-              value={alertSettings.whatsapp?.from_number ?? ''}
-              onChange={(e) => updateChannel('whatsapp', { from_number: e.target.value })}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
-            />
-            <input
-              type="text"
-              placeholder="To Number (your WhatsApp, +91XXXXXXXXXX)"
-              value={alertSettings.whatsapp?.to_number ?? ''}
-              onChange={(e) => updateChannel('whatsapp', { to_number: e.target.value })}
-              className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-emerald-500/50"
-            />
-          </div>
-          <p className="text-[11px] text-white/25 mt-2">
-            The <code>whatsapp:</code> prefix is added automatically — enter plain phone numbers only.
-          </p>
-          <button
-            onClick={() => testChannel('whatsapp')}
-            disabled={testingChannel === 'whatsapp'}
-            className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-40 rounded-lg text-xs font-medium text-white/70 hover:text-white transition-all"
-          >
-            {testingChannel === 'whatsapp' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-            Test WhatsApp
-          </button>
-        </div>
+        <ChannelWizardCard
+          title="WhatsApp Alerts"
+          providers={WA_PROVIDERS}
+          settings={alertSettings.whatsapp ?? {}}
+          onChange={(patch) => updateChannel('whatsapp', patch)}
+          onTest={() => testChannel('whatsapp')}
+          testing={testingChannel === 'whatsapp'}
+          testResult={testResult.whatsapp}
+        />
 
         {/* Email */}
         <div className="p-4 bg-white/3 border border-white/8 rounded-xl mb-5">
