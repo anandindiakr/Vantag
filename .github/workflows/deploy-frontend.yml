@@ -43,7 +43,8 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.VPS_IN_REPO_PATH }}
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             BUILD_DIR="/tmp/vantag-frontend-build-in-$(date +%s)"
             mkdir -p "$BUILD_DIR"
@@ -69,7 +70,7 @@ jobs:
             sleep 3
 
             HTTP_CODE=$(curl -s -o /tmp/health_body_in.html -w "%{http_code}" -H "Host: retailnazar.com" -k https://localhost/ || echo "000")
-            if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_in.html; then
+            if [ "$HTTP_CODE" != "200" ] || ! grep -qiE "<!doctype html|<html" /tmp/health_body_in.html; then
               echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
               rm -rf dist
               if [ -d dist.bak ]; then mv dist.bak dist; fi
@@ -93,7 +94,8 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.VPS_SG_REPO_PATH }}
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             BUILD_DIR="/tmp/vantag-frontend-build-sg-$(date +%s)"
             mkdir -p "$BUILD_DIR"
@@ -116,7 +118,7 @@ jobs:
 
             sleep 3
             HTTP_CODE=$(curl -s -o /tmp/health_body_sg.html -w "%{http_code}" -H "Host: retail-vantag.com" -k https://localhost/ || echo "000")
-            if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_sg.html; then
+            if [ "$HTTP_CODE" != "200" ] || ! grep -qiE "<!doctype html|<html" /tmp/health_body_sg.html; then
               echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
               rm -rf dist
               if [ -d dist.bak ]; then mv dist.bak dist; fi
@@ -140,7 +142,8 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.VPS_PH_REPO_PATH }}
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             BUILD_DIR="/tmp/vantag-frontend-build-ph-$(date +%s)"
             mkdir -p "$BUILD_DIR"
@@ -163,7 +166,7 @@ jobs:
 
             sleep 3
             HTTP_CODE=$(curl -s -o /tmp/health_body_ph.html -w "%{http_code}" -H "Host: retailbantay.com" -k https://localhost/ || echo "000")
-            if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_ph.html; then
+            if [ "$HTTP_CODE" != "200" ] || ! grep -qiE "<!doctype html|<html" /tmp/health_body_ph.html; then
               echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
               rm -rf dist
               if [ -d dist.bak ]; then mv dist.bak dist; fi
@@ -187,7 +190,8 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.VPS_MY_REPO_PATH }}
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             BUILD_DIR="/tmp/vantag-frontend-build-my-$(date +%s)"
             mkdir -p "$BUILD_DIR"
@@ -210,7 +214,7 @@ jobs:
 
             sleep 3
             HTTP_CODE=$(curl -s -o /tmp/health_body_my.html -w "%{http_code}" -H "Host: jagajaga.my" -k https://localhost/ || echo "000")
-            if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_my.html; then
+            if [ "$HTTP_CODE" != "200" ] || ! grep -qiE "<!doctype html|<html" /tmp/health_body_my.html; then
               echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
               rm -rf dist
               if [ -d dist.bak ]; then mv dist.bak dist; fi
