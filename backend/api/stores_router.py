@@ -445,6 +445,7 @@ async def list_incidents(
                     occurred_at=raw.get("timestamp", raw.get("occurred_at", datetime.now(tz=timezone.utc))),
                     snapshot_url=raw.get("snapshot_url"),
                     acknowledged=raw.get("acknowledged", False),
+                    is_demo=bool(raw.get("is_demo", False)),
                     metadata=raw.get("metadata", {}),
                 )
             )

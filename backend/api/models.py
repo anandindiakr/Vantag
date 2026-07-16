@@ -33,6 +33,10 @@ class AlertLevel(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+    CRITICAL = "critical"
+    # "staff" = enrolled staff member: face matches are recorded for audit
+    # but NEVER raise an alert / risk score (whitelist semantics).
+    STAFF = "staff"
 
 
 class CameraStatus(str, Enum):
@@ -142,6 +146,7 @@ class IncidentResponse(BaseModel):
     occurred_at: datetime
     snapshot_url: Optional[str] = Field(None, description="URL to the associated JPEG snapshot, if any.")
     acknowledged: bool = Field(False, description="Whether an operator has acknowledged this incident.")
+    is_demo: bool = Field(False, description="True if this incident was synthetically generated for demo purposes.")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Arbitrary event-specific metadata.")
 
 

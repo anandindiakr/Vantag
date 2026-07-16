@@ -13,7 +13,9 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { useIncidents, useGenerateReport, useStores } from '../hooks/useApi';
+import { useQueryClient } from '@tanstack/react-query';
+import { Trash2 } from 'lucide-react';
+import { useIncidents, useGenerateReport, useStores, api } from '../hooks/useApi';
 import { Severity, EventType, Incident } from '../store/useVantagStore';
 
 // ── Lightbox ──────────────────────────────────────────────────────────────────
@@ -64,6 +66,7 @@ const SEVERITY_ORDER: Record<Severity, number> = {
   HIGH:     3,
   MEDIUM:   2,
   LOW:      1,
+  STAFF:    0,
 };
 
 const EVENT_TYPE_LABELS: Record<EventType, string> = {
@@ -102,6 +105,8 @@ export default function IncidentsPage() {
   const [typeFilter, setTypeFilter]   = useState<EventType | 'all'>('all');
   const [downloadingId, setDownloadingId]   = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [purging, setPurging]         = useState(false);
+  const qc = useQueryClient();
 
   // Collect all store IDs so we can aggregate incidents across them
   const { data: stores = [] } = useStores();
@@ -168,6 +173,20 @@ export default function IncidentsPage() {
     }
   };
 
+  const handlePurgeDemo = async () => {
+    if (!window.confirm('Remove all DEMO (synthetic test) incidents? Real incidents will be preserved.')) return;
+    setPurging(true);
+    try {
+      const res = await api.delete('/demo/clear');
+      toast.success(`Purged ${res.data?.cleared ?? 0} demo incident(s)`);
+      await qc.invalidateQueries();
+    } catch (err) {
+      toast.error(`Failed to purge demo data: ${(err as Error).message}`);
+    } finally {
+      setPurging(false);
+    }
+  };
+
   function SortIcon({ col }: { col: SortKey }) {
     if (sortKey !== col) return <SortAsc size={12} className="text-slate-600" />;
     return sortDir === 'asc'
@@ -198,6 +217,15 @@ export default function IncidentsPage() {
               </p>
             </div>
           </div>
+          <button
+            onClick={handlePurgeDemo}
+            disabled={purging}
+            title="Remove all synthetic demo incidents (real incidents are preserved)"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/40 text-purple-300 text-xs hover:bg-purple-500/20 transition-colors disabled:opacity-40"
+          >
+            {purging ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+            Purge Demo Data
+          </button>
         </div>
       </header>
 
@@ -339,10 +367,18 @@ export default function IncidentsPage() {
                   </div>
 
                   {/* Event type */}
-                  <div className="col-span-2">
+                  <div className="col-span-2 flex items-center gap-1.5 flex-wrap">
                     <span className="text-xs text-slate-300 bg-slate-800/60 px-2 py-0.5 rounded">
                       {EVENT_TYPE_LABELS[inc.type] ?? inc.type}
                     </span>
+                    {inc.isDemo && (
+                      <span
+                        title="Synthetic test incident — generated for demo purposes, not a real detection"
+                        className="text-[10px] font-bold tracking-wider text-purple-300 bg-purple-500/15 border border-purple-500/40 px-1.5 py-0.5 rounded"
+                      >
+                        DEMO
+                      </span>
+                    )}
                   </div>
 
                   {/* Severity */}

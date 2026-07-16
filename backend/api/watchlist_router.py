@@ -177,6 +177,15 @@ def record_match(
     }
     _matches.append(match)
     _flush_matches()
+    if entry["alert_level"] == "staff":
+        # Staff member recognised — audit log only, no alert is raised.
+        logger.info(
+            "Staff face recognised (no alert) | entry=%s camera=%s confidence=%.2f",
+            entry_id,
+            camera_id,
+            confidence,
+        )
+        return None
     logger.info(
         "Watchlist match recorded | entry=%s camera=%s confidence=%.2f",
         entry_id,

@@ -3,7 +3,7 @@ import { devtools, subscribeWithSelector } from 'zustand/middleware';
 
 // ─── Domain Interfaces ────────────────────────────────────────────────────────
 
-export type Severity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type Severity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'STAFF';
 
 export interface Store {
   id: string;
@@ -93,7 +93,7 @@ export interface QueueLane {
 export interface WatchlistEntry {
   id: string;
   name: string;
-  alertLevel: Severity;
+  alertLevel: Severity | 'STAFF';
   faceImageUrl?: string;
   notes: string;
   addedAt: string;
@@ -129,6 +129,7 @@ export interface Incident {
   resolved: boolean;
   reportUrl?: string;
   snapshotUrl?: string;
+  isDemo?: boolean;
 }
 
 export type DoorState = 'locked' | 'unlocked' | 'unknown';

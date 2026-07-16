@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   MonitorCheck,
   UserCircle,
+  UserCheck,
   Wand2,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -40,6 +41,7 @@ const navItems: NavItem[] = [
   { label: 'Manage Cameras', to: '/cameras/manage', icon: <Settings2 size={20} /> },
   { label: 'Incidents',    to: '/incidents',    icon: <AlertTriangle size={20} /> },
   { label: 'Watchlist',    to: '/watchlist',    icon: <Users size={20} /> },
+  { label: 'Staff Faces',  to: '/staff-faces',  icon: <UserCheck size={20} /> },
   { label: 'Zone Editor',  to: '/zone-editor',  icon: <PenTool size={20} />, dividerBefore: true },
   { label: 'Demo Center',  to: '/demo',         icon: <Zap size={20} /> },
   { label: 'Health Check', to: '/health-check', icon: <HeartPulse size={20} />, dividerBefore: true },

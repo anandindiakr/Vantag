@@ -117,6 +117,7 @@ const normIncident = (r: any): Incident => ({
   resolved:    r.acknowledged ?? r.resolved    ?? false,
   reportUrl:   r.report_url  ?? r.reportUrl    ?? undefined,
   snapshotUrl: r.snapshot_url ?? r.snapshotUrl ?? undefined,
+  isDemo:      r.is_demo     ?? r.isDemo       ?? false,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
