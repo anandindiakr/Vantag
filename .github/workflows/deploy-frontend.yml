@@ -42,9 +42,16 @@ jobs:
 
             cd frontend/web
             rm -rf dist.bak
-            [ -d dist ] && cp -r dist dist.bak || true
+            [ -d dist ] && cp -a dist dist.bak || true
 
-            npm ci
+            # Clean corrupted npm state from previous interrupted runs
+            rm -rf node_modules
+            npm cache clean --force
+
+            if ! npm ci; then
+              echo "npm ci failed — falling back to npm install"
+              npm install
+            fi
             if ! npm run build:in; then
               echo "Build failed — restoring previous dist/"
               rm -rf dist
@@ -83,9 +90,16 @@ jobs:
 
             cd frontend/web
             rm -rf dist.bak
-            [ -d dist ] && cp -r dist dist.bak || true
+            [ -d dist ] && cp -a dist dist.bak || true
 
-            npm ci
+            # Clean corrupted npm state from previous interrupted runs
+            rm -rf node_modules
+            npm cache clean --force
+
+            if ! npm ci; then
+              echo "npm ci failed — falling back to npm install"
+              npm install
+            fi
             if ! npm run build:sg; then
               echo "Build failed — restoring previous dist/"
               rm -rf dist
@@ -122,9 +136,16 @@ jobs:
 
             cd frontend/web
             rm -rf dist.bak
-            [ -d dist ] && cp -r dist dist.bak || true
+            [ -d dist ] && cp -a dist dist.bak || true
 
-            npm ci
+            # Clean corrupted npm state from previous interrupted runs
+            rm -rf node_modules
+            npm cache clean --force
+
+            if ! npm ci; then
+              echo "npm ci failed — falling back to npm install"
+              npm install
+            fi
             if ! npm run build:ph; then
               echo "Build failed — restoring previous dist/"
               rm -rf dist
@@ -161,9 +182,16 @@ jobs:
 
             cd frontend/web
             rm -rf dist.bak
-            [ -d dist ] && cp -r dist dist.bak || true
+            [ -d dist ] && cp -a dist dist.bak || true
 
-            npm ci
+            # Clean corrupted npm state from previous interrupted runs
+            rm -rf node_modules
+            npm cache clean --force
+
+            if ! npm ci; then
+              echo "npm ci failed — falling back to npm install"
+              npm install
+            fi
             if ! npm run build:my; then
               echo "Build failed — restoring previous dist/"
               rm -rf dist
