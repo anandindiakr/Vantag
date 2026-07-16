@@ -45,33 +45,25 @@ jobs:
             cd ${{ secrets.VPS_IN_REPO_PATH }}
             git pull origin main
 
-            cd frontend/web
-            rm -rf dist.bak
-            if [ -d dist ]; then
-              cp -a dist dist.bak || true
-            fi
+            BUILD_DIR="/tmp/vantag-frontend-build-in-$(date +%s)"
+            mkdir -p "$BUILD_DIR"
+            git archive HEAD frontend/web | tar -x -C "$BUILD_DIR"
+            cd "$BUILD_DIR/frontend/web"
 
             export NODE_ENV=development
             export NPM_CONFIG_PRODUCTION=false
             export NPM_CONFIG_OMIT=
-
-            NPM_CACHE="/tmp/vantag-npm-cache-$(date +%s)"
-            OLD_NODE_MODULES="node_modules.old.$(date +%s)"
-            if [ -e node_modules ]; then
-              mv node_modules "$OLD_NODE_MODULES"
-            fi
-            NPM_CONFIG_CACHE="$NPM_CACHE" npm ci --include=dev --omit=
+            NPM_CONFIG_CACHE="/tmp/vantag-npm-cache-in-$(date +%s)" npm ci --include=dev --omit=
 
             if ! npm run build:in; then
               echo "Build failed — restoring previous dist/"
-              rm -rf dist
-              if [ -d dist.bak ]; then
-                mv dist.bak dist
-              else
-                echo "No dist.bak available to restore"
-              fi
               exit 1
             fi
+            cd "${{ secrets.VPS_IN_REPO_PATH }}/frontend/web"
+            rm -rf dist.bak
+            if [ -d dist ]; then cp -a dist dist.bak; fi
+            rm -rf dist
+            cp -a "$BUILD_DIR/frontend/web/dist" dist
 
             echo "Waiting for nginx to pick up new files..."
             sleep 3
@@ -80,12 +72,12 @@ jobs:
             if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_in.html; then
               echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
               rm -rf dist
-              mv dist.bak dist
+              if [ -d dist.bak ]; then mv dist.bak dist; fi
               exit 1
             fi
 
             echo "Health check passed (HTTP $HTTP_CODE) — deploy successful"
-            rm -rf dist.bak
+            rm -rf dist.bak "$BUILD_DIR"
 
   deploy-sg:
     if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'sg') }}
@@ -103,43 +95,36 @@ jobs:
             cd ${{ secrets.VPS_SG_REPO_PATH }}
             git pull origin main
 
-            cd frontend/web
-            rm -rf dist.bak
-            if [ -d dist ]; then
-              cp -a dist dist.bak || true
-            fi
+            BUILD_DIR="/tmp/vantag-frontend-build-sg-$(date +%s)"
+            mkdir -p "$BUILD_DIR"
+            git archive HEAD frontend/web | tar -x -C "$BUILD_DIR"
+            cd "$BUILD_DIR/frontend/web"
 
             export NODE_ENV=development
             export NPM_CONFIG_PRODUCTION=false
             export NPM_CONFIG_OMIT=
-            NPM_CACHE="/tmp/vantag-npm-cache-$(date +%s)"
-            OLD_NODE_MODULES="node_modules.old.$(date +%s)"
-            if [ -e node_modules ]; then
-              mv node_modules "$OLD_NODE_MODULES"
-            fi
-            NPM_CONFIG_CACHE="$NPM_CACHE" npm ci --include=dev --omit=
+            NPM_CONFIG_CACHE="/tmp/vantag-npm-cache-sg-$(date +%s)" npm ci --include=dev --omit=
             if ! npm run build:sg; then
-              echo "Build failed — restoring previous dist/"
-              rm -rf dist
-              if [ -d dist.bak ]; then
-                mv dist.bak dist
-              else
-                echo "No dist.bak available to restore"
-              fi
+              echo "Build failed"
               exit 1
             fi
+            cd "${{ secrets.VPS_SG_REPO_PATH }}/frontend/web"
+            rm -rf dist.bak
+            if [ -d dist ]; then cp -a dist dist.bak; fi
+            rm -rf dist
+            cp -a "$BUILD_DIR/frontend/web/dist" dist
 
             sleep 3
             HTTP_CODE=$(curl -s -o /tmp/health_body_sg.html -w "%{http_code}" -H "Host: retail-vantag.com" -k https://localhost/ || echo "000")
             if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_sg.html; then
               echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
               rm -rf dist
-              mv dist.bak dist
+              if [ -d dist.bak ]; then mv dist.bak dist; fi
               exit 1
             fi
 
             echo "Health check passed (HTTP $HTTP_CODE) — deploy successful"
-            rm -rf dist.bak
+            rm -rf dist.bak "$BUILD_DIR"
 
   deploy-ph:
     if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'ph') }}
@@ -157,43 +142,36 @@ jobs:
             cd ${{ secrets.VPS_PH_REPO_PATH }}
             git pull origin main
 
-            cd frontend/web
-            rm -rf dist.bak
-            if [ -d dist ]; then
-              cp -a dist dist.bak || true
-            fi
+            BUILD_DIR="/tmp/vantag-frontend-build-ph-$(date +%s)"
+            mkdir -p "$BUILD_DIR"
+            git archive HEAD frontend/web | tar -x -C "$BUILD_DIR"
+            cd "$BUILD_DIR/frontend/web"
 
             export NODE_ENV=development
             export NPM_CONFIG_PRODUCTION=false
             export NPM_CONFIG_OMIT=
-            NPM_CACHE="/tmp/vantag-npm-cache-$(date +%s)"
-            OLD_NODE_MODULES="node_modules.old.$(date +%s)"
-            if [ -e node_modules ]; then
-              mv node_modules "$OLD_NODE_MODULES"
-            fi
-            NPM_CONFIG_CACHE="$NPM_CACHE" npm ci --include=dev --omit=
+            NPM_CONFIG_CACHE="/tmp/vantag-npm-cache-ph-$(date +%s)" npm ci --include=dev --omit=
             if ! npm run build:ph; then
-              echo "Build failed — restoring previous dist/"
-              rm -rf dist
-              if [ -d dist.bak ]; then
-                mv dist.bak dist
-              else
-                echo "No dist.bak available to restore"
-              fi
+              echo "Build failed"
               exit 1
             fi
+            cd "${{ secrets.VPS_PH_REPO_PATH }}/frontend/web"
+            rm -rf dist.bak
+            if [ -d dist ]; then cp -a dist dist.bak; fi
+            rm -rf dist
+            cp -a "$BUILD_DIR/frontend/web/dist" dist
 
             sleep 3
             HTTP_CODE=$(curl -s -o /tmp/health_body_ph.html -w "%{http_code}" -H "Host: retailbantay.com" -k https://localhost/ || echo "000")
             if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_ph.html; then
               echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
               rm -rf dist
-              mv dist.bak dist
+              if [ -d dist.bak ]; then mv dist.bak dist; fi
               exit 1
             fi
 
             echo "Health check passed (HTTP $HTTP_CODE) — deploy successful"
-            rm -rf dist.bak
+            rm -rf dist.bak "$BUILD_DIR"
 
   deploy-my:
     if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'my') }}
@@ -211,40 +189,33 @@ jobs:
             cd ${{ secrets.VPS_MY_REPO_PATH }}
             git pull origin main
 
-            cd frontend/web
-            rm -rf dist.bak
-            if [ -d dist ]; then
-              cp -a dist dist.bak || true
-            fi
+            BUILD_DIR="/tmp/vantag-frontend-build-my-$(date +%s)"
+            mkdir -p "$BUILD_DIR"
+            git archive HEAD frontend/web | tar -x -C "$BUILD_DIR"
+            cd "$BUILD_DIR/frontend/web"
 
             export NODE_ENV=development
             export NPM_CONFIG_PRODUCTION=false
             export NPM_CONFIG_OMIT=
-            NPM_CACHE="/tmp/vantag-npm-cache-$(date +%s)"
-            OLD_NODE_MODULES="node_modules.old.$(date +%s)"
-            if [ -e node_modules ]; then
-              mv node_modules "$OLD_NODE_MODULES"
-            fi
-            NPM_CONFIG_CACHE="$NPM_CACHE" npm ci --include=dev --omit=
+            NPM_CONFIG_CACHE="/tmp/vantag-npm-cache-my-$(date +%s)" npm ci --include=dev --omit=
             if ! npm run build:my; then
-              echo "Build failed — restoring previous dist/"
-              rm -rf dist
-              if [ -d dist.bak ]; then
-                mv dist.bak dist
-              else
-                echo "No dist.bak available to restore"
-              fi
+              echo "Build failed"
               exit 1
             fi
+            cd "${{ secrets.VPS_MY_REPO_PATH }}/frontend/web"
+            rm -rf dist.bak
+            if [ -d dist ]; then cp -a dist dist.bak; fi
+            rm -rf dist
+            cp -a "$BUILD_DIR/frontend/web/dist" dist
 
             sleep 3
             HTTP_CODE=$(curl -s -o /tmp/health_body_my.html -w "%{http_code}" -H "Host: jagajaga.my" -k https://localhost/ || echo "000")
             if [ "$HTTP_CODE" != "200" ] || ! grep -qi "retail" /tmp/health_body_my.html; then
               echo "Health check FAILED (HTTP $HTTP_CODE) — rolling back dist/"
               rm -rf dist
-              mv dist.bak dist
+              if [ -d dist.bak ]; then mv dist.bak dist; fi
               exit 1
             fi
 
             echo "Health check passed (HTTP $HTTP_CODE) — deploy successful"
-            rm -rf dist.bak
+            rm -rf dist.bak "$BUILD_DIR"
