@@ -24,6 +24,10 @@ on:
         description: "Comma-separated regions to deploy (in,sg,my,ph) or 'all'"
         default: "all"
 
+concurrency:
+  group: deploy-frontend-production
+  cancel-in-progress: true
+
 jobs:
   deploy-in:
     if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'in') }}
@@ -47,13 +51,14 @@ jobs:
               cp -a dist dist.bak || true
             fi
 
-            # The VPS environment may set NODE_ENV=production, which would skip
-            # devDependencies like cross-env. Force a full dev install.
             export NODE_ENV=development
 
-            # Avoid npm ci which aggressively re-creates node_modules and can fail
-            # on this VPS filesystem (ENOTEMPTY). npm install repairs in place.
-            npm install
+            NPM_CACHE="/tmp/vantag-npm-cache-$(date +%s)"
+            OLD_NODE_MODULES="node_modules.old.$(date +%s)"
+            if [ -e node_modules ]; then
+              mv node_modules "$OLD_NODE_MODULES"
+            fi
+            NPM_CONFIG_CACHE="$NPM_CACHE" npm ci --include=dev
 
             if ! npm run build:in; then
               echo "Build failed — restoring previous dist/"
@@ -102,26 +107,13 @@ jobs:
               cp -a dist dist.bak || true
             fi
 
-            # The VPS environment may set NODE_ENV=production, which would skip
-            # devDependencies like cross-env. Force a full dev install.
             export NODE_ENV=development
-
-            # The VPS filesystem sometimes keeps directories locked, so node_modules
-            # deletion needs to be forced and retried. Move it aside first (instant),
-            # then delete in the background so it cannot block the install.
-            set +e
-            if [ -d node_modules ]; then
-              OLD=node_modules.old.$$
-              mv node_modules "$OLD" || true
-              (nohup rm -rf "$OLD" >/dev/null 2>&1 &) || true
+            NPM_CACHE="/tmp/vantag-npm-cache-$(date +%s)"
+            OLD_NODE_MODULES="node_modules.old.$(date +%s)"
+            if [ -e node_modules ]; then
+              mv node_modules "$OLD_NODE_MODULES"
             fi
-            npm cache clean --force >/dev/null 2>&1 || true
-            set -e
-
-            if ! npm ci; then
-              echo "npm ci failed — falling back to npm install"
-              npm install
-            fi
+            NPM_CONFIG_CACHE="$NPM_CACHE" npm ci --include=dev
             if ! npm run build:sg; then
               echo "Build failed — restoring previous dist/"
               rm -rf dist
@@ -167,26 +159,13 @@ jobs:
               cp -a dist dist.bak || true
             fi
 
-            # The VPS environment may set NODE_ENV=production, which would skip
-            # devDependencies like cross-env. Force a full dev install.
             export NODE_ENV=development
-
-            # The VPS filesystem sometimes keeps directories locked, so node_modules
-            # deletion needs to be forced and retried. Move it aside first (instant),
-            # then delete in the background so it cannot block the install.
-            set +e
-            if [ -d node_modules ]; then
-              OLD=node_modules.old.$$
-              mv node_modules "$OLD" || true
-              (nohup rm -rf "$OLD" >/dev/null 2>&1 &) || true
+            NPM_CACHE="/tmp/vantag-npm-cache-$(date +%s)"
+            OLD_NODE_MODULES="node_modules.old.$(date +%s)"
+            if [ -e node_modules ]; then
+              mv node_modules "$OLD_NODE_MODULES"
             fi
-            npm cache clean --force >/dev/null 2>&1 || true
-            set -e
-
-            if ! npm ci; then
-              echo "npm ci failed — falling back to npm install"
-              npm install
-            fi
+            NPM_CONFIG_CACHE="$NPM_CACHE" npm ci --include=dev
             if ! npm run build:ph; then
               echo "Build failed — restoring previous dist/"
               rm -rf dist
