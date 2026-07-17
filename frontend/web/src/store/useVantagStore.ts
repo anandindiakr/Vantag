@@ -130,6 +130,7 @@ export interface Incident {
   reportUrl?: string;
   snapshotUrl?: string;
   isDemo?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 export type DoorState = 'locked' | 'unlocked' | 'unknown';

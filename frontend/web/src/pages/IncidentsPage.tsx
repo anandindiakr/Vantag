@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ChevronLeft,
@@ -21,6 +21,24 @@ import { Severity, EventType, Incident } from '../store/useVantagStore';
 // ── Lightbox ──────────────────────────────────────────────────────────────────
 function EvidenceLightbox({ url, onClose }: { url: string; onClose: () => void }) {
   const [imgError, setImgError] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    setImgError(false);
+    setImageUrl(null);
+    const requestUrl = url.startsWith('/api/') ? url.slice(4) : url;
+    api.get(requestUrl, { responseType: 'blob' })
+      .then(({ data }) => {
+        objectUrl = URL.createObjectURL(data as Blob);
+        setImageUrl(objectUrl);
+      })
+      .catch(() => setImgError(true));
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [url]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
@@ -42,13 +60,17 @@ function EvidenceLightbox({ url, onClose }: { url: string; onClose: () => void }
             <p className="text-slate-400 text-sm">Snapshot not available</p>
             <p className="text-slate-600 text-xs">The evidence image was captured before the camera frame loaded.</p>
           </div>
-        ) : (
+        ) : imageUrl ? (
           <img
-            src={url}
+            src={imageUrl}
             alt="Evidence snapshot"
             className="w-full rounded-xl border border-slate-600 shadow-2xl"
             onError={() => setImgError(true)}
           />
+        ) : (
+          <div className="w-full rounded-xl border border-slate-600 bg-slate-800 flex items-center justify-center py-20">
+            <Loader2 size={28} className="animate-spin text-slate-500" />
+          </div>
         )}
         <p className="text-center text-xs text-slate-400 mt-3">
           Camera snapshot captured at the moment of detection — zone highlighted in colour
@@ -379,6 +401,14 @@ export default function IncidentsPage() {
                         DEMO
                       </span>
                     )}
+                    {!inc.isDemo && inc.metadata?.source === 'edge_agent' && (
+                      <span
+                        title="Received from the Windows Edge Agent. This is not a simulated event."
+                        className="text-[10px] font-bold tracking-wider text-cyan-300 bg-cyan-500/15 border border-cyan-500/40 px-1.5 py-0.5 rounded"
+                      >
+                        EDGE
+                      </span>
+                    )}
                   </div>
 
                   {/* Severity */}
@@ -413,13 +443,9 @@ export default function IncidentsPage() {
                         className="flex items-center gap-1.5 group mt-1"
                         title="View evidence snapshot"
                       >
-                        <img
-                          src={inc.snapshotUrl}
-                          alt="Evidence"
-                          className="h-9 rounded border border-slate-600 group-hover:border-slate-400 transition-colors object-cover"
-                          style={{ aspectRatio: '16/9', width: 'auto' }}
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
+                        <span className="h-9 w-16 rounded border border-slate-600 group-hover:border-slate-400 transition-colors bg-slate-800 flex items-center justify-center">
+                          <Camera size={13} className="text-slate-500" />
+                        </span>
                         <span className="text-[10px] text-slate-500 group-hover:text-slate-300 transition-colors flex items-center gap-1">
                           <Camera size={10} /> View evidence
                         </span>

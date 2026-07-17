@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/zones", tags=["Zones"])
 class BboxZone(BaseModel):
     label:       str
     bbox:        list[int]            # [x1, y1, x2, y2] in pixels
-    zone_type:   str = "shelf"        # shelf | queue
+    zone_type:   str = "shelf"        # shelf | queue | people_count
     max_queue:   int | None = None    # for queue zones
 
 
@@ -50,6 +50,7 @@ class ZoneConfig(BaseModel):
     shelf_zones:      list[BboxZone]    = []
     restricted_zones: list[PolygonZone] = []
     queue_zones:      list[BboxZone]    = []
+    people_count_zones: list[BboxZone] = []
 
 
 class ZoneConfigResponse(BaseModel):
@@ -125,10 +126,23 @@ def _parse_zones(ac: dict[str, Any]) -> ZoneConfig:
         if "bbox" in z
     ]
 
+    pc_cfg = ac.get("people_count") or {}
+    raw_people_count = pc_cfg.get("zones") or []
+    people_count = [
+        BboxZone(
+            label=z.get("label", "People Count"),
+            bbox=z["bbox"],
+            zone_type="people_count",
+        )
+        for z in raw_people_count
+        if "bbox" in z
+    ]
+
     return ZoneConfig(
         shelf_zones=shelves,
         restricted_zones=restricted,
         queue_zones=queues,
+        people_count_zones=people_count,
     )
 
 
@@ -224,6 +238,13 @@ async def save_zones(
         for z in body.queue_zones
     ]
     ac["queue_length"] = ql_cfg
+
+    pc_cfg = dict(ac.get("people_count") or {})
+    pc_cfg["zones"] = [
+        {"label": z.label, "bbox": z.bbox}
+        for z in body.people_count_zones
+    ]
+    ac["people_count"] = pc_cfg
 
     # Reassign (not mutate in place) so SQLAlchemy detects the JSONB change.
     row.analyzer_config = ac

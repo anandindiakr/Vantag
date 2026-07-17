@@ -25,6 +25,7 @@ class CameraConfig:
     # Per-camera detection confidence threshold (0.25–0.85). When None the
     # agent falls back to the global AgentConfig.confidence_threshold.
     confidence: Optional[float] = None
+    people_count_zones: list[dict] = field(default_factory=list)
 
 
 @dataclass

@@ -118,6 +118,7 @@ const normIncident = (r: any): Incident => ({
   reportUrl:   r.report_url  ?? r.reportUrl    ?? undefined,
   snapshotUrl: r.snapshot_url ?? r.snapshotUrl ?? undefined,
   isDemo:      r.is_demo     ?? r.isDemo       ?? false,
+  metadata:    r.metadata    ?? undefined,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -427,8 +428,23 @@ export function useDeleteWatchlistEntry(): UseMutationResult<void, Error, string
 export function useGenerateReport(): UseMutationResult<Blob, Error, string> {
   return useMutation({
     mutationFn: async (incidentId: string) => {
-      const res = await api.get(`/reports/generate/${incidentId}`, { responseType: 'blob' });
-      return res.data as Blob;
+      const queued = await api.post<{ report_id: string }>(`/reports/generate/${incidentId}`);
+      let lastError: Error | undefined;
+
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        try {
+          const res = await api.get(`/reports/${queued.data.report_id}`, {
+            responseType: 'blob',
+            validateStatus: (status) => status >= 200 && status < 300,
+          });
+          return res.data as Blob;
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error('Report is not ready');
+        }
+      }
+
+      throw lastError ?? new Error('Report generation timed out');
     },
   });
 }

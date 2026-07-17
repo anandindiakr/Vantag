@@ -536,6 +536,7 @@ class DetectionAnalyzer:
         cooldown_sec: int = 30,
         fps: float = 5.0,
         pose_inference: Optional["YoloPoseInference"] = None,
+        people_count_zones: Optional[list[dict]] = None,
     ):
         self.camera_id = camera_id
         self.cooldown_sec = cooldown_sec
@@ -556,6 +557,7 @@ class DetectionAnalyzer:
             PoseShopliftingDetector(camera_id, pose_inference, cooldown_sec)
             if pose_inference is not None else None
         )
+        self._people_count_zones = people_count_zones or []
 
     def _can_emit(self, event_type: str) -> bool:
         last = self._last_event.get(event_type, 0)
@@ -592,7 +594,7 @@ class DetectionAnalyzer:
         items       = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "high_value_item"]
         shelf_items = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "shelf_item"]
 
-        self.last_person_count = len(persons)
+        self.last_person_count = self._count_people(persons, frame)
 
         # 1. Shoplifting: person near high-value item for >2s
         # Key on the ITEM's position (items are stationary — backpack/bag on shelf).
@@ -632,16 +634,9 @@ class DetectionAnalyzer:
             for k in oldest:
                 del self._person_frame_counts[k]
 
-        # 3. Inventory Movement: no shelf items for >60s
-        if not shelf_items:
-            if self._shelf_empty_since is None:
-                self._shelf_empty_since = now
-            elif now - self._shelf_empty_since >= 60.0:
-                evt = self._emit("inventory_movement", 0.85, [], frame)
-                if evt:
-                    events.append(evt)
-        else:
-            self._shelf_empty_since = None
+        # Inventory movement is configured and evaluated by the dedicated
+        # detector on the backend. Do not create a generic incident merely
+        # because this frame contains no shelf-item detections.
 
         # 4. Fall Detection
         fall_evt = self._fall_detector.analyse(persons, frame)
@@ -671,6 +666,24 @@ class DetectionAnalyzer:
 
         return events
 
+    def _count_people(self, persons: list, frame: np.ndarray) -> int:
+        if not self._people_count_zones:
+            return len(persons)
+
+        frame_height, frame_width = frame.shape[:2]
+        count = 0
+        for person in persons:
+            center_x = (person.x + person.w / 2) * frame_width
+            center_y = (person.y + person.h / 2) * frame_height
+            for zone in self._people_count_zones:
+                bbox = zone.get("bbox", [])
+                if len(bbox) != 4:
+                    continue
+                if bbox[0] <= center_x <= bbox[2] and bbox[1] <= center_y <= bbox[3]:
+                    count += 1
+                    break
+        return count
+
     @staticmethod
     def _boxes_overlap(a, b, threshold: float = 0.3) -> bool:
         x_overlap = max(0, min(a.x + a.w, b.x + b.w) - max(a.x, b.x))
@@ -699,6 +712,7 @@ class CameraWorker:
         event_cooldown_sec: int = 30,
         on_event: Optional[Callable[[dict], None]] = None,
         pose_inference: Optional[YoloPoseInference] = None,
+        people_count_zones: Optional[list[dict]] = None,
     ):
         self.config = config
         self._inference = inference
@@ -711,6 +725,7 @@ class CameraWorker:
             cooldown_sec=event_cooldown_sec,
             fps=float(target_fps),
             pose_inference=pose_inference,
+            people_count_zones=people_count_zones,
         )
 
         self._stop_event = threading.Event()

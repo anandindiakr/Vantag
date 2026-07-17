@@ -172,6 +172,7 @@ def _map_remote_camera(c: dict) -> CameraConfig:
         width=c.get("resolution_width") or c.get("width") or 1280,
         height=c.get("resolution_height") or c.get("height") or 720,
         confidence=conf,
+        people_count_zones=c.get("people_count_zones") or [],
     )
 
 
@@ -194,6 +195,7 @@ def _build_worker(cam):
         event_cooldown_sec=_config.event_cooldown_sec,
         on_event=_on_event,
         pose_inference=_pose_inference,
+        people_count_zones=getattr(cam, "people_count_zones", []),
     )
 
 
@@ -245,6 +247,9 @@ def reconcile_cameras():
             cam_id not in desired
             or desired[cam_id].rtsp_url != w.config.rtsp_url
             or _cam_conf(desired[cam_id]) != getattr(w, "_conf", None)
+            or desired[cam_id].people_count_zones != getattr(
+                w.config, "people_count_zones", []
+            )
         )
         if changed:
             log.info(f"Stopping worker for camera {cam_id} (removed/changed)")
@@ -317,6 +322,7 @@ def start_monitoring():
             event_cooldown_sec=_config.event_cooldown_sec,
             on_event=_on_event,
             pose_inference=_pose_inference,
+            people_count_zones=getattr(cam, "people_count_zones", []),
         )
         worker.start()
         _workers.append(worker)

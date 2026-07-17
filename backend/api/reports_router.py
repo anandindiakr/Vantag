@@ -173,7 +173,9 @@ def _generate_pdf_report(
         )
         elements.append(table)
 
-        description = incident_data.get("description", "No description available.")
+        description = str(incident_data.get("description", "No description available."))
+        from xml.sax.saxutils import escape
+        description = escape(description)
         elements.append(Spacer(1, 0.5 * cm))
         elements.append(Paragraph(f"<b>Description:</b> {description}", styles["Normal"]))
 
@@ -264,6 +266,40 @@ async def list_reports() -> ReportListResponse:
 # ---------------------------------------------------------------------------
 # GET /api/reports/{report_id}
 # ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/incident/{incident_id}",
+    summary="Generate and download an incident PDF",
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+async def download_incident_report(
+    incident_id: str,
+) -> FileResponse:
+    """Generate a report synchronously for the incident download action."""
+    incident_data = _find_incident(incident_id) or {
+        "incident_id": incident_id,
+        "store_id": "unknown",
+        "camera_id": "unknown",
+        "type": "manual",
+        "severity": "medium",
+        "description": "Incident report.",
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+    }
+    report_id = str(uuid.uuid4())
+    file_path = _generate_pdf_report(report_id, incident_id, incident_data)
+    _register_report(
+        report_id=report_id,
+        incident_id=incident_id,
+        store_id=incident_data.get("store_id", "unknown"),
+        file_name=file_path.name,
+        file_size=file_path.stat().st_size,
+    )
+    return FileResponse(
+        path=str(file_path),
+        media_type="application/pdf",
+        filename=file_path.name,
+    )
 
 
 @router.get(

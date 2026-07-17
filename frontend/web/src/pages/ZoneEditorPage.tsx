@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
-import { RefreshCw, Save, Trash2, CheckCircle, Loader2, AlertCircle, Undo2, Pencil, X, Check } from 'lucide-react';
+import { RefreshCw, Save, Trash2, CheckCircle, Loader2, AlertCircle, Undo2, Pencil, X, Check, Users } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { api } from '../hooks/useApi';
@@ -7,7 +7,7 @@ import InfoTooltip from '../components/InfoTooltip';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ZoneType = 'shelf' | 'restricted' | 'queue';
+type ZoneType = 'shelf' | 'restricted' | 'queue' | 'people_count';
 
 interface Zone {
   id:       string;
@@ -59,6 +59,15 @@ const ZONE_META: Record<ZoneType, {
     tagline: 'BLUE box',
     desc:    'Mark where customers wait to pay',
     guide:   'Click and drag on the camera image to mark the queue area',
+  },
+  people_count: {
+    label:   'People Count Area',
+    emoji:   '👥',
+    color:   'violet',
+    hex:     '#a78bfa',
+    tagline: 'PURPLE box',
+    desc:    'Count people only inside this area',
+    guide:   'Click and drag on the camera image to mark the people-count area',
   },
 };
 
@@ -178,6 +187,9 @@ export default function ZoneEditorPage() {
         }
         for (const q of data.zones?.queue_zones ?? []) {
           loaded.push({ id: uid(), label: q.label, bbox: q.bbox, type: 'queue', maxQueue: q.max_queue });
+        }
+        for (const p of data.zones?.people_count_zones ?? []) {
+          loaded.push({ id: uid(), label: p.label, bbox: p.bbox, type: 'people_count' });
         }
         for (const r of data.zones?.restricted_zones ?? []) {
           // Backend may store rectangle as 4-point polygon; convert to bbox if needed
@@ -379,7 +391,8 @@ export default function ZoneEditorPage() {
     const defaultLabel =
       mode === 'shelf'      ? `Shelf ${zoneCount}` :
       mode === 'restricted' ? `Restricted ${zoneCount}` :
-                              `Queue Lane ${zoneCount}`;
+      mode === 'queue'      ? `Queue Lane ${zoneCount}` :
+                              `People Count ${zoneCount}`;
 
     setNamePopup({ canvasX: popupX, canvasY: popupY, rect: currentRect, defaultLabel });
     void e;
@@ -427,6 +440,9 @@ export default function ZoneEditorPage() {
     queue_zones: list
       .filter((z) => z.type === 'queue')
       .map((z) => ({ label: z.label, bbox: z.bbox, zone_type: 'queue', max_queue: z.maxQueue ?? 5 })),
+    people_count_zones: list
+      .filter((z) => z.type === 'people_count')
+      .map((z) => ({ label: z.label, bbox: z.bbox, zone_type: 'people_count' })),
     restricted_zones: list
       .filter((z) => z.type === 'restricted')
       .map((z) => {
@@ -464,6 +480,11 @@ export default function ZoneEditorPage() {
   const testZone = async (zone: Zone) => {
     setTesting(zone.id);
     try {
+      if (zone.type === 'people_count') {
+        toast.success(`People counting is configured for "${zone.label}"`);
+        return;
+      }
+
       const eventType =
         zone.type === 'restricted' ? 'restricted_zone' :
         zone.type === 'queue'      ? 'queue_breach'     : 'inventory_movement';
@@ -824,10 +845,12 @@ export default function ZoneEditorPage() {
                           disabled={testing === zone.id || deletingId === zone.id}
                           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs hover:bg-blue-500/20 transition-colors disabled:opacity-50"
                         >
-                          {testing === zone.id
+                          {zone.type === 'people_count'
+                            ? <Users size={11} />
+                            : testing === zone.id
                             ? <Loader2 size={11} className="animate-spin" />
                             : <CheckCircle size={11} />}
-                          Test Event
+                          {zone.type === 'people_count' ? 'Counting Area' : 'Test Event'}
                         </button>
                         <button
                           onClick={() => startEditZone(zone)}

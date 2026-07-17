@@ -407,6 +407,11 @@ async def register_agent(
                 "fps_target": c.fps_target,
                 "resolution_width": c.resolution_width,
                 "resolution_height": c.resolution_height,
+                "people_count_zones": (
+                    (getattr(c, "analyzer_config", None) or {})
+                    .get("people_count", {})
+                    .get("zones", [])
+                ),
             }
             for c in cameras
         ],
@@ -622,6 +627,40 @@ async def ingest_event(
     """Receive a detection event from the edge agent and fan it out to the
     live dashboard pipeline (recent_events + risk buffer + SQLite + WebSocket).
     """
+    camera = None
+    try:
+        camera = (
+            await session.execute(
+                select(CameraConfig).where(
+                    CameraConfig.tenant_id == agent.tenant_id,
+                    CameraConfig.camera_id == body.camera_id,
+                )
+            )
+        ).scalar_one_or_none()
+    except Exception:
+        camera = None
+
+    event_type = body.event_type.lower()
+    analyzer_config = (getattr(camera, "analyzer_config", None) or {}) if camera else {}
+    configured_zones = {
+        "inventory_movement": (analyzer_config.get("inventory_movement") or {}).get("zones") or [],
+        "restricted_zone": (analyzer_config.get("restricted_zone") or {}).get("restricted_zones") or [],
+        "queue_breach": (analyzer_config.get("queue_length") or {}).get("queue_zones") or [],
+        "queue_length": (analyzer_config.get("queue_length") or {}).get("queue_zones") or [],
+    }
+    if event_type in configured_zones and not configured_zones[event_type]:
+        logger.info(
+            "Ignored unconfigured edge event | tenant=%s camera=%s type=%s",
+            agent.tenant_id,
+            body.camera_id,
+            event_type,
+        )
+        return {
+            "ok": True,
+            "ignored": True,
+            "reason": f"{event_type} has no configured zone",
+        }
+
     # 1) Decode + persist the snapshot JPEG so the dashboard can display it.
     snapshot_url = None
     if body.snapshot_b64:
@@ -634,16 +673,8 @@ async def ingest_event(
     location = body.location
     if location is None:
         try:
-            cam = (
-                await session.execute(
-                    select(CameraConfig).where(
-                        CameraConfig.tenant_id == agent.tenant_id,
-                        CameraConfig.camera_id == body.camera_id,
-                    )
-                )
-            ).scalar_one_or_none()
-            if cam is not None:
-                location = cam.location
+            if camera is not None:
+                location = camera.location
         except Exception:  # noqa: BLE001
             location = None
     store_id = (location or "auto-detected").split("–")[0].strip().lower().replace(" ", "_")
@@ -683,7 +714,10 @@ async def ingest_event(
         "risk_score": body.risk_score,
         "description": description,
         "snapshot_url": snapshot_url,
-        "metadata": body.metadata or {},
+        "metadata": {
+            **(body.metadata or {}),
+            "source": "edge_agent",
+        },
         "acknowledged": False,
         "is_demo": False,
     }
@@ -736,6 +770,11 @@ async def get_config(
                 "location": c.location,
                 "fps_target": c.fps_target,
                 "confidence_threshold": (getattr(c, "analyzer_config", None) or {}).get("confidence_threshold"),
+                "people_count_zones": (
+                    (getattr(c, "analyzer_config", None) or {})
+                    .get("people_count", {})
+                    .get("zones", [])
+                ),
             }
             for c in cameras
         ]
