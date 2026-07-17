@@ -1,6 +1,13 @@
 name: Deploy Backend (Vantag FastAPI)
 
-# Real infra: each region runs its own VPS with a git checkout of this repo.
+# Real infra: ALL region domains (retailnazar.com, retail-vantag.com,
+# jagajaga.my, retailjagajaga.com, retailbantay.com, retailpantau.com)
+# resolve to the SAME VPS and are served by the SAME vantag-backend
+# container. There is only one backend to deploy, so this workflow runs a
+# single deploy job (previously 4 sequential region jobs rebuilt the same
+# container 4 times, and the MY job failed on an unreachable VPS_MY_HOST
+# secret).
+#
 # docker/docker-compose.prod.yml builds the backend image from source via
 # docker/Dockerfile.edge (context = repo root). Deploying is:
 #   git pull -> docker compose build vantag-backend -> up -d vantag-backend
@@ -25,23 +32,18 @@ on:
       - "docker/docker-compose.prod.yml"
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
-    inputs:
-      regions:
-        description: "Comma-separated regions to deploy (in,sg,my,ph) or 'all'"
-        default: "all"
 
-# All region jobs SSH into shared infrastructure — never allow two deploy
-# runs (or two region jobs) to execute at the same time.
+# The deploy SSHes into shared infrastructure — never allow two deploy
+# runs to execute at the same time.
 concurrency:
   group: deploy-backend
   cancel-in-progress: false
 
 jobs:
-  deploy-in:
-    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'in') }}
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy backend to India VPS
+      - name: Deploy backend to VPS (serves all region domains)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_IN_HOST }}
@@ -61,186 +63,6 @@ jobs:
               docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
 
               echo "Waiting for container health..."
-              for i in $(seq 1 45); do
-                STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
-                if [ "$STATUS" = "healthy" ]; then
-                  break
-                fi
-                sleep 6
-              done
-
-              HTTP_CODE="000"
-              for i in $(seq 1 10); do
-                HTTP_CODE=$(docker exec vantag-backend curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health || echo "000")
-                if [ "$HTTP_CODE" = "200" ]; then
-                  break
-                fi
-                sleep 6
-              done
-              if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
-                return 0
-              else
-                echo "Backend unhealthy (container status=$STATUS, /health HTTP=$HTTP_CODE)"
-                return 1
-              fi
-            }
-
-            if deploy_and_check; then
-              echo "Backend deploy successful and healthy."
-              docker image prune -f
-            else
-              echo "Deploy failed health check — rolling back to $PREV_SHA"
-              git reset --hard "$PREV_SHA"
-              docker compose -f docker/docker-compose.prod.yml build vantag-backend
-              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
-              echo "Rolled back to previous version. Failing job for visibility."
-              exit 1
-            fi
-
-  deploy-sg:
-    needs: deploy-in
-    if: ${{ !cancelled() && (github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'sg')) }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy backend to Singapore VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_SG_HOST }}
-          username: ${{ secrets.VPS_SG_USER }}
-          key: ${{ secrets.VPS_SG_SSH_KEY }}
-          command_timeout: 30m
-          script: |
-            set -e
-            cd ${{ secrets.VPS_SG_REPO_PATH }}
-            PREV_SHA=$(git rev-parse HEAD)
-            echo "Previous known-good commit: $PREV_SHA"
-            git fetch origin main
-            git reset --hard origin/main
-
-            deploy_and_check() {
-              docker compose -f docker/docker-compose.prod.yml build vantag-backend
-              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
-
-              for i in $(seq 1 45); do
-                STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
-                if [ "$STATUS" = "healthy" ]; then
-                  break
-                fi
-                sleep 6
-              done
-
-              HTTP_CODE="000"
-              for i in $(seq 1 10); do
-                HTTP_CODE=$(docker exec vantag-backend curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health || echo "000")
-                if [ "$HTTP_CODE" = "200" ]; then
-                  break
-                fi
-                sleep 6
-              done
-              if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
-                return 0
-              else
-                echo "Backend unhealthy (container status=$STATUS, /health HTTP=$HTTP_CODE)"
-                return 1
-              fi
-            }
-
-            if deploy_and_check; then
-              echo "Backend deploy successful and healthy."
-              docker image prune -f
-            else
-              echo "Deploy failed health check — rolling back to $PREV_SHA"
-              git reset --hard "$PREV_SHA"
-              docker compose -f docker/docker-compose.prod.yml build vantag-backend
-              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
-              echo "Rolled back to previous version. Failing job for visibility."
-              exit 1
-            fi
-
-  deploy-ph:
-    needs: deploy-sg
-    if: ${{ !cancelled() && (github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'ph')) }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy backend to Philippines VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_PH_HOST }}
-          username: ${{ secrets.VPS_PH_USER }}
-          key: ${{ secrets.VPS_PH_SSH_KEY }}
-          command_timeout: 30m
-          script: |
-            set -e
-            cd ${{ secrets.VPS_PH_REPO_PATH }}
-            PREV_SHA=$(git rev-parse HEAD)
-            echo "Previous known-good commit: $PREV_SHA"
-            git fetch origin main
-            git reset --hard origin/main
-
-            deploy_and_check() {
-              docker compose -f docker/docker-compose.prod.yml build vantag-backend
-              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
-
-              for i in $(seq 1 45); do
-                STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
-                if [ "$STATUS" = "healthy" ]; then
-                  break
-                fi
-                sleep 6
-              done
-
-              HTTP_CODE="000"
-              for i in $(seq 1 10); do
-                HTTP_CODE=$(docker exec vantag-backend curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health || echo "000")
-                if [ "$HTTP_CODE" = "200" ]; then
-                  break
-                fi
-                sleep 6
-              done
-              if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
-                return 0
-              else
-                echo "Backend unhealthy (container status=$STATUS, /health HTTP=$HTTP_CODE)"
-                return 1
-              fi
-            }
-
-            if deploy_and_check; then
-              echo "Backend deploy successful and healthy."
-              docker image prune -f
-            else
-              echo "Deploy failed health check — rolling back to $PREV_SHA"
-              git reset --hard "$PREV_SHA"
-              docker compose -f docker/docker-compose.prod.yml build vantag-backend
-              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
-              echo "Rolled back to previous version. Failing job for visibility."
-              exit 1
-            fi
-
-  deploy-my:
-    needs: deploy-ph
-    if: ${{ !cancelled() && (github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'my')) }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy backend to Malaysia VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_MY_HOST }}
-          username: ${{ secrets.VPS_MY_USER }}
-          key: ${{ secrets.VPS_MY_SSH_KEY }}
-          command_timeout: 30m
-          script: |
-            set -e
-            cd ${{ secrets.VPS_MY_REPO_PATH }}
-            PREV_SHA=$(git rev-parse HEAD)
-            echo "Previous known-good commit: $PREV_SHA"
-            git fetch origin main
-            git reset --hard origin/main
-
-            deploy_and_check() {
-              docker compose -f docker/docker-compose.prod.yml build vantag-backend
-              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
-
               for i in $(seq 1 45); do
                 STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
                 if [ "$STATUS" = "healthy" ]; then
