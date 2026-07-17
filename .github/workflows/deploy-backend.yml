@@ -9,7 +9,9 @@ name: Deploy Backend (Vantag FastAPI)
 #
 # Safety: the previously-deployed commit SHA is recorded before pulling. The
 # new backend image is health-checked (docker compose healthcheck status,
-# then a real HTTP call to /health through nginx) with retries. If it does
+# then a real HTTP call to /health inside the container — NOT through the
+# host's nginx, since the VPS hosts multiple apps and https://localhost hits
+# a different vhost, returning 404 and causing false rollbacks). If it does
 # not become healthy in time, the workflow automatically rolls back: git
 # checkout the previous commit, rebuild, and restart — leaving the VPS on
 # the last known-good version — then fails the job so it's visible in CI.
@@ -69,7 +71,7 @@ jobs:
 
               HTTP_CODE="000"
               for i in $(seq 1 10); do
-                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+                HTTP_CODE=$(docker exec vantag-backend curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health || echo "000")
                 if [ "$HTTP_CODE" = "200" ]; then
                   break
                 fi
@@ -129,7 +131,7 @@ jobs:
 
               HTTP_CODE="000"
               for i in $(seq 1 10); do
-                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+                HTTP_CODE=$(docker exec vantag-backend curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health || echo "000")
                 if [ "$HTTP_CODE" = "200" ]; then
                   break
                 fi
@@ -189,7 +191,7 @@ jobs:
 
               HTTP_CODE="000"
               for i in $(seq 1 10); do
-                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+                HTTP_CODE=$(docker exec vantag-backend curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health || echo "000")
                 if [ "$HTTP_CODE" = "200" ]; then
                   break
                 fi
@@ -249,7 +251,7 @@ jobs:
 
               HTTP_CODE="000"
               for i in $(seq 1 10); do
-                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+                HTTP_CODE=$(docker exec vantag-backend curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health || echo "000")
                 if [ "$HTTP_CODE" = "200" ]; then
                   break
                 fi
