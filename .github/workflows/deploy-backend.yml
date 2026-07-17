@@ -44,22 +44,30 @@ jobs:
             cd ${{ secrets.VPS_IN_REPO_PATH }}
             PREV_SHA=$(git rev-parse HEAD)
             echo "Previous known-good commit: $PREV_SHA"
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             deploy_and_check() {
               docker compose -f docker/docker-compose.prod.yml build vantag-backend
               docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
 
               echo "Waiting for container health..."
-              for i in $(seq 1 15); do
+              for i in $(seq 1 45); do
                 STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
                 if [ "$STATUS" = "healthy" ]; then
                   break
                 fi
-                sleep 4
+                sleep 6
               done
 
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+              HTTP_CODE="000"
+              for i in $(seq 1 10); do
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+                if [ "$HTTP_CODE" = "200" ]; then
+                  break
+                fi
+                sleep 6
+              done
               if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
                 return 0
               else
@@ -73,7 +81,7 @@ jobs:
               docker image prune -f
             else
               echo "Deploy failed health check — rolling back to $PREV_SHA"
-              git checkout "$PREV_SHA" -- .
+              git reset --hard "$PREV_SHA"
               docker compose -f docker/docker-compose.prod.yml build vantag-backend
               docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
               echo "Rolled back to previous version. Failing job for visibility."
@@ -95,21 +103,29 @@ jobs:
             cd ${{ secrets.VPS_SG_REPO_PATH }}
             PREV_SHA=$(git rev-parse HEAD)
             echo "Previous known-good commit: $PREV_SHA"
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             deploy_and_check() {
               docker compose -f docker/docker-compose.prod.yml build vantag-backend
               docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
 
-              for i in $(seq 1 15); do
+              for i in $(seq 1 45); do
                 STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
                 if [ "$STATUS" = "healthy" ]; then
                   break
                 fi
-                sleep 4
+                sleep 6
               done
 
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+              HTTP_CODE="000"
+              for i in $(seq 1 10); do
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+                if [ "$HTTP_CODE" = "200" ]; then
+                  break
+                fi
+                sleep 6
+              done
               if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
                 return 0
               else
@@ -123,7 +139,7 @@ jobs:
               docker image prune -f
             else
               echo "Deploy failed health check — rolling back to $PREV_SHA"
-              git checkout "$PREV_SHA" -- .
+              git reset --hard "$PREV_SHA"
               docker compose -f docker/docker-compose.prod.yml build vantag-backend
               docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
               echo "Rolled back to previous version. Failing job for visibility."
@@ -145,21 +161,29 @@ jobs:
             cd ${{ secrets.VPS_PH_REPO_PATH }}
             PREV_SHA=$(git rev-parse HEAD)
             echo "Previous known-good commit: $PREV_SHA"
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             deploy_and_check() {
               docker compose -f docker/docker-compose.prod.yml build vantag-backend
               docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
 
-              for i in $(seq 1 15); do
+              for i in $(seq 1 45); do
                 STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
                 if [ "$STATUS" = "healthy" ]; then
                   break
                 fi
-                sleep 4
+                sleep 6
               done
 
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+              HTTP_CODE="000"
+              for i in $(seq 1 10); do
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+                if [ "$HTTP_CODE" = "200" ]; then
+                  break
+                fi
+                sleep 6
+              done
               if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
                 return 0
               else
@@ -173,7 +197,7 @@ jobs:
               docker image prune -f
             else
               echo "Deploy failed health check — rolling back to $PREV_SHA"
-              git checkout "$PREV_SHA" -- .
+              git reset --hard "$PREV_SHA"
               docker compose -f docker/docker-compose.prod.yml build vantag-backend
               docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
               echo "Rolled back to previous version. Failing job for visibility."
@@ -195,21 +219,29 @@ jobs:
             cd ${{ secrets.VPS_MY_REPO_PATH }}
             PREV_SHA=$(git rev-parse HEAD)
             echo "Previous known-good commit: $PREV_SHA"
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             deploy_and_check() {
               docker compose -f docker/docker-compose.prod.yml build vantag-backend
               docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
 
-              for i in $(seq 1 15); do
+              for i in $(seq 1 45); do
                 STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
                 if [ "$STATUS" = "healthy" ]; then
                   break
                 fi
-                sleep 4
+                sleep 6
               done
 
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+              HTTP_CODE="000"
+              for i in $(seq 1 10); do
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost/health || echo "000")
+                if [ "$HTTP_CODE" = "200" ]; then
+                  break
+                fi
+                sleep 6
+              done
               if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
                 return 0
               else
@@ -223,7 +255,7 @@ jobs:
               docker image prune -f
             else
               echo "Deploy failed health check — rolling back to $PREV_SHA"
-              git checkout "$PREV_SHA" -- .
+              git reset --hard "$PREV_SHA"
               docker compose -f docker/docker-compose.prod.yml build vantag-backend
               docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
               echo "Rolled back to previous version. Failing job for visibility."
