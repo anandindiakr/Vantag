@@ -252,6 +252,33 @@ signaling_server = IntercomSignalingServer()
 
 
 # ---------------------------------------------------------------------------
+# REST endpoint — session initiation / status probe
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/cameras/{camera_id}/intercom/initiate")
+async def initiate_intercom(camera_id: str) -> dict:
+    """Create (or reuse) an intercom session and report edge availability.
+
+    The dashboard calls this before opening the signaling WebSocket so it can
+    tell the operator whether a speaker-equipped edge device is actually
+    connected for this camera. Two-way audio only works when the on-premises
+    edge peer has joined ``/ws/intercom/{camera_id}?role=edge``.
+    """
+    session = await signaling_server.get_or_create_session(camera_id)
+    edge_connected = bool(
+        session.edge_ws
+        and session.edge_ws.client_state == WebSocketState.CONNECTED
+    )
+    return {
+        "camera_id": camera_id,
+        "state": session.state,
+        "edge_connected": edge_connected,
+        "ws_url": f"/ws/intercom/{camera_id}?role=dashboard",
+    }
+
+
+# ---------------------------------------------------------------------------
 # WebSocket endpoint
 # ---------------------------------------------------------------------------
 

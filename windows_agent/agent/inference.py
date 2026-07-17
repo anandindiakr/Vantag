@@ -190,3 +190,162 @@ class YoloInference:
             ))
 
         return results[:50]  # cap at 50 boxes
+
+
+# ---------------------------------------------------------------------------
+# Pose estimation (YOLOv8n-pose) — used for concealment-gesture shoplifting
+# detection. 17 COCO keypoints per person.
+# ---------------------------------------------------------------------------
+
+COCO_KEYPOINTS = [
+    "nose", "left_eye", "right_eye", "left_ear", "right_ear",
+    "left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
+    "left_wrist", "right_wrist", "left_hip", "right_hip",
+    "left_knee", "right_knee", "left_ankle", "right_ankle",
+]
+
+# Keypoint indices used by the concealment heuristic
+KP_L_SHOULDER, KP_R_SHOULDER = 5, 6
+KP_L_WRIST, KP_R_WRIST = 9, 10
+KP_L_HIP, KP_R_HIP = 11, 12
+
+
+class PersonPose:
+    """A detected person with 17 COCO keypoints.
+
+    ``keypoints`` is an ndarray [17, 3] of (x, y, conf) with x/y normalized
+    to 0-1 relative to the original frame.
+    """
+
+    def __init__(self, box: BoundingBox, keypoints: np.ndarray):
+        self.box = box
+        self.keypoints = keypoints
+
+    def kp(self, idx: int, min_conf: float = 0.3):
+        """Return (x, y) for keypoint ``idx`` or None if below confidence."""
+        x, y, c = self.keypoints[idx]
+        if c < min_conf:
+            return None
+        return float(x), float(y)
+
+    def to_dict(self) -> dict:
+        return {
+            "box": self.box.to_dict(),
+            "keypoints": {
+                COCO_KEYPOINTS[i]: [round(float(x), 4), round(float(y), 4), round(float(c), 3)]
+                for i, (x, y, c) in enumerate(self.keypoints)
+            },
+        }
+
+
+class YoloPoseInference(YoloInference):
+    """YOLOv8n-pose via ONNX Runtime.
+
+    Output tensor is [1, 56, 8400]: 4 box coords + 1 person conf +
+    17 keypoints x (x, y, conf). Coordinates are in 640-input pixel space.
+    """
+
+    MODEL_URLS = []  # no reliable prebuilt pose ONNX mirror — export locally
+
+    def _load_model(self, model_path: Optional[str]):
+        try:
+            import onnxruntime as ort
+
+            if model_path is None:
+                cache_dir = Path.home() / ".vantag" / "models"
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                model_path = str(cache_dir / "yolov8n-pose.onnx")
+
+                if not Path(model_path).exists():
+                    self._acquire_model(model_path)
+
+            providers = ["CPUExecutionProvider"]
+            if self.device == "cuda":
+                providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+            elif self.device == "dml":
+                providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
+
+            opts = ort.SessionOptions()
+            opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            opts.intra_op_num_threads = 4
+            self._session = ort.InferenceSession(model_path, sess_options=opts, providers=providers)
+            self._input_name = self._session.get_inputs()[0].name
+            log.info(f"ONNX pose model loaded: {model_path} providers={providers}")
+
+        except ImportError:
+            log.warning("onnxruntime not installed — pose inference disabled")
+        except Exception as e:
+            log.error(f"Failed to load ONNX pose model: {e}")
+
+    def _acquire_model(self, model_path: str):
+        try:
+            from ultralytics import YOLO
+            import shutil
+            log.info("Preparing YOLOv8n-pose ONNX via ultralytics (first run only, ~30s)…")
+            m = YOLO("yolov8n-pose.pt")
+            exported = m.export(format="onnx", imgsz=self._img_size, opset=12)
+            shutil.copyfile(str(exported), model_path)
+            log.info(f"Pose model ready at {model_path}")
+            return
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(f"Could not obtain YOLOv8n-pose model: {e}")
+
+    def detect_poses(self, frame_bgr: np.ndarray, conf_threshold: float = 0.4) -> List["PersonPose"]:
+        """Run pose inference on a BGR frame. Returns list of PersonPose."""
+        if self._session is None:
+            return []
+        try:
+            blob = self._preprocess(frame_bgr)
+            outputs = self._session.run(None, {self._input_name: blob})
+            return self._postprocess_pose(outputs[0], conf_threshold)
+        except Exception as e:
+            log.error(f"Pose inference error: {e}")
+            return []
+
+    def _postprocess_pose(self, output: np.ndarray, conf: float) -> List["PersonPose"]:
+        output = np.squeeze(output)  # [56, 8400]
+        if output.ndim != 2 or output.shape[0] != 56:
+            return []
+
+        boxes = output[:4].T          # [8400, 4] cx, cy, w, h (640-px space)
+        scores = output[4]            # [8400] person confidence
+        kps = output[5:].T            # [8400, 51] → 17 x (x, y, conf)
+
+        keep = np.where(scores >= conf)[0]
+        if keep.size == 0:
+            return []
+
+        # Greedy NMS on the kept candidates (pose head has no class NMS baked in)
+        order = keep[np.argsort(-scores[keep])]
+        selected = []
+        for i in order:
+            cx, cy, bw, bh = boxes[i]
+            dup = False
+            for j in selected:
+                cx2, cy2, bw2, bh2 = boxes[j]
+                # IoU approximation via center distance vs half-extent
+                if abs(cx - cx2) < (bw + bw2) * 0.3 and abs(cy - cy2) < (bh + bh2) * 0.3:
+                    dup = True
+                    break
+            if not dup:
+                selected.append(i)
+            if len(selected) >= 20:
+                break
+
+        results = []
+        s = float(self._img_size)
+        for i in selected:
+            cx, cy, bw, bh = boxes[i]
+            box = BoundingBox(
+                x=max(0.0, float(cx - bw / 2) / s),
+                y=max(0.0, float(cy - bh / 2) / s),
+                w=min(1.0, float(bw) / s),
+                h=min(1.0, float(bh) / s),
+                label="person",
+                confidence=float(scores[i]),
+            )
+            pts = kps[i].reshape(17, 3).astype(np.float64).copy()
+            pts[:, 0] /= s
+            pts[:, 1] /= s
+            results.append(PersonPose(box, pts))
+        return results

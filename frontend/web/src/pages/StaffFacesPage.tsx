@@ -69,6 +69,12 @@ function AddStaffModal({ onClose }: AddStaffModalProps) {
               Use a clear, front-facing photo in good lighting — no mask, cap or sunglasses.
               One face per photo. Enrolled staff are <span className="text-vantag-green font-medium">whitelisted</span>:
               they will not trigger intruder / no-entry / after-hours alerts.
+              <br /><br />
+              <span className="text-slate-100 font-medium">Ceiling / angled cameras?</span>{' '}
+              One photo gives ~70–80% recognition when cameras look down at an angle.
+              For 90%+ accuracy, enroll the <span className="font-medium">same person 2–3 times</span> with
+              different photos: straight-on, looking slightly down (how the camera sees them), and a
+              side/three-quarter view. Use the same name each time — all photos count toward matching.
             </p>
           </div>
 

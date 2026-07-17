@@ -33,7 +33,11 @@ import numpy as np
 
 from .config import CameraConfig
 from .api_client import VantagApiClient
-from .inference import YoloInference, RETAIL_CLASSES
+from .inference import (
+    YoloInference, RETAIL_CLASSES,
+    YoloPoseInference, PersonPose,
+    KP_L_SHOULDER, KP_R_SHOULDER, KP_L_WRIST, KP_R_WRIST, KP_L_HIP, KP_R_HIP,
+)
 
 log = logging.getLogger("vantag.camera")
 
@@ -376,6 +380,129 @@ class SuspiciousBehaviorDetector:
 
 
 # ---------------------------------------------------------------------------
+# Pose-based Concealment Shoplifting Detector
+# ---------------------------------------------------------------------------
+
+class PoseShopliftingDetector:
+    """
+    Concealment-gesture shoplifting detection using body pose keypoints
+    (YOLOv8n-pose). Complements the proximity-based heuristic: it looks at
+    WHAT the person is doing with their hands, not just where they stand.
+
+    Heuristic: a wrist that dips below the hip line AND stays close to the
+    body's vertical centerline (hand tucked at waist/pocket/bag rather than
+    swinging naturally at the side) for several consecutive pose frames is a
+    concealment gesture — slipping an item into a waistband, pocket or bag.
+
+    Pose inference runs at most once per POSE_INTERVAL seconds to keep CPU
+    usage bounded regardless of the main inference fps.
+    """
+
+    POSE_INTERVAL    = 1.0    # seconds between pose runs (CPU budget)
+    CONCEAL_FRAMES   = 3      # consecutive pose frames showing the gesture
+    CENTER_TOLERANCE = 0.25   # wrist within this fraction of box width from centerline
+
+    def __init__(self, camera_id: str, pose_inference: "YoloPoseInference", cooldown_sec: int = 60):
+        self.camera_id = camera_id
+        self._pose = pose_inference
+        self._cooldown = max(cooldown_sec, 60)
+        self._last_run: float = 0.0
+        self._last_event: dict[str, float] = {}
+        # cell → consecutive gesture-frame count
+        self._streaks: dict[str, int] = {}
+
+    def _cell(self, box) -> str:
+        cx = int(min(box.x + box.w / 2, 0.999) * 4)
+        cy = int(min(box.y + box.h / 2, 0.999) * 4)
+        return f"{cx}_{cy}"
+
+    @staticmethod
+    def _gesture(person: "PersonPose") -> Optional[str]:
+        """Return 'left'/'right' if that wrist shows a concealment gesture."""
+        l_hip = person.kp(KP_L_HIP)
+        r_hip = person.kp(KP_R_HIP)
+        hips = [h for h in (l_hip, r_hip) if h is not None]
+        if not hips:
+            return None
+        hip_y = sum(h[1] for h in hips) / len(hips)
+
+        l_sh = person.kp(KP_L_SHOULDER)
+        r_sh = person.kp(KP_R_SHOULDER)
+        shoulders = [s for s in (l_sh, r_sh) if s is not None]
+        if shoulders:
+            center_x = sum(s[0] for s in shoulders) / len(shoulders)
+        else:
+            center_x = person.box.x + person.box.w / 2
+
+        tol = PoseShopliftingDetector.CENTER_TOLERANCE * max(person.box.w, 1e-4)
+
+        for side, kp_idx in (("left", KP_L_WRIST), ("right", KP_R_WRIST)):
+            wrist = person.kp(kp_idx)
+            if wrist is None:
+                continue
+            wx, wy = wrist
+            # Below the hip line AND tucked toward the body centerline
+            if wy > hip_y and abs(wx - center_x) < tol:
+                return side
+        return None
+
+    def analyse(self, frame: np.ndarray) -> Optional[dict]:
+        if self._pose is None or self._pose._session is None:
+            return None
+        now = time.time()
+        if now - self._last_run < self.POSE_INTERVAL:
+            return None
+        self._last_run = now
+
+        poses = self._pose.detect_poses(frame, conf_threshold=0.4)
+        seen: set[str] = set()
+        result: Optional[dict] = None
+
+        for person in poses:
+            cell = self._cell(person.box)
+            seen.add(cell)
+            side = self._gesture(person)
+            if side is None:
+                self._streaks[cell] = 0
+                continue
+
+            self._streaks[cell] = self._streaks.get(cell, 0) + 1
+            if self._streaks[cell] < self.CONCEAL_FRAMES:
+                continue
+
+            last = self._last_event.get(cell, 0)
+            if now - last < self._cooldown:
+                continue
+            self._last_event[cell] = now
+            self._streaks[cell] = 0
+
+            small = cv2.resize(frame, (320, 180))
+            _, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 60])
+            snap = base64.b64encode(buf.tobytes()).decode()
+            result = {
+                "camera_id": self.camera_id,
+                "event_type": "shoplifting",
+                "severity": "high",
+                "confidence": round(person.box.confidence, 3),
+                "snapshot_b64": snap,
+                "metadata": {
+                    "timestamp": int(now * 1000),
+                    "detection_method": "pose_concealment",
+                    "wrist_side": side,
+                    "bounding_boxes": [person.box.to_dict()],
+                    "pose": person.to_dict(),
+                },
+            }
+
+        # Reset streaks for cells with no person this pose frame
+        for cell in list(self._streaks.keys()):
+            if cell not in seen:
+                del self._streaks[cell]
+
+        return result
+
+
+# ---------------------------------------------------------------------------
 # Detection Analyzer (orchestrates all sub-detectors)
 # ---------------------------------------------------------------------------
 
@@ -403,7 +530,13 @@ class DetectionAnalyzer:
         "suspicious_behavior": "medium",
     }
 
-    def __init__(self, camera_id: str, cooldown_sec: int = 30, fps: float = 5.0):
+    def __init__(
+        self,
+        camera_id: str,
+        cooldown_sec: int = 30,
+        fps: float = 5.0,
+        pose_inference: Optional["YoloPoseInference"] = None,
+    ):
         self.camera_id = camera_id
         self.cooldown_sec = cooldown_sec
         self.fps = fps
@@ -412,10 +545,17 @@ class DetectionAnalyzer:
         self._person_frame_counts: dict[str, int] = {}
         self._shelf_empty_since: Optional[float] = None
 
+        # Live person count from the most recent analysed frame (footfall)
+        self.last_person_count: int = 0
+
         self._fall_detector = FallDetector(camera_id, cooldown_sec)
         self._loiter_detector = LoiteringDetector(camera_id, cooldown_sec)
         self._crowd_detector = CrowdDetector(camera_id, cooldown_sec)
         self._suspicious_detector = SuspiciousBehaviorDetector(camera_id, cooldown_sec)
+        self._pose_detector: Optional[PoseShopliftingDetector] = (
+            PoseShopliftingDetector(camera_id, pose_inference, cooldown_sec)
+            if pose_inference is not None else None
+        )
 
     def _can_emit(self, event_type: str) -> bool:
         last = self._last_event.get(event_type, 0)
@@ -451,6 +591,8 @@ class DetectionAnalyzer:
         persons     = [b for b in boxes if b.label == "person"]
         items       = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "high_value_item"]
         shelf_items = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "shelf_item"]
+
+        self.last_person_count = len(persons)
 
         # 1. Shoplifting: person near high-value item for >2s
         # Key on the ITEM's position (items are stationary — backpack/bag on shelf).
@@ -521,6 +663,12 @@ class DetectionAnalyzer:
         if suspicious_evt:
             events.append(suspicious_evt)
 
+        # 8. Pose-based concealment shoplifting (rate-limited internally)
+        if self._pose_detector is not None:
+            pose_evt = self._pose_detector.analyse(frame)
+            if pose_evt:
+                events.append(pose_evt)
+
         return events
 
     @staticmethod
@@ -550,6 +698,7 @@ class CameraWorker:
         target_fps: int = 5,
         event_cooldown_sec: int = 30,
         on_event: Optional[Callable[[dict], None]] = None,
+        pose_inference: Optional[YoloPoseInference] = None,
     ):
         self.config = config
         self._inference = inference
@@ -561,6 +710,7 @@ class CameraWorker:
             camera_id=config.id,
             cooldown_sec=event_cooldown_sec,
             fps=float(target_fps),
+            pose_inference=pose_inference,
         )
 
         self._stop_event = threading.Event()
@@ -625,14 +775,24 @@ class CameraWorker:
                 fps_frames = 0
                 last_infer = 0.0
 
-                # LOW-LATENCY LOOP: read every frame at the camera's native
-                # rate (cap.read() blocks until the next frame, so this loop
-                # self-paces). Never sleep between reads — sleeping lets
-                # FFMPEG's internal buffer fill with stale frames, which is
-                # what caused the multi-second live-view lag. AI inference is
-                # gated by wall-clock time instead of a frame counter.
+                # LOW-LATENCY LOOP with GRAB-DRAIN: cap.read() decodes frames
+                # one-by-one, so whenever AI inference blocks longer than one
+                # frame period, FFMPEG's buffer accumulates stale frames and
+                # the live view drifts seconds behind realtime. Fix: grab()
+                # (cheap, no decode) repeatedly to drain any buffered frames,
+                # then retrieve() (decode) only the NEWEST one. A grab that
+                # returns in <5ms was a stale buffered frame; a grab that
+                # blocks longer waited for a fresh frame — stop draining.
                 while not self._stop_event.is_set():
-                    ret, frame = cap.read()
+                    if not cap.grab():
+                        raise ConnectionError("Frame grab failed — stream ended")
+                    for _ in range(10):  # drain at most 10 stale frames
+                        t_g = time.monotonic()
+                        if not cap.grab():
+                            break
+                        if time.monotonic() - t_g > 0.005:
+                            break  # blocked → this grab is a fresh frame
+                    ret, frame = cap.retrieve()
                     if not ret:
                         raise ConnectionError("Frame read failed — stream ended")
 

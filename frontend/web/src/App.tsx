@@ -39,6 +39,7 @@ const CameraView   = lazy(() => import('./pages/CameraView'));
 const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
 const StaffFacesPage = lazy(() => import('./pages/StaffFacesPage'));
+const PeopleCountPage = lazy(() => import('./pages/PeopleCountPage'));
 const StoreDetail  = lazy(() => import('./pages/StoreDetail'));
 const DownloadPage = lazy(() => import('./pages/DownloadPage'));
 const AgentStatusPage = lazy(() => import('./pages/AgentStatusPage'));
@@ -142,6 +143,7 @@ export default function App() {
               <Route path="/incidents"  element={<IncidentsPage />} />
               <Route path="/watchlist"  element={<WatchlistPage />} />
               <Route path="/staff-faces" element={<StaffFacesPage />} />
+              <Route path="/people-count" element={<PeopleCountPage />} />
               <Route path="/stores/:id" element={<StoreDetail />} />
               <Route path="/download"   element={<DownloadPage />} />
               <Route path="/agent-status" element={<AgentStatusPage />} />

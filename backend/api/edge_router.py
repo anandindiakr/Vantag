@@ -320,6 +320,42 @@ class HeartbeatBody(BaseModel):
     cpu_percent: float | None = None
     memory_percent: float | None = None
     fps_per_camera: dict[str, float] | None = None
+    person_counts: dict[str, int] | None = None  # camera_id → live person count
+
+
+# ---------------------------------------------------------------------------
+# Live people-count store (in-memory)
+# ---------------------------------------------------------------------------
+# The Edge Agent reports per-camera person counts (from YOLO person detections)
+# in every heartbeat (~15s). We keep the latest count per camera plus a rolling
+# 24h hourly peak history so the dashboard can render a footfall chart.
+# In-memory only — restarting the backend clears history (acceptable: counts
+# repopulate on the next heartbeat and full-day history rebuilds over time).
+
+# tenant_id -> camera_id -> (count, unix_ts)
+_live_person_counts: dict[str, dict[str, tuple[int, float]]] = {}
+# tenant_id -> {hour_iso -> peak_total_count}
+_hourly_people_peaks: dict[str, dict[str, int]] = {}
+_PERSON_COUNT_STALE_SEC = 120.0
+
+
+def _record_person_counts(tenant_id: str, counts: dict[str, int]) -> None:
+    now = time.time()
+    per_cam = _live_person_counts.setdefault(tenant_id, {})
+    for cam_id, n in counts.items():
+        try:
+            per_cam[cam_id] = (max(int(n), 0), now)
+        except (TypeError, ValueError):
+            continue
+    # Update the hourly peak (sum across cameras at this instant)
+    total = sum(c for c, ts in per_cam.values() if now - ts < _PERSON_COUNT_STALE_SEC)
+    hour_key = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:00Z")
+    peaks = _hourly_people_peaks.setdefault(tenant_id, {})
+    peaks[hour_key] = max(peaks.get(hour_key, 0), total)
+    # Trim to the most recent 24 buckets
+    if len(peaks) > 24:
+        for k in sorted(peaks.keys())[:-24]:
+            del peaks[k]
 
 
 class DetectionEventBody(BaseModel):
@@ -400,6 +436,9 @@ async def heartbeat(
                 )
                 .values(conn_status=cam_status, last_connected_at=now if cam_status == "online" else None)
             )
+    # Record live per-camera person counts (in-memory footfall store)
+    if body.person_counts:
+        _record_person_counts(str(agent.tenant_id), body.person_counts)
     await session.commit()
     return {
         "ok": True,
@@ -754,6 +793,48 @@ async def list_agents(
         })
 
     return {"agents": items, "total": len(items)}
+
+
+@edge_router.get("/people-counts")
+async def get_people_counts(
+    user: dict = Depends(get_current_user_id),
+) -> dict:
+    """Live per-camera person counts + rolling 24h hourly peak history.
+
+    Counts are pushed by the Edge Agent in every heartbeat (YOLO person
+    detections per camera). A camera's count is considered stale if no
+    heartbeat arrived within the last 2 minutes.
+    """
+    tenant_id = str(user["tenant_id"])
+    now = time.time()
+    per_cam_raw = _live_person_counts.get(tenant_id, {})
+
+    cameras = []
+    total = 0
+    for cam_id, (count, ts) in per_cam_raw.items():
+        age = now - ts
+        stale = age > _PERSON_COUNT_STALE_SEC
+        if not stale:
+            total += count
+        cameras.append({
+            "camera_id": cam_id,
+            "person_count": count,
+            "age_seconds": int(age),
+            "stale": stale,
+        })
+
+    peaks = _hourly_people_peaks.get(tenant_id, {})
+    history = [
+        {"hour": h, "peak_count": c}
+        for h, c in sorted(peaks.items())
+    ]
+
+    return {
+        "total_people": total,
+        "cameras": cameras,
+        "hourly_peaks": history,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 # ─── Simple edge agent endpoints (registration_token-based, no API key) ──────

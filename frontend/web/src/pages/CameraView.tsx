@@ -12,10 +12,9 @@ import {
   Maximize2,
 } from 'lucide-react';
 import clsx from 'clsx';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useVantagStore, EventType, VantagEvent } from '../store/useVantagStore';
-import { useCameras } from '../hooks/useApi';
+import { useCameras, api } from '../hooks/useApi';
 
 const EVENT_TYPE_OPTIONS: Array<{ value: EventType | 'all'; label: string }> = [
   { value: 'all',               label: 'All Events' },
@@ -72,7 +71,7 @@ export default function CameraView() {
       return;
     }
     try {
-      await axios.post(`/api/cameras/${cameraId}/zones`, { points: zonePoints });
+      await api.post(`/cameras/${cameraId}/zones`, { points: zonePoints });
       toast.success('Zone saved successfully');
       setIsDrawing(false);
       clearZone();
@@ -84,10 +83,18 @@ export default function CameraView() {
   const handleIntercom = async () => {
     setIntercomLoading(true);
     try {
-      await axios.post(`/api/cameras/${cameraId}/intercom/initiate`);
-      toast.success('Intercom session initiated');
+      const { data } = await api.post(`/cameras/${cameraId}/intercom/initiate`);
+      if (data?.edge_connected) {
+        toast.success('Intercom session ready — camera audio device connected');
+      } else {
+        toast(
+          'Intercom requires a camera or edge device with a speaker/mic connected. ' +
+          'Your current camera does not have audio support, so two-way talk is unavailable.',
+          { icon: 'ℹ️', duration: 6000 }
+        );
+      }
     } catch {
-      toast.error('Failed to initiate intercom');
+      toast.error('Failed to initiate intercom — backend unreachable');
     } finally {
       setIntercomLoading(false);
     }

@@ -42,6 +42,7 @@ const navItems: NavItem[] = [
   { label: 'Incidents',    to: '/incidents',    icon: <AlertTriangle size={20} /> },
   { label: 'Watchlist',    to: '/watchlist',    icon: <Users size={20} /> },
   { label: 'Staff Faces',  to: '/staff-faces',  icon: <UserCheck size={20} /> },
+  { label: 'People Count', to: '/people-count', icon: <Users size={20} /> },
   { label: 'Zone Editor',  to: '/zone-editor',  icon: <PenTool size={20} />, dividerBefore: true },
   { label: 'Demo Center',  to: '/demo',         icon: <Zap size={20} /> },
   { label: 'Health Check', to: '/health-check', icon: <HeartPulse size={20} />, dividerBefore: true },

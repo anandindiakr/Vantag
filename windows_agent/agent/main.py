@@ -22,7 +22,7 @@ from .config import AgentConfig
 from .api_client import VantagApiClient
 from .mqtt_client import VantagMqttClient
 from .camera_worker import CameraWorker, CameraConfig
-from .inference import YoloInference
+from .inference import YoloInference, YoloPoseInference
 from .tray_icon import VantagTrayIcon
 from . import discovery
 
@@ -57,6 +57,7 @@ _config: AgentConfig = None
 _api: VantagApiClient = None
 _mqtt: VantagMqttClient = None
 _inference: YoloInference = None
+_pose_inference: YoloPoseInference = None
 _workers: list[CameraWorker] = []
 _recent_events: list[dict] = []   # in-memory event log for tray tooltip
 _scan_lock = threading.Lock()     # guards against concurrent discovery scans
@@ -192,6 +193,7 @@ def _build_worker(cam):
         target_fps=_config.inference_fps,
         event_cooldown_sec=_config.event_cooldown_sec,
         on_event=_on_event,
+        pose_inference=_pose_inference,
     )
 
 
@@ -269,7 +271,7 @@ def reconcile_cameras():
 
 
 def start_monitoring():
-    global _workers, _inference, _mqtt
+    global _workers, _inference, _pose_inference, _mqtt
 
     log.info("Starting monitoring…")
 
@@ -286,6 +288,14 @@ def start_monitoring():
 
     # Load inference model
     _inference = YoloInference(device=_config.inference_device)
+
+    # Load pose model (best-effort — pose-based shoplifting detection +
+    # people counting; workers run fine without it if the model can't load)
+    try:
+        _pose_inference = YoloPoseInference(device=_config.inference_device)
+    except Exception as e:  # noqa: BLE001
+        log.warning(f"Pose model unavailable — pose detection disabled: {e}")
+        _pose_inference = None
 
     # Start per-camera workers
     _workers = []
@@ -306,6 +316,7 @@ def start_monitoring():
             target_fps=_config.inference_fps,
             event_cooldown_sec=_config.event_cooldown_sec,
             on_event=_on_event,
+            pose_inference=_pose_inference,
         )
         worker.start()
         _workers.append(worker)
@@ -333,13 +344,19 @@ def start_monitoring():
         import psutil
         camera_statuses = {}
         fps_per_camera = {}
+        person_counts = {}
         for w in _workers:
             cam_id = w.config.id
             camera_statuses[cam_id] = "online" if w.is_connected else "offline"
             fps_per_camera[cam_id] = round(w.current_fps, 1)
+            try:
+                person_counts[cam_id] = int(w._analyzer.last_person_count)
+            except Exception:  # noqa: BLE001
+                person_counts[cam_id] = 0
         resp = _api.heartbeat({
             "camera_statuses": camera_statuses,
             "fps_per_camera": fps_per_camera,
+            "person_counts": person_counts,
             "cpu_percent": psutil.cpu_percent(interval=None),
             "memory_percent": psutil.virtual_memory().percent,
         })
