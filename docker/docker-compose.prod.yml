@@ -30,6 +30,8 @@ volumes:
     driver: local
   snapshots:
     driver: local
+  vantag-data:
+    driver: local
 
 services:
 
@@ -96,6 +98,7 @@ services:
       - ../models:/app/models
       - ../backend/config:/app/backend/config
       - snapshots:/app/snapshots
+      - vantag-data:/app/data
     environment:
       VANTAG_ENV:           production
       DATABASE_URL:         postgresql+asyncpg://${POSTGRES_USER:-vantag}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vantag}
