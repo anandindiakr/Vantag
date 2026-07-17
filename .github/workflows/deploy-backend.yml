@@ -28,6 +28,12 @@ on:
         description: "Comma-separated regions to deploy (in,sg,my,ph) or 'all'"
         default: "all"
 
+# All region jobs SSH into shared infrastructure — never allow two deploy
+# runs (or two region jobs) to execute at the same time.
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
 jobs:
   deploy-in:
     if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'in') }}
@@ -39,6 +45,7 @@ jobs:
           host: ${{ secrets.VPS_IN_HOST }}
           username: ${{ secrets.VPS_IN_USER }}
           key: ${{ secrets.VPS_IN_SSH_KEY }}
+          command_timeout: 30m
           script: |
             set -e
             cd ${{ secrets.VPS_IN_REPO_PATH }}
@@ -89,7 +96,8 @@ jobs:
             fi
 
   deploy-sg:
-    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'sg') }}
+    needs: deploy-in
+    if: ${{ !cancelled() && (github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'sg')) }}
     runs-on: ubuntu-latest
     steps:
       - name: Deploy backend to Singapore VPS
@@ -98,6 +106,7 @@ jobs:
           host: ${{ secrets.VPS_SG_HOST }}
           username: ${{ secrets.VPS_SG_USER }}
           key: ${{ secrets.VPS_SG_SSH_KEY }}
+          command_timeout: 30m
           script: |
             set -e
             cd ${{ secrets.VPS_SG_REPO_PATH }}
@@ -147,7 +156,8 @@ jobs:
             fi
 
   deploy-ph:
-    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'ph') }}
+    needs: deploy-sg
+    if: ${{ !cancelled() && (github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'ph')) }}
     runs-on: ubuntu-latest
     steps:
       - name: Deploy backend to Philippines VPS
@@ -156,6 +166,7 @@ jobs:
           host: ${{ secrets.VPS_PH_HOST }}
           username: ${{ secrets.VPS_PH_USER }}
           key: ${{ secrets.VPS_PH_SSH_KEY }}
+          command_timeout: 30m
           script: |
             set -e
             cd ${{ secrets.VPS_PH_REPO_PATH }}
@@ -205,7 +216,8 @@ jobs:
             fi
 
   deploy-my:
-    if: ${{ github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'my') }}
+    needs: deploy-ph
+    if: ${{ !cancelled() && (github.event.inputs.regions == 'all' || github.event.inputs.regions == '' || contains(github.event.inputs.regions, 'my')) }}
     runs-on: ubuntu-latest
     steps:
       - name: Deploy backend to Malaysia VPS
@@ -214,6 +226,7 @@ jobs:
           host: ${{ secrets.VPS_MY_HOST }}
           username: ${{ secrets.VPS_MY_USER }}
           key: ${{ secrets.VPS_MY_SSH_KEY }}
+          command_timeout: 30m
           script: |
             set -e
             cd ${{ secrets.VPS_MY_REPO_PATH }}
