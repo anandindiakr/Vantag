@@ -45,6 +45,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ---------------------------------------------------------------------------
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
+RUN pip install --no-cache-dir torch torchvision \
+        --index-url https://download.pytorch.org/whl/cpu
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

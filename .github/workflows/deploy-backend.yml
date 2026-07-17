@@ -9,7 +9,7 @@ name: Deploy Backend (Vantag FastAPI)
 # secret).
 #
 # docker/docker-compose.prod.yml builds the backend image from source via
-# docker/Dockerfile.edge (context = repo root). Deploying is:
+# docker/Dockerfile (context = repo root). Deploying is:
 #   git pull -> docker compose build vantag-backend -> up -d vantag-backend
 # Only the backend container is rebuilt/restarted — postgres, mosquitto,
 # nginx, certbot keep running untouched.
@@ -28,7 +28,7 @@ on:
     branches: [main]
     paths:
       - "backend/**"
-      - "docker/Dockerfile.edge"
+      - "docker/Dockerfile"
       - "docker/docker-compose.prod.yml"
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
@@ -50,6 +50,7 @@ jobs:
           username: ${{ secrets.VPS_IN_USER }}
           key: ${{ secrets.VPS_IN_SSH_KEY }}
           command_timeout: 30m
+          request_pty: true
           script: |
             set -e
             cd ${{ secrets.VPS_IN_REPO_PATH }}
@@ -63,7 +64,8 @@ jobs:
               docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
 
               echo "Waiting for container health..."
-              for i in $(seq 1 45); do
+              STATUS="starting"
+              for i in $(seq 1 60); do
                 STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
                 if [ "$STATUS" = "healthy" ]; then
                   break
@@ -72,7 +74,7 @@ jobs:
               done
 
               HTTP_CODE="000"
-              for i in $(seq 1 10); do
+              for i in $(seq 1 15); do
                 HTTP_CODE=$(docker exec vantag-backend curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health || echo "000")
                 if [ "$HTTP_CODE" = "200" ]; then
                   break
