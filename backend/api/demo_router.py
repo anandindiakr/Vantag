@@ -343,6 +343,13 @@ async def trigger_sequence(
     return {"fired": len(fired), "events": fired}
 
 
+def _is_demo_event(e: dict) -> bool:
+    """Demo = is_demo flag OR legacy 'demo-' incident_id prefix."""
+    if e.get("is_demo", False):
+        return True
+    return str(e.get("incident_id", "")).startswith("demo-")
+
+
 @router.delete(
     "/clear",
     summary="Clear all demo incidents",
@@ -350,19 +357,42 @@ async def trigger_sequence(
 async def clear_demo_events(
     _: dict = Depends(get_current_user),
 ) -> dict:
-    if _pipeline is None:
-        return {"cleared": 0}
+    # 1. Remove from in-memory deques (live Incidents page reads these).
+    mem_cleared = 0
+    if _pipeline is not None:
+        for store_id, dq in _pipeline.recent_events.items():
+            before  = len(dq)
+            to_keep = [e for e in dq if not _is_demo_event(e)]
+            dq.clear()
+            for e in to_keep:
+                dq.append(e)
+            mem_cleared += before - len(dq)
 
-    total = 0
-    for store_id, dq in _pipeline.recent_events.items():
-        before   = len(dq)
-        to_keep  = [e for e in dq if not e.get("is_demo", False)]
-        dq.clear()
-        for e in to_keep:
-            dq.append(e)
-        total += before - len(dq)
+    # 2. Remove from SQLite so demo events do NOT re-hydrate after a restart.
+    db_cleared = 0
+    try:
+        from ..db import incident_store as _istore  # type: ignore[import]
+        db_cleared = await asyncio.to_thread(_istore.delete_demo)
+    except Exception:  # noqa: BLE001
+        pass
 
-    return {"cleared": total, "message": "Demo incidents removed. Real incidents preserved."}
+    # 3. Remove demo snapshot images from disk.
+    snaps_cleared = 0
+    try:
+        if _DEMO_SNAPS_DIR.exists():
+            for f in _DEMO_SNAPS_DIR.glob("*.jpg"):
+                f.unlink(missing_ok=True)
+                snaps_cleared += 1
+    except Exception:  # noqa: BLE001
+        pass
+
+    return {
+        "cleared":           max(mem_cleared, db_cleared),
+        "memory_cleared":    mem_cleared,
+        "database_cleared":  db_cleared,
+        "snapshots_cleared": snaps_cleared,
+        "message": "Demo incidents removed from memory, database and snapshots. Real incidents preserved.",
+    }
 
 
 @router.get("/event-types", summary="List all demo-able event types")

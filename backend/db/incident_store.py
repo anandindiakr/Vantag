@@ -167,6 +167,25 @@ def query_incidents(
     return items, total, pages
 
 
+def delete_demo() -> int:
+    """
+    Delete ALL demo incidents from SQLite.
+
+    Matches both the `is_demo` flag AND the `demo-` incident_id prefix so that
+    legacy demo rows persisted before the flag existed are also removed.
+    Returns the number of rows deleted.
+    """
+    conn = _get_conn()
+    with _lock, conn:
+        cursor = conn.execute(
+            "DELETE FROM incidents WHERE is_demo = 1 OR incident_id LIKE 'demo-%'"
+        )
+        deleted = cursor.rowcount
+    if deleted:
+        logger.info("Deleted %d demo incident(s) from SQLite", deleted)
+    return deleted
+
+
 def cleanup_old(days: int = 30) -> int:
     """Delete incidents older than `days` days. Returns count deleted."""
     conn = _get_conn()
