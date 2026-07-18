@@ -34,9 +34,12 @@ on:
   workflow_dispatch:
 
 # The deploy SSHes into shared infrastructure — never allow two deploy
-# runs to execute at the same time.
+# runs to execute at the same time. Shared group with deploy-frontend.yml:
+# both workflows git-fetch the SAME repo checkout on the VPS, and running
+# them concurrently causes "cannot lock ref refs/remotes/origin/main"
+# failures when one updates origin/main mid-fetch of the other.
 concurrency:
-  group: deploy-backend
+  group: vps-deploy
   cancel-in-progress: false
 
 jobs:

@@ -28,8 +28,11 @@ on:
       - ".github/workflows/deploy-frontend.yml"
   workflow_dispatch:
 
+# Shared group with deploy-backend.yml: both workflows git-fetch the SAME
+# repo checkout on the VPS; running them concurrently causes git ref-lock
+# failures. One shared group serializes all VPS deploys.
 concurrency:
-  group: deploy-frontend-production
+  group: vps-deploy
   cancel-in-progress: false
 
 jobs:
