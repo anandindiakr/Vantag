@@ -788,6 +788,16 @@ class CameraWorker:
         self._frame_push_interval: float = 0.5
         self._frame_push_inflight = threading.Event()
 
+        # AI inference runs in its own single thread so a slow YOLO/pose pass
+        # (1-3s on CPU) can NEVER stall the capture loop. Previously inference
+        # was inline: while it blocked, no frames were pushed to the backend,
+        # the relay's staleness window expired, and the live tile went black
+        # ("camera blip") exactly when a detection was about to fire.
+        self._infer_executor = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix=f"infer-{config.id}"
+        )
+        self._infer_inflight = threading.Event()
+
     def start(self):
         if self._thread and self._thread.is_alive():
             return
@@ -804,7 +814,31 @@ class CameraWorker:
         self._stop_event.set()
         if self._thread:
             self._thread.join(timeout=5)
+        self._infer_executor.shutdown(wait=False)
         log.info(f"[{self.config.name}] Worker stopped")
+
+    def _run_inference(self, frame: np.ndarray) -> None:
+        """Runs YOLO detection + event analysis off the capture thread.
+
+        Only one inference is in flight per camera (single-worker executor +
+        in-flight flag), so a slow pass simply lowers the effective detection
+        fps instead of freezing the live view.
+        """
+        try:
+            boxes = self._inference.detect(frame, conf_threshold=self._conf)
+            events = self._analyzer.analyse(boxes, frame)
+            for event in events:
+                log.info(
+                    f"[{self.config.name}] Event: {event['event_type']} "
+                    f"conf={event['confidence']} sev={event['severity']}"
+                )
+                if self._on_event:
+                    self._on_event(event)
+                self._api.post_event(event)
+        except Exception as e:  # noqa: BLE001 — inference must never kill the worker
+            log.warning(f"[{self.config.name}] Inference error: {e}")
+        finally:
+            self._infer_inflight.clear()
 
     def _run(self):
         frame_interval = 1.0 / self._target_fps
@@ -860,18 +894,10 @@ class CameraWorker:
                         fps_t0 = time.time()
 
                     now = time.time()
-                    if now - last_infer >= frame_interval:
+                    if now - last_infer >= frame_interval and not self._infer_inflight.is_set():
                         last_infer = now
-                        boxes = self._inference.detect(frame, conf_threshold=self._conf)
-                        events = self._analyzer.analyse(boxes, frame)
-                        for event in events:
-                            log.info(
-                                f"[{self.config.name}] Event: {event['event_type']} "
-                                f"conf={event['confidence']} sev={event['severity']}"
-                            )
-                            if self._on_event:
-                                self._on_event(event)
-                            self._api.post_event(event)
+                        self._infer_inflight.set()
+                        self._infer_executor.submit(self._run_inference, frame.copy())
 
                     self._maybe_push_frame(frame)
 

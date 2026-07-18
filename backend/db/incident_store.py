@@ -167,6 +167,33 @@ def query_incidents(
     return items, total, pages
 
 
+def get_incident(incident_id: str) -> Optional[Dict[str, Any]]:
+    """Return a single incident by id (canonical keys), or None."""
+    conn = _get_conn()
+    row = conn.execute(
+        """
+        SELECT incident_id, store_id, camera_id, event_type, severity,
+               description, occurred_at, snapshot_url, acknowledged,
+               is_demo, metadata, created_at
+        FROM incidents
+        WHERE incident_id = ?
+        """,
+        (incident_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    d = dict(row)
+    try:
+        d["metadata"] = json.loads(d.get("metadata") or "{}")
+    except (ValueError, TypeError):
+        d["metadata"] = {}
+    d["type"] = d.pop("event_type", "")
+    d["timestamp"] = d.pop("occurred_at", "")
+    d["is_demo"] = bool(d.get("is_demo", 0))
+    d["acknowledged"] = bool(d.get("acknowledged", 0))
+    return d
+
+
 def delete_demo() -> int:
     """
     Delete ALL demo incidents from SQLite.

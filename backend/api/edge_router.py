@@ -928,20 +928,37 @@ async def list_agents(
 @edge_router.get("/people-counts")
 async def get_people_counts(
     user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Live per-camera person counts + rolling 24h hourly peak history.
 
     Counts are pushed by the Edge Agent in every heartbeat (YOLO person
     detections per camera). A camera's count is considered stale if no
-    heartbeat arrived within the last 2 minutes.
+    heartbeat arrived within the last 2 minutes. Cameras whose People Count
+    toggle (CameraView > AI Detections) is switched off are excluded.
     """
     tenant_id = str(user["tenant_id"])
     now = time.time()
     per_cam_raw = _live_person_counts.get(tenant_id, {})
 
+    # Per-camera People Count toggle (default ON when never set).
+    disabled_cams: set[str] = set()
+    try:
+        rows = await session.execute(
+            select(CameraConfig).where(CameraConfig.tenant_id == user["tenant_id"])
+        )
+        for c in rows.scalars().all():
+            det = ((getattr(c, "analyzer_config", None) or {}).get("detections") or {})
+            if det.get("people_count") is False:
+                disabled_cams.add(c.camera_id)
+    except Exception:  # noqa: BLE001 — never break live counts on a DB hiccup
+        pass
+
     cameras = []
     total = 0
     for cam_id, (count, ts) in per_cam_raw.items():
+        if cam_id in disabled_cams:
+            continue
         age = now - ts
         stale = age > _PERSON_COUNT_STALE_SEC
         if not stale:

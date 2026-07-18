@@ -39,6 +39,7 @@ const DETECTION_TOGGLES: Array<{ key: string; label: string; desc: string }> = [
   { key: 'suspicious_behavior', label: 'Suspicious Behavior',  desc: 'Erratic movement patterns' },
   { key: 'crowding',            label: 'Crowding',             desc: 'Too many people in view' },
   { key: 'fall_detected',       label: 'Fall Detection',       desc: 'Person falling / on the ground' },
+  { key: 'people_count',        label: 'People Count',         desc: 'Live person counting (People Count page)' },
 ];
 
 export default function CameraView() {
@@ -164,12 +165,12 @@ export default function CameraView() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-10 bg-vantag-dark/95 backdrop-blur border-b border-slate-700/60 px-6 py-4">
         <nav className="flex items-center gap-1.5 text-sm text-slate-400 mb-1">
-          <Link to="/" className="flex items-center gap-1 hover:text-slate-200">
+          <Link to="/dashboard" className="flex items-center gap-1 hover:text-slate-200">
             <Home size={14} /> Dashboard
           </Link>
           <ChevronRight size={12} />
           <Link
-            to={`/store/${storeId}`}
+            to={`/stores/${storeId}`}
             className="flex items-center gap-1 hover:text-slate-200"
           >
             <Store size={14} /> {storeId}

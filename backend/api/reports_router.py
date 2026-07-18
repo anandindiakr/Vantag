@@ -118,6 +118,28 @@ _load_registry()
 # ---------------------------------------------------------------------------
 
 
+def _resolve_snapshot_file(snapshot_url: str | None) -> Optional[Path]:
+    """Map an ``/api/snapshots/...`` URL to its local file under snapshots/.
+
+    Returns the file path if it exists on disk, else None. Rejects any path
+    that escapes the snapshots root (path traversal safety).
+    """
+    if not snapshot_url:
+        return None
+    prefix = "/api/snapshots/"
+    if not snapshot_url.startswith(prefix):
+        return None
+    rel = snapshot_url[len(prefix):]
+    snapshots_root = (_BASE_DIR / "snapshots").resolve()
+    try:
+        candidate = (snapshots_root / rel).resolve()
+        if not str(candidate).startswith(str(snapshots_root)):
+            return None
+        return candidate if candidate.is_file() else None
+    except OSError:
+        return None
+
+
 def _generate_pdf_report(
     report_id: str,
     incident_id: str,
@@ -179,6 +201,29 @@ def _generate_pdf_report(
         elements.append(Spacer(1, 0.5 * cm))
         elements.append(Paragraph(f"<b>Description:</b> {description}", styles["Normal"]))
 
+        # Embed the event snapshot image when it exists on disk.
+        snapshot_file = _resolve_snapshot_file(incident_data.get("snapshot_url"))
+        if snapshot_file is not None:
+            try:
+                from reportlab.platypus import Image as RLImage
+
+                elements.append(Spacer(1, 0.6 * cm))
+                elements.append(Paragraph("<b>Event Snapshot:</b>", styles["Normal"]))
+                elements.append(Spacer(1, 0.2 * cm))
+                img = RLImage(str(snapshot_file))
+                # Scale to fit page width (max 16 cm) keeping aspect ratio.
+                max_w = 16 * cm
+                if img.drawWidth > max_w:
+                    scale = max_w / img.drawWidth
+                    img.drawWidth *= scale
+                    img.drawHeight *= scale
+                elements.append(img)
+            except Exception as img_exc:  # noqa: BLE001
+                logger.warning(
+                    "Could not embed snapshot in report | report_id=%s error=%s",
+                    report_id, img_exc,
+                )
+
         doc.build(elements)
         logger.info("PDF report generated | report_id=%s path=%s", report_id, file_path)
 
@@ -212,14 +257,20 @@ def set_pipeline(pipeline: object) -> None:  # noqa: ANN001
 
 
 def _find_incident(incident_id: str) -> Optional[dict]:
-    """Search recent_events across all stores for the given incident_id."""
-    if _pipeline is None:
+    """Search recent_events (in-memory), then the SQLite incident store."""
+    if _pipeline is not None:
+        for events in _pipeline.recent_events.values():
+            for ev in events:
+                if ev.get("incident_id") == incident_id:
+                    return ev
+    # Fallback: persisted incidents survive backend restarts.
+    try:
+        from ..db import incident_store as _istore  # lazy import
+
+        return _istore.get_incident(incident_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Incident DB lookup failed | id=%s error=%s", incident_id, exc)
         return None
-    for events in _pipeline.recent_events.values():
-        for ev in events:
-            if ev.get("incident_id") == incident_id:
-                return ev
-    return None
 
 
 # ---------------------------------------------------------------------------

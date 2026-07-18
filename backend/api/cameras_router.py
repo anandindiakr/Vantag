@@ -534,7 +534,12 @@ DETECTION_TOGGLE_KEYS = (
     "suspicious_behavior",
     "crowding",
     "fall_detected",
+    "people_count",
 )
+
+# people_count is the only detection that is ON by default: it is a passive
+# counter (no incidents/alerts), and the People Count dashboard relies on it.
+DETECTION_TOGGLE_DEFAULTS = {k: (k == "people_count") for k in DETECTION_TOGGLE_KEYS}
 
 
 class DetectionTogglesRequest(BaseModel):
@@ -555,7 +560,10 @@ async def get_detections(
     current = cfg.get("detections") or {}
     return {
         "camera_id": camera_id,
-        "detections": {k: bool(current.get(k, False)) for k in DETECTION_TOGGLE_KEYS},
+        "detections": {
+            k: bool(current.get(k, DETECTION_TOGGLE_DEFAULTS[k]))
+            for k in DETECTION_TOGGLE_KEYS
+        },
     }
 
 
@@ -605,7 +613,10 @@ async def update_detections(
     )
     return {
         "camera_id": camera_id,
-        "detections": {k: bool(merged.get(k, False)) for k in DETECTION_TOGGLE_KEYS},
+        "detections": {
+            k: bool(merged.get(k, DETECTION_TOGGLE_DEFAULTS[k]))
+            for k in DETECTION_TOGGLE_KEYS
+        },
     }
 
 
@@ -773,6 +784,14 @@ async def mjpeg_stream(
     return StreamingResponse(
         generate(),
         media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            # X-Accel-Buffering tells nginx to disable proxy buffering for
+            # this response. Without it nginx buffers the MJPEG stream and
+            # the live view drifts 45-90s behind real time.
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+        },
     )
 
 
