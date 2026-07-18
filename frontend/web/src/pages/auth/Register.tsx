@@ -15,6 +15,7 @@ const COUNTRIES = [
   { code: 'SG', name: '🇸🇬 Singapore' },
   { code: 'MY', name: '🇲🇾 Malaysia' },
   { code: 'PH', name: '🇵🇭 Philippines' },
+  { code: 'ID', name: '🇮🇩 Indonesia' },
 ] as const;
 
 const PHONE_PLACEHOLDER: Record<string, string> = {
@@ -22,6 +23,7 @@ const PHONE_PLACEHOLDER: Record<string, string> = {
   SG: '+65 9123 4567',
   MY: '+60 12 345 6789',
   PH: '+63 917 123 4567',
+  ID: '+62 812 3456 7890',
 };
 
 type CountryCode = typeof COUNTRIES[number]['code'];

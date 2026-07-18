@@ -267,6 +267,7 @@ export default function Onboarding() {
                       <option value="SG" className="bg-gray-900">🇸🇬 Singapore</option>
                       <option value="MY" className="bg-gray-900">🇲🇾 Malaysia</option>
                       <option value="PH" className="bg-gray-900">🇵🇭 Philippines</option>
+                      <option value="ID" className="bg-gray-900">🇮🇩 Indonesia</option>
                     </select>
                   </div>
                   <div>
