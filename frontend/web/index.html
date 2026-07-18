@@ -192,6 +192,26 @@
               description: 'Platform keselamatan AI DIY Malaysia. Kesan kecurian, lepak, jatuh pada kamera sedia ada. Siap 30 minit. Dari RM59/bulan. English + Bahasa.',
               icon: '/favicon-my.svg'
             };
+          } else if (h.indexOf('bantay') !== -1) {
+            cfg = {
+              code: 'PH',
+              lang: 'en',
+              locale: 'en_PH',
+              brand: 'Vantag — Retail Bantay',
+              title: 'Retail Bantay — AI CCTV Security for Philippine Shops',
+              description: 'The Philippines\u2019 DIY AI CCTV platform for sari-sari stores, shops & malls. Detects theft, loitering, empty shelves on your cameras. From \u20B1999/mo.',
+              icon: '/favicon-ph.svg'
+            };
+          } else if (h.indexOf('pantau') !== -1) {
+            cfg = {
+              code: 'ID',
+              lang: 'id',
+              locale: 'id_ID',
+              brand: 'Vantag — Retail Pantau',
+              title: 'Retail Pantau — Keamanan AI CCTV untuk Toko Indonesia',
+              description: 'Platform keamanan AI DIY Indonesia. Deteksi pencurian, loitering, rak kosong di kamera CCTV Anda. Siap 30 menit. Mulai Rp149.000/bulan.',
+              icon: '/favicon-id.svg'
+            };
           }
 
           // Apply
@@ -239,6 +259,10 @@
             text = 'Retail Nazar by Vantag — AI-Powered CCTV Security for Indian Retail Shops, Malls, Hospitals, Offices, Post Offices and Police Stations';
           } else if (h.indexOf('jagajaga') !== -1) {
             text = 'Vantag JagaJaga — AI Security & Surveillance Platform for Malaysian Shops, Malls, Clinics, Offices and Homes';
+          } else if (h.indexOf('bantay') !== -1) {
+            text = 'Retail Bantay by Vantag — AI CCTV Security & Analytics for Philippine Shops, Sari-Sari Stores, Malls, Clinics and Offices';
+          } else if (h.indexOf('pantau') !== -1) {
+            text = 'Retail Pantau by Vantag — Keamanan AI CCTV & Analitik untuk Toko, Mal, Klinik dan Kantor di Indonesia';
           }
           var el = document.getElementById('seo-h1');
           if (el) el.textContent = text;
