@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ChevronRight,
@@ -10,6 +10,7 @@ import {
   Filter,
   X,
   Maximize2,
+  ShieldCheck,
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -30,6 +31,16 @@ const EVENT_TYPE_OPTIONS: Array<{ value: EventType | 'all'; label: string }> = [
 
 interface ZonePoint { x: number; y: number }
 
+// Behaviour-based AI detections. OFF by default — the backend drops these
+// event types unless enabled here, so no false incidents are generated.
+const DETECTION_TOGGLES: Array<{ key: string; label: string; desc: string }> = [
+  { key: 'shoplifting',         label: 'Shoplifting',          desc: 'Sweep / concealment motion heuristics' },
+  { key: 'loitering',           label: 'Loitering',            desc: 'Person staying in view too long' },
+  { key: 'suspicious_behavior', label: 'Suspicious Behavior',  desc: 'Erratic movement patterns' },
+  { key: 'crowding',            label: 'Crowding',             desc: 'Too many people in view' },
+  { key: 'fall_detected',       label: 'Fall Detection',       desc: 'Person falling / on the ground' },
+];
+
 export default function CameraView() {
   const { storeId = '', cameraId = '' } = useParams<{ storeId: string; cameraId: string }>();
 
@@ -38,8 +49,39 @@ export default function CameraView() {
   const [isDrawing, setIsDrawing]       = useState(false);
   const [intercomLoading, setIntercomLoading] = useState(false);
   const [fullscreen, setFullscreen]     = useState(false);
+  const [detections, setDetections]     = useState<Record<string, boolean>>({});
+  const [detSaving, setDetSaving]       = useState<string | null>(null);
 
   const overlayRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    if (!cameraId) return;
+    let cancelled = false;
+    api
+      .get(`/cameras/${cameraId}/detections`)
+      .then(({ data }) => {
+        if (!cancelled && data?.detections) setDetections(data.detections);
+      })
+      .catch(() => { /* older backend without toggles — leave all off */ });
+    return () => { cancelled = true; };
+  }, [cameraId]);
+
+  const toggleDetection = async (key: string) => {
+    const next = !detections[key];
+    setDetSaving(key);
+    setDetections((prev) => ({ ...prev, [key]: next }));
+    try {
+      await api.patch(`/cameras/${cameraId}/detections`, { detections: { [key]: next } });
+      toast.success(
+        `${DETECTION_TOGGLES.find((d) => d.key === key)?.label ?? key} ${next ? 'enabled' : 'disabled'}`
+      );
+    } catch {
+      setDetections((prev) => ({ ...prev, [key]: !next }));
+      toast.error('Failed to save detection setting');
+    } finally {
+      setDetSaving(null);
+    }
+  };
 
   const { data: cameras = [] } = useCameras(storeId);
   const allEvents              = useVantagStore((s) => s.recentEvents);
@@ -313,6 +355,50 @@ export default function CameraView() {
 
           {/* ── Right Panel ────────────────────────────────────────── */}
           <div className="space-y-4">
+            {/* AI Detection toggles */}
+            <div className="bg-vantag-card border border-slate-700/60 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <ShieldCheck size={15} className="text-vantag-green" />
+                <h3 className="text-sm font-semibold text-slate-100">AI Detections</h3>
+              </div>
+              <p className="text-xs text-slate-500 mb-3">
+                Off by default. Enable only the detections you need — disabled types
+                never create incidents for this camera.
+              </p>
+              <div className="space-y-2">
+                {DETECTION_TOGGLES.map((d) => {
+                  const on = !!detections[d.key];
+                  return (
+                    <div
+                      key={d.key}
+                      className="flex items-center justify-between bg-slate-800/60 rounded-lg px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-xs font-medium text-slate-200">{d.label}</p>
+                        <p className="text-[10px] text-slate-500">{d.desc}</p>
+                      </div>
+                      <button
+                        onClick={() => toggleDetection(d.key)}
+                        disabled={detSaving === d.key}
+                        className={clsx(
+                          'relative w-9 h-5 rounded-full transition-colors shrink-0 disabled:opacity-60',
+                          on ? 'bg-vantag-green' : 'bg-slate-600'
+                        )}
+                        title={on ? 'Disable' : 'Enable'}
+                      >
+                        <span
+                          className={clsx(
+                            'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all',
+                            on ? 'left-[18px]' : 'left-0.5'
+                          )}
+                        />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Current detections */}
             {cameraEvents.length > 0 && (
               <div className="bg-vantag-card border border-slate-700/60 rounded-xl p-4">

@@ -129,6 +129,15 @@ snapshots to the Vantag cloud dashboard.
 - H.265 (HEVC) streams may not decode on older Edge Agent versions — if a
   channel won't load, try switching that channel's encoding to H.264 in the
   NVR's video settings, or use the sub-stream (usually H.264 by default).
+- Running MORE than 6–8 cameras: recommend (in order) 1) switch all
+  live-preview channels to the NVR SUB-stream (~1/10th the bandwidth/CPU of
+  main stream, makes 16+ channels practical), 2) split cameras across two or
+  more Edge Agent PCs (e.g. cams 1–8 on PC A, 9–16 on PC B — both report to
+  the same dashboard), 3) one Edge Agent per NVR if multiple NVRs exist,
+  4) wired gigabit connection between Edge Agent PC and NVR (never WiFi for
+  6+ streams), 5) for 16+ cameras use a dedicated 4-core/8GB+ PC and enable
+  AI analysis only on the cameras that need it (entrances, billing counters,
+  high-value shelves).
 
 # Alert delivery (WhatsApp / SMS / Email) — SELF-SERVICE
 - Vantag can push real-time alerts via SMS, WhatsApp, and Email whenever an
@@ -295,7 +304,10 @@ _FALLBACK_KEYWORDS = {
         "rtsp://user:pass@NVR-IP:554/Streaming/Channels/101. Dahua/CP Plus: "
         "rtsp://user:pass@NVR-IP:554/cam/realmonitor?channel=1&subtype=0. "
         "If several channels drop out, use the NVR's sub-stream instead of "
-        "main stream, and use a wired connection for the Edge Agent PC."
+        "main stream, and use a wired connection for the Edge Agent PC. "
+        "For more than 6-8 cameras: switch to sub-streams, split cameras "
+        "across two Edge Agent PCs (both report to the same dashboard), and "
+        "enable AI analysis only on the cameras that need it."
     ),
     "alert": (
         "Vantag sends SMS, WhatsApp, and Email alerts on theft, tamper, fall, "
@@ -592,6 +604,25 @@ async def get_faq() -> dict:
                              "string or the connection silently fails. Common encodings: # → %23, "
                              "@ → %40, % → %25. Example: a password Pass#1 becomes Pass%231 in the "
                              "RTSP URL.",
+                    },
+                    {
+                        "q": "I need to run MORE than 6–8 cameras. What is the recommended setup?",
+                        "a": "Beyond 6–8 simultaneous streams you will typically hit one of three "
+                             "limits: the NVR's concurrent RTSP connection cap, the network "
+                             "bandwidth, or the CPU of the PC running the Edge Agent. Recommended "
+                             "solutions, in order: (1) Switch ALL live-preview channels to the "
+                             "NVR's SUB-stream — a sub-stream uses roughly 1/10th the bandwidth "
+                             "and CPU of the main stream, so 16+ channels become practical on one "
+                             "PC. (2) Split cameras across TWO or more Edge Agent PCs — e.g. "
+                             "cameras 1–8 on PC A and 9–16 on PC B; both agents report to the "
+                             "same dashboard, so you still see everything in one place. (3) If "
+                             "the cameras are spread across two NVRs, run one Edge Agent per NVR "
+                             "on the same or separate PCs. (4) Use a wired gigabit connection "
+                             "between the Edge Agent PC and the NVR — never WiFi for 6+ streams. "
+                             "(5) For 16+ cameras, use a dedicated PC with at least a modern "
+                             "4-core CPU and 8 GB RAM for the Edge Agent, and enable AI analysis "
+                             "only on the cameras that actually need it (entrances, billing "
+                             "counters, high-value shelves) rather than every channel.",
                     },
                 ],
             },

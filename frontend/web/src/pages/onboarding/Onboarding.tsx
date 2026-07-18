@@ -366,7 +366,7 @@ export default function Onboarding() {
                 </button>
                 <button onClick={submitStep2} disabled={loading}
                   className="flex-[2] py-3.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Continue</span><ChevronRight className="w-4 h-4" /></>}
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Continue to Free Trial</span><ChevronRight className="w-4 h-4" /></>}
                 </button>
               </div>
             </motion.div>

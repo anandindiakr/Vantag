@@ -522,6 +522,94 @@ async def update_sensitivity(
 
 
 # ---------------------------------------------------------------------------
+# GET / PATCH /api/cameras/{camera_id}/detections  (per-camera AI toggles)
+# ---------------------------------------------------------------------------
+
+# Behaviour-heuristic detections are OFF by default: the edge agent fires
+# these for any detected person, so the server ignores them unless the shop
+# owner explicitly enables them here (see edge_router.ingest_event gate).
+DETECTION_TOGGLE_KEYS = (
+    "shoplifting",
+    "loitering",
+    "suspicious_behavior",
+    "crowding",
+    "fall_detected",
+)
+
+
+class DetectionTogglesRequest(BaseModel):
+    detections: dict[str, bool]
+
+
+@router.get(
+    "/{camera_id}/detections",
+    summary="Get per-camera AI detection toggles",
+)
+async def get_detections(
+    camera_id: str,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    row = await _get_db_camera(session, user.get("tenant_id"), camera_id)
+    cfg = dict(getattr(row, "analyzer_config", None) or {})
+    current = cfg.get("detections") or {}
+    return {
+        "camera_id": camera_id,
+        "detections": {k: bool(current.get(k, False)) for k in DETECTION_TOGGLE_KEYS},
+    }
+
+
+@router.patch(
+    "/{camera_id}/detections",
+    summary="Enable/disable per-camera AI detections",
+)
+async def update_detections(
+    camera_id: str,
+    body: DetectionTogglesRequest,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Toggle behaviour-based AI detections (shoplifting, loitering, suspicious
+    behaviour, crowding, fall detection) per camera. These are OFF by default;
+    the backend drops edge-agent events of a type that is not enabled here.
+    """
+    unknown = [k for k in body.detections if k not in DETECTION_TOGGLE_KEYS]
+    if unknown:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown detection type(s): {', '.join(unknown)}",
+        )
+
+    row = await _get_db_camera(session, user.get("tenant_id"), camera_id)
+    try:
+        cfg = dict(getattr(row, "analyzer_config", None) or {})
+        merged = dict(cfg.get("detections") or {})
+        for k, v in body.detections.items():
+            merged[k] = bool(v)
+        cfg["detections"] = merged
+        row.analyzer_config = cfg
+        await session.commit()
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save detection toggles: {exc}",
+        ) from exc
+
+    logger.info(
+        "Detection toggles updated | camera_id=%s detections=%s",
+        camera_id, merged,
+    )
+    return {
+        "camera_id": camera_id,
+        "detections": {k: bool(merged.get(k, False)) for k in DETECTION_TOGGLE_KEYS},
+    }
+
+
+# ---------------------------------------------------------------------------
 # PATCH /api/cameras/{camera_id}  (edit name / location / RTSP URL)
 # ---------------------------------------------------------------------------
 

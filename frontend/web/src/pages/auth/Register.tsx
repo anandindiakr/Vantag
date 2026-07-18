@@ -155,8 +155,11 @@ export default function Register() {
             </div>
             <button type="submit" disabled={loading}
               className="w-full py-3.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all mt-2">
-              {loading ? 'Creating account...' : <><span>Create Account</span><ArrowRight className="w-4 h-4" /></>}
+              {loading ? 'Creating account...' : <><span>Create Account & Start Free Trial</span><ArrowRight className="w-4 h-4" /></>}
             </button>
+            <p className="text-center text-white/30 text-xs">
+              Your 3-day free trial starts automatically — no card, no charges. You'll confirm your plan in the next step.
+            </p>
           </form>
           <p className="text-center text-white/40 text-sm mt-6">
             Already have an account? <Link to="/login" className="text-violet-400 hover:text-violet-300">Sign in</Link>

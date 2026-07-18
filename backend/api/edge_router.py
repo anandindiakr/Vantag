@@ -664,6 +664,45 @@ async def ingest_event(
             "reason": f"{event_type} has no configured zone",
         }
 
+    # Behaviour-heuristic events (fired by the edge agent for ANY detected
+    # person) must be explicitly enabled per camera before they are accepted.
+    # Without this gate the agent's motion heuristics flood the incident feed
+    # with false "shoplifting"/"loitering"/"suspicious behaviour" reports even
+    # though the shop owner never configured those detections.
+    OPT_IN_EVENT_TYPES = {
+        "shoplifting",
+        "loitering",
+        "suspicious_behavior",
+        "suspicious_behaviour",
+        "crowding",
+        "fall_detected",
+    }
+    if event_type in OPT_IN_EVENT_TYPES:
+        # Normalise UK/US spelling to a single config key.
+        cfg_key = (
+            "suspicious_behavior"
+            if event_type == "suspicious_behaviour"
+            else event_type
+        )
+        detections_cfg = analyzer_config.get("detections") or {}
+        feature_cfg = analyzer_config.get(cfg_key) or {}
+        enabled = bool(
+            detections_cfg.get(cfg_key)
+            or feature_cfg.get("enabled")
+        )
+        if not enabled:
+            logger.info(
+                "Ignored non-enabled edge event | tenant=%s camera=%s type=%s",
+                agent.tenant_id,
+                body.camera_id,
+                event_type,
+            )
+            return {
+                "ok": True,
+                "ignored": True,
+                "reason": f"{event_type} detection is not enabled for this camera",
+            }
+
     # 1) Decode + persist the snapshot JPEG so the dashboard can display it.
     snapshot_url = None
     if body.snapshot_b64:
