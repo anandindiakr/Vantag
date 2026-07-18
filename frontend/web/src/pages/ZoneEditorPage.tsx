@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
 import { RefreshCw, Save, Trash2, CheckCircle, Loader2, AlertCircle, Undo2, Pencil, X, Check, Users } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { api } from '../hooks/useApi';
+import { api, useCameras } from '../hooks/useApi';
 import InfoTooltip from '../components/InfoTooltip';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -91,8 +91,6 @@ function toCanvasCoords(
 
 export default function ZoneEditorPage() {
   const [camId,       setCamId]       = useState('');
-  const [cameras,     setCameras]     = useState<{ id: string; label: string }[]>([]);
-  const [camsLoading, setCamsLoading] = useState(true);
   const [snapUrl,     setSnapUrl]     = useState('');
   const [snapLoading, setSnapLoading] = useState(false);
   const [mode,        setMode]        = useState<ZoneType | null>(null);
@@ -124,6 +122,12 @@ export default function ZoneEditorPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef    = useRef<HTMLImageElement | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const snapshotRequestRef = useRef(0);
+  const { data: liveCameras = [], isLoading: camsLoading, isError: camsError } = useCameras();
+  const cameras = liveCameras.map((camera) => ({
+    id: camera.id,
+    label: `${camera.id} — ${camera.name}${camera.location ? ` · ${camera.location}` : ''}`,
+  }));
 
   // Pulse animation for guide overlay
   useEffect(() => {
@@ -134,49 +138,60 @@ export default function ZoneEditorPage() {
   // ── Fetch tenant cameras ───────────────────────────────────────────────────
 
   useEffect(() => {
-    setCamsLoading(true);
-    api.get('/cameras')
-      .then(({ data }) => {
-        const list: { id: string; label: string }[] = (
-          Array.isArray(data) ? data : (data.cameras ?? [])
-        ).map((c: { camera_id: string; name?: string; location?: string }) => ({
-          id:    c.camera_id,
-          label: c.name ? `${c.camera_id} — ${c.name}` : c.camera_id,
-        }));
-        setCameras(list);
-        if (list.length > 0 && !camId) setCamId(list[0].id);
-      })
-      .catch(() => {
-        // Fallback to sensible defaults when API is unreachable
-        const fallback = [
-          { id: 'cam-01', label: 'cam-01' },
-          { id: 'cam-02', label: 'cam-02' },
-        ];
-        setCameras(fallback);
-        if (!camId) setCamId(fallback[0].id);
-      })
-      .finally(() => setCamsLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (liveCameras.length === 0) {
+      setCamId('');
+      return;
+    }
+    setCamId((current) =>
+      current && liveCameras.some((camera) => camera.id === current)
+        ? current
+        : liveCameras[0].id
+    );
+  }, [liveCameras]);
 
   // ── Snapshot ──────────────────────────────────────────────────────────────
 
   const refreshSnapshot = useCallback(async () => {
+    if (!camId) return;
+    const requestId = ++snapshotRequestRef.current;
+    const requestedCameraId = camId;
     setSnapLoading(true);
+    setSnapUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return '';
+    });
+    imgRef.current = null;
     try {
       const resp = await api.get(`/cameras/${camId}/snapshot?t=${Date.now()}`, {
         responseType: 'blob',
       });
-      setSnapUrl(URL.createObjectURL(resp.data as Blob));
+      if (
+        requestId === snapshotRequestRef.current &&
+        requestedCameraId === camId
+      ) {
+        setSnapUrl(URL.createObjectURL(resp.data as Blob));
+      }
     } catch {
-      toast.error('Could not load snapshot. Is the camera online?');
+      if (requestId === snapshotRequestRef.current) {
+        toast.error('Could not load snapshot. Is the camera online?');
+      }
     } finally {
-      setSnapLoading(false);
+      if (requestId === snapshotRequestRef.current) {
+        setSnapLoading(false);
+      }
     }
   }, [camId]);
 
   // Load zones + snapshot on camera change
   useEffect(() => {
+    if (!camId) {
+      setZones([]);
+      setSnapUrl('');
+      imgRef.current = null;
+      return;
+    }
+    setZones([]);
+    setCamRes({ width: 1920, height: 1080 });
     void refreshSnapshot();
     api.get(`/zones/cameras/${camId}`)
       .then(({ data }) => {
@@ -207,9 +222,12 @@ export default function ZoneEditorPage() {
         }
         setZones(loaded);
       })
-      .catch(() => { /* no zones yet — that's fine */ });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camId]);
+      .catch((error) => {
+        setZones([]);
+        const message = error instanceof Error ? error.message : 'Could not load camera zones.';
+        toast.error(message);
+      });
+  }, [camId, refreshSnapshot]);
 
   // ── Canvas draw loop ────────────────────────────────────────────────────────
 
@@ -627,9 +645,11 @@ export default function ZoneEditorPage() {
           >
             {camsLoading
               ? <option>Loading cameras…</option>
-              : cameras.length === 0
-                ? <option value="">No cameras configured</option>
-                : cameras.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)
+              : camsError
+                ? <option value="">Could not load cameras</option>
+                : cameras.length === 0
+                  ? <option value="">No cameras configured</option>
+                  : cameras.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)
             }
           </select>
           <button
