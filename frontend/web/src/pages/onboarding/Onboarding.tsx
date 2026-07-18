@@ -6,6 +6,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { usePayment } from '../../hooks/usePayment';
 import { useRegion } from '../../hooks/useRegion';
+import { REGIONS, type Region } from '../../config/regions';
 import InfoTooltip from '../../components/InfoTooltip';
 
 // ── helpers ───────────────────────────────────────────────────────────────
@@ -56,18 +57,21 @@ function StepBar({ current }: { current: number }) {
 }
 
 // ── PLAN DATA ─────────────────────────────────────────────────────────────
-const PLANS = [
-  { id: 'starter', name: 'Starter', cameras: 'Up to 4', price: { IN: '₹1,999', SG: 'S$49', MY: 'RM 149', PH: '₱2,499' }, features: ['AI Detection Suite', 'Real-time Dashboard', 'One-Tap Door Lock', 'Email Alerts', '7-day history'] },
-  { id: 'growth', name: 'Growth', cameras: 'Up to 10', price: { IN: '₹4,499', SG: 'S$99', MY: 'RM 299', PH: '₱5,499' }, highlight: true, features: ['Everything in Starter', 'Face Recognition', 'Heatmap Analytics', 'Queue Detection', 'Priority Support'] },
-  { id: 'pro', name: 'Pro', cameras: 'Up to 20', price: { IN: '₹9,999', SG: 'S$149', MY: 'RM 449', PH: '₱11,999' }, features: ['Everything in Growth', 'Watchlist Matching', 'Multi-location', 'Custom Webhooks + API', 'Unlimited history', 'Dedicated Support'] },
-  { id: 'proplus', name: 'Pro Plus', cameras: 'Up to 30', price: { IN: '₹15,000', SG: 'S$199', MY: 'RM 599', PH: '₱17,999' }, features: ['Everything in Pro', 'Custom AI Training', 'SLA Uptime Guarantee', 'Dedicated Account Manager', 'On-site Support'] },
-];
+// Prices come from the single source of truth in config/regions.ts
+// (REGIONS[country].plans) — never hardcode per-country prices here.
+const PLAN_FEATURES: Record<string, string[]> = {
+  starter: ['AI Detection Suite', 'Real-time Dashboard', 'One-Tap Door Lock', 'Email Alerts', '7-day history'],
+  growth: ['Everything in Starter', 'Face Recognition', 'Heatmap Analytics', 'Queue Detection', 'Priority Support'],
+  pro: ['Everything in Growth', 'Watchlist Matching', 'Multi-location', 'Custom Webhooks + API', 'Unlimited history', 'Dedicated Support'],
+  proplus: ['Everything in Pro', 'Custom AI Training', 'SLA Uptime Guarantee', 'Dedicated Account Manager', 'On-site Support'],
+};
 
 const PHONE_PLACEHOLDER: Record<string, string> = {
   IN: '+91 98765 43210',
   SG: '+65 9123 4567',
   MY: '+60 12 345 6789',
   PH: '+63 917 123 4567',
+  ID: '+62 812 3456 7890',
 };
 
 // ── Main Onboarding Component ─────────────────────────────────────────────
@@ -115,7 +119,10 @@ export default function Onboarding() {
     // Load saved step from server
     api.get('/onboarding/status').then(({ data }) => {
       setStep(Math.min(data.onboarding_step || 1, 5));
-      setCountry(data.country || 'IN');
+      // Only override with the saved tenant country; otherwise keep the
+      // domain-detected region (e.g. retailpantau.com -> ID) instead of
+      // falling back to India.
+      if (data.country) setCountry(data.country);
     }).catch(() => {});
   }, []);
 
@@ -309,6 +316,7 @@ export default function Onboarding() {
                     <option value="hi" className="bg-gray-900">हिंदी (Hindi)</option>
                     <option value="ms" className="bg-gray-900">Bahasa Malaysia</option>
                     <option value="tl" className="bg-gray-900">Filipino (Tagalog)</option>
+                    <option value="id" className="bg-gray-900">Bahasa Indonesia</option>
                     <option value="zh" className="bg-gray-900">中文 (Chinese)</option>
                   </select>
                 </div>
@@ -326,26 +334,27 @@ export default function Onboarding() {
               <h2 className="text-2xl font-bold mb-1">Choose your plan</h2>
               <p className="text-white/40 text-sm mb-8">Start with a 3-day free trial. Cancel anytime.</p>
               <div className="space-y-3 mb-8">
-                {PLANS.map(plan => {
-                  const price = plan.price[country as keyof typeof plan.price] || plan.price.IN;
+                {(REGIONS[country as Region] ?? regionData).plans.map(plan => {
+                  const price = `${plan.symbol}${plan.monthlyPrice.toLocaleString()}`;
+                  const features = PLAN_FEATURES[plan.key] ?? [];
                   return (
-                    <div key={plan.id} onClick={() => setSelectedPlan(plan.id)}
-                      className={`p-5 rounded-xl border cursor-pointer transition-all ${selectedPlan === plan.id ? 'border-violet-500 bg-violet-500/10' : 'border-white/10 hover:border-white/20'}`}>
+                    <div key={plan.key} onClick={() => setSelectedPlan(plan.key)}
+                      className={`p-5 rounded-xl border cursor-pointer transition-all ${selectedPlan === plan.key ? 'border-violet-500 bg-violet-500/10' : 'border-white/10 hover:border-white/20'}`}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
-                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedPlan === plan.id ? 'border-violet-500' : 'border-white/30'}`}>
-                            {selectedPlan === plan.id && <div className="w-2 h-2 rounded-full bg-violet-500" />}
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${selectedPlan === plan.key ? 'border-violet-500' : 'border-white/30'}`}>
+                            {selectedPlan === plan.key && <div className="w-2 h-2 rounded-full bg-violet-500" />}
                           </div>
                           <span className="font-semibold">{plan.name}</span>
-                          {(plan as any).highlight && <span className="px-2 py-0.5 bg-violet-600 rounded-full text-xs font-medium">Popular</span>}
+                          {plan.popular && <span className="px-2 py-0.5 bg-violet-600 rounded-full text-xs font-medium">Popular</span>}
                         </div>
                         <div className="text-right">
                           <div className="font-bold">{price}<span className="text-white/40 font-normal text-sm">/mo</span></div>
-                          <div className="text-xs text-white/40">{plan.cameras} cameras</div>
+                          <div className="text-xs text-white/40">Up to {plan.cameras} cameras</div>
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-0.5 ml-7">
-                        {plan.features.slice(0, 3).map(f => <span key={f} className="text-xs text-white/40">{f}</span>)}
+                        {features.slice(0, 3).map(f => <span key={f} className="text-xs text-white/40">{f}</span>)}
                       </div>
                     </div>
                   );
