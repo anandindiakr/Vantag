@@ -621,6 +621,97 @@ async def update_detections(
 
 
 # ---------------------------------------------------------------------------
+# GET / PATCH /api/cameras/{camera_id}/schedule  (AI detection time window)
+# ---------------------------------------------------------------------------
+
+_HHMM_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+_SCHEDULE_DEFAULTS = {
+    "enabled": False,
+    "start": "09:00",
+    "end": "21:00",
+    "tz_offset_minutes": 0,
+}
+
+
+class DetectionScheduleRequest(BaseModel):
+    enabled: bool
+    start: str = "09:00"           # HH:MM local time
+    end: str = "21:00"             # HH:MM local time
+    tz_offset_minutes: int = 0     # browser offset from UTC, e.g. IST = +330
+
+
+@router.get(
+    "/{camera_id}/schedule",
+    summary="Get the AI detection schedule for a camera",
+)
+async def get_detection_schedule(
+    camera_id: str,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    row = await _get_db_camera(session, user.get("tenant_id"), camera_id)
+    cfg = dict(getattr(row, "analyzer_config", None) or {})
+    schedule = {**_SCHEDULE_DEFAULTS, **(cfg.get("detection_schedule") or {})}
+    return {"camera_id": camera_id, "schedule": schedule}
+
+
+@router.patch(
+    "/{camera_id}/schedule",
+    summary="Set the AI detection schedule for a camera",
+)
+async def update_detection_schedule(
+    camera_id: str,
+    body: DetectionScheduleRequest,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """
+    Restrict AI detections (loitering, crowding, zones, queues, etc.) to a
+    daily time window. Theft/shoplifting detection is ALWAYS live and is not
+    affected by this schedule. Overnight windows (e.g. 20:00-06:00) are
+    supported.
+    """
+    if not _HHMM_RE.match(body.start) or not _HHMM_RE.match(body.end):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="start/end must be in HH:MM 24-hour format",
+        )
+    if not -840 <= body.tz_offset_minutes <= 840:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="tz_offset_minutes out of range",
+        )
+
+    row = await _get_db_camera(session, user.get("tenant_id"), camera_id)
+    try:
+        cfg = dict(getattr(row, "analyzer_config", None) or {})
+        schedule = {
+            "enabled": bool(body.enabled),
+            "start": body.start,
+            "end": body.end,
+            "tz_offset_minutes": int(body.tz_offset_minutes),
+        }
+        cfg["detection_schedule"] = schedule
+        row.analyzer_config = cfg
+        await session.commit()
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save detection schedule: {exc}",
+        ) from exc
+
+    logger.info(
+        "Detection schedule updated | camera_id=%s schedule=%s",
+        camera_id, schedule,
+    )
+    return {"camera_id": camera_id, "schedule": schedule}
+
+
+# ---------------------------------------------------------------------------
 # PATCH /api/cameras/{camera_id}  (edit name / location / RTSP URL)
 # ---------------------------------------------------------------------------
 

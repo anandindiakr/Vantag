@@ -11,6 +11,7 @@ import {
   X,
   Maximize2,
   ShieldCheck,
+  Clock,
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -52,6 +53,8 @@ export default function CameraView() {
   const [fullscreen, setFullscreen]     = useState(false);
   const [detections, setDetections]     = useState<Record<string, boolean>>({});
   const [detSaving, setDetSaving]       = useState<string | null>(null);
+  const [schedule, setSchedule]         = useState({ enabled: false, start: '09:00', end: '21:00' });
+  const [schedSaving, setSchedSaving]   = useState(false);
 
   const overlayRef = useRef<SVGSVGElement>(null);
 
@@ -64,8 +67,43 @@ export default function CameraView() {
         if (!cancelled && data?.detections) setDetections(data.detections);
       })
       .catch(() => { /* older backend without toggles — leave all off */ });
+    api
+      .get(`/cameras/${cameraId}/schedule`)
+      .then(({ data }) => {
+        if (!cancelled && data?.schedule) {
+          setSchedule({
+            enabled: !!data.schedule.enabled,
+            start: data.schedule.start || '09:00',
+            end: data.schedule.end || '21:00',
+          });
+        }
+      })
+      .catch(() => { /* older backend without schedule — keep defaults */ });
     return () => { cancelled = true; };
   }, [cameraId]);
+
+  const saveSchedule = async (next: { enabled: boolean; start: string; end: string }) => {
+    setSchedSaving(true);
+    const prev = schedule;
+    setSchedule(next);
+    try {
+      await api.patch(`/cameras/${cameraId}/schedule`, {
+        ...next,
+        // Browser's local UTC offset, e.g. IST = +330 (getTimezoneOffset is inverted)
+        tz_offset_minutes: -new Date().getTimezoneOffset(),
+      });
+      toast.success(
+        next.enabled
+          ? `AI detections scheduled ${next.start}–${next.end} (theft stays on 24/7)`
+          : 'Detection schedule disabled — AI detections run 24/7'
+      );
+    } catch {
+      setSchedule(prev);
+      toast.error('Failed to save schedule');
+    } finally {
+      setSchedSaving(false);
+    }
+  };
 
   const toggleDetection = async (key: string) => {
     const next = !detections[key];
@@ -400,7 +438,63 @@ export default function CameraView() {
               </div>
             </div>
 
-            {/* Current detections */}
+            {/* Detection schedule */}
+            <div className="bg-vantag-card border border-slate-700/60 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <Clock size={15} className="text-vantag-amber" />
+                  <h3 className="text-sm font-semibold text-slate-100">Detection Schedule</h3>
+                </div>
+                <button
+                  onClick={() => saveSchedule({ ...schedule, enabled: !schedule.enabled })}
+                  disabled={schedSaving}
+                  className={clsx(
+                    'relative w-9 h-5 rounded-full transition-colors shrink-0 disabled:opacity-60',
+                    schedule.enabled ? 'bg-vantag-green' : 'bg-slate-600'
+                  )}
+                  title={schedule.enabled ? 'Disable schedule (run 24/7)' : 'Enable schedule'}
+                >
+                  <span
+                    className={clsx(
+                      'absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all',
+                      schedule.enabled ? 'left-[18px]' : 'left-0.5'
+                    )}
+                  />
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mb-3">
+                Limit AI detections to a daily time window. Theft detection is
+                always on 24/7 and is not affected by this schedule.
+              </p>
+              <div className={clsx('flex items-center gap-2', !schedule.enabled && 'opacity-50 pointer-events-none')}>
+                <div className="flex-1">
+                  <label className="block text-[10px] text-slate-500 mb-1">Active from</label>
+                  <input
+                    type="time"
+                    value={schedule.start}
+                    onChange={(e) => setSchedule((s) => ({ ...s, start: e.target.value }))}
+                    onBlur={() => saveSchedule(schedule)}
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg text-xs text-slate-200 px-2 py-1.5 focus:outline-none focus:border-slate-400"
+                  />
+                </div>
+                <span className="text-slate-500 text-xs mt-4">to</span>
+                <div className="flex-1">
+                  <label className="block text-[10px] text-slate-500 mb-1">Active until</label>
+                  <input
+                    type="time"
+                    value={schedule.end}
+                    onChange={(e) => setSchedule((s) => ({ ...s, end: e.target.value }))}
+                    onBlur={() => saveSchedule(schedule)}
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg text-xs text-slate-200 px-2 py-1.5 focus:outline-none focus:border-slate-400"
+                  />
+                </div>
+              </div>
+              {schedule.enabled && schedule.start > schedule.end && (
+                <p className="text-[10px] text-vantag-amber mt-2">
+                  Overnight window: active from {schedule.start} until {schedule.end} the next day.
+                </p>
+              )}
+            </div>
             {cameraEvents.length > 0 && (
               <div className="bg-vantag-card border border-slate-700/60 rounded-xl p-4">
                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">

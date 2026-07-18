@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Users, Camera, Clock, RefreshCw, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Users, Camera, Clock, RefreshCw, AlertTriangle, TrendingUp, Printer } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../hooks/useApi';
 
@@ -28,6 +28,64 @@ async function fetchPeopleCounts(): Promise<PeopleCountsResponse> {
   return data;
 }
 
+// Build a light-themed, print-friendly report in a new window.
+function printReport(data: PeopleCountsResponse | undefined) {
+  if (!data) return;
+  const now = new Date().toLocaleString();
+  const rows = data.cameras
+    .map(
+      (c) => `<tr>
+        <td>${c.camera_id}</td>
+        <td style="text-align:center;font-weight:bold">${c.person_count}</td>
+        <td>${c.age_seconds < 60 ? `${c.age_seconds}s ago` : `${Math.floor(c.age_seconds / 60)}m ago`}</td>
+        <td>${c.stale ? 'STALE' : 'LIVE'}</td>
+      </tr>`
+    )
+    .join('');
+  const peakRows = data.hourly_peaks
+    .map((p) => {
+      const label = p.hour.includes('T') ? p.hour.replace('T', ' ') : p.hour;
+      return `<tr><td>${label}</td><td style="text-align:center;font-weight:bold">${p.peak_count}</td></tr>`;
+    })
+    .join('');
+  const html = `<!doctype html><html><head><title>People Count Report</title>
+    <style>
+      body { font-family: Arial, Helvetica, sans-serif; color: #1e293b; margin: 32px; }
+      h1 { font-size: 20px; margin-bottom: 2px; }
+      .sub { color: #64748b; font-size: 12px; margin-bottom: 20px; }
+      .cards { display: flex; gap: 16px; margin-bottom: 24px; }
+      .card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 20px; }
+      .card .label { font-size: 11px; text-transform: uppercase; color: #64748b; }
+      .card .value { font-size: 26px; font-weight: bold; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px; }
+      th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
+      th { background: #f1f5f9; font-size: 11px; text-transform: uppercase; color: #475569; }
+      h2 { font-size: 14px; margin: 20px 0 8px; }
+      .footer { font-size: 10px; color: #94a3b8; margin-top: 24px; }
+    </style></head><body>
+    <h1>People Count Report</h1>
+    <div class="sub">Generated: ${now} &nbsp;|&nbsp; Data updated: ${data.updated_at}</div>
+    <div class="cards">
+      <div class="card"><div class="label">People in store (live)</div><div class="value">${data.total_people}</div></div>
+      <div class="card"><div class="label">Cameras reporting</div><div class="value">${data.cameras.filter((c) => !c.stale).length} / ${data.cameras.length}</div></div>
+      <div class="card"><div class="label">Peak (24h)</div><div class="value">${data.hourly_peaks.length ? Math.max(...data.hourly_peaks.map((p) => p.peak_count)) : 0}</div></div>
+    </div>
+    <h2>Per-camera counts</h2>
+    <table><thead><tr><th>Camera</th><th>People</th><th>Last update</th><th>Status</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4">No data</td></tr>'}</tbody></table>
+    <h2>Hourly footfall peaks (last 24h)</h2>
+    <table><thead><tr><th>Hour</th><th>Peak occupancy</th></tr></thead>
+    <tbody>${peakRows || '<tr><td colspan="2">No history yet</td></tr>'}</tbody></table>
+    <div class="footer">Counts are produced by YOLO person detection on the Edge Agent. Overlapping camera views may double-count.</div>
+    <script>window.onload = function () { window.print(); };</script>
+    </body></html>`;
+  const w = window.open('', '_blank', 'width=900,height=700');
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+  }
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 export default function PeopleCountPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
@@ -54,13 +112,23 @@ export default function PeopleCountPage() {
             Live person counts per camera, detected by the Edge Agent (YOLO). Updates with every agent heartbeat (~30s).
           </p>
         </div>
-        <button
-          onClick={() => refetch()}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-slate-200 border border-slate-700 transition-colors"
-        >
-          <RefreshCw size={15} className={isFetching ? 'animate-spin' : ''} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => printReport(data)}
+            disabled={!data}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-sm text-white transition-colors"
+          >
+            <Printer size={15} />
+            Print report
+          </button>
+          <button
+            onClick={() => refetch()}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sm text-slate-200 border border-slate-700 transition-colors"
+          >
+            <RefreshCw size={15} className={isFetching ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Error banner */}

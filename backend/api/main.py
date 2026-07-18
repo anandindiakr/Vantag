@@ -213,6 +213,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception as exc:  # noqa: BLE001
         logger.warning("SQLite incident store init failed (non-fatal) | error=%s", exc)
 
+    # Initialise the shared SQLite people-count store (multi-worker safe).
+    try:
+        from ..db import people_count_store as _pcstore
+        _pcstore.init_db()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("People-count store init failed (non-fatal) | error=%s", exc)
+
     # ------------------------------------------------------------------
     # 5. Start pipeline (RTSP threads + async tasks).
     # ------------------------------------------------------------------

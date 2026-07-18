@@ -326,38 +326,26 @@ class HeartbeatBody(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Live people-count store (in-memory)
+# Live people-count store (SQLite-backed, shared across uvicorn workers)
 # ---------------------------------------------------------------------------
 # The Edge Agent reports per-camera person counts (from YOLO person detections)
-# in every heartbeat (~15s). We keep the latest count per camera plus a rolling
-# 24h hourly peak history so the dashboard can render a footfall chart.
-# In-memory only — restarting the backend clears history (acceptable: counts
-# repopulate on the next heartbeat and full-day history rebuilds over time).
+# in every heartbeat. The backend runs with ``--workers 2`` (two separate OS
+# processes), so an in-memory dict is NOT shared between the worker that
+# receives the heartbeat POST and the worker that serves the dashboard GET —
+# that was why the People Count page always showed 0. The store now lives in
+# backend/db/people_count_store.py (SQLite, WAL mode) which is shared by all
+# workers AND survives backend restarts/redeploys.
 
-# tenant_id -> camera_id -> (count, unix_ts)
-_live_person_counts: dict[str, dict[str, tuple[int, float]]] = {}
-# tenant_id -> {hour_iso -> peak_total_count}
-_hourly_people_peaks: dict[str, dict[str, int]] = {}
-_PERSON_COUNT_STALE_SEC = 120.0
+from ..db import people_count_store as _pc_store
+
+_PERSON_COUNT_STALE_SEC = _pc_store.STALE_SEC
 
 
 def _record_person_counts(tenant_id: str, counts: dict[str, int]) -> None:
-    now = time.time()
-    per_cam = _live_person_counts.setdefault(tenant_id, {})
-    for cam_id, n in counts.items():
-        try:
-            per_cam[cam_id] = (max(int(n), 0), now)
-        except (TypeError, ValueError):
-            continue
-    # Update the hourly peak (sum across cameras at this instant)
-    total = sum(c for c, ts in per_cam.values() if now - ts < _PERSON_COUNT_STALE_SEC)
-    hour_key = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:00Z")
-    peaks = _hourly_people_peaks.setdefault(tenant_id, {})
-    peaks[hour_key] = max(peaks.get(hour_key, 0), total)
-    # Trim to the most recent 24 buckets
-    if len(peaks) > 24:
-        for k in sorted(peaks.keys())[:-24]:
-            del peaks[k]
+    try:
+        _pc_store.record_counts(tenant_id, counts)
+    except Exception:  # noqa: BLE001 — never fail a heartbeat over count storage
+        logger.exception("Failed to persist person counts for tenant %s", tenant_id)
 
 
 class DetectionEventBody(BaseModel):
@@ -644,6 +632,22 @@ async def ingest_event(
         camera = None
 
     event_type = body.event_type.lower()
+
+    # A camera that the owner disabled entirely must not produce ANY
+    # incidents — drop every event from it, regardless of type.
+    if camera is not None and getattr(camera, "enabled", True) is False:
+        logger.info(
+            "Ignored event from disabled camera | tenant=%s camera=%s type=%s",
+            agent.tenant_id,
+            body.camera_id,
+            event_type,
+        )
+        return {
+            "ok": True,
+            "ignored": True,
+            "reason": "camera is disabled",
+        }
+
     analyzer_config = (getattr(camera, "analyzer_config", None) or {}) if camera else {}
     configured_zones = {
         "inventory_movement": (analyzer_config.get("inventory_movement") or {}).get("zones") or [],
@@ -686,10 +690,14 @@ async def ingest_event(
         )
         detections_cfg = analyzer_config.get("detections") or {}
         feature_cfg = analyzer_config.get(cfg_key) or {}
-        enabled = bool(
-            detections_cfg.get(cfg_key)
-            or feature_cfg.get("enabled")
-        )
+        toggle = detections_cfg.get(cfg_key)
+        if toggle is not None:
+            # An explicit per-camera toggle ALWAYS wins — a stale
+            # feature-level "enabled" flag must never resurrect a
+            # detection the owner switched OFF in the dashboard.
+            enabled = bool(toggle)
+        else:
+            enabled = bool(feature_cfg.get("enabled"))
         if not enabled:
             logger.info(
                 "Ignored non-enabled edge event | tenant=%s camera=%s type=%s",
@@ -702,6 +710,39 @@ async def ingest_event(
                 "ignored": True,
                 "reason": f"{event_type} detection is not enabled for this camera",
             }
+
+    # Detection schedule: the owner may restrict AI detections to a daily
+    # time window. Theft (shoplifting) is deliberately EXEMPT — it stays
+    # live 24/7 regardless of the schedule.
+    if event_type not in ("shoplifting", "theft"):
+        schedule = analyzer_config.get("detection_schedule") or {}
+        if schedule.get("enabled"):
+            try:
+                from datetime import datetime, timedelta, timezone as _tz
+
+                offset_min = int(schedule.get("tz_offset_minutes") or 0)
+                local_now = datetime.now(_tz.utc) + timedelta(minutes=offset_min)
+                now_hm = local_now.strftime("%H:%M")
+                start = str(schedule.get("start") or "00:00")
+                end = str(schedule.get("end") or "23:59")
+                if start <= end:
+                    in_window = start <= now_hm <= end
+                else:
+                    # Overnight window, e.g. 20:00 -> 06:00
+                    in_window = now_hm >= start or now_hm <= end
+            except Exception:  # noqa: BLE001
+                in_window = True  # malformed schedule must never block events
+            if not in_window:
+                logger.info(
+                    "Ignored out-of-schedule edge event | tenant=%s camera=%s type=%s window=%s-%s",
+                    agent.tenant_id, body.camera_id, event_type,
+                    schedule.get("start"), schedule.get("end"),
+                )
+                return {
+                    "ok": True,
+                    "ignored": True,
+                    "reason": f"{event_type} is outside the configured detection schedule",
+                }
 
     # 1) Decode + persist the snapshot JPEG so the dashboard can display it.
     snapshot_url = None
@@ -939,7 +980,12 @@ async def get_people_counts(
     """
     tenant_id = str(user["tenant_id"])
     now = time.time()
-    per_cam_raw = _live_person_counts.get(tenant_id, {})
+    try:
+        latest = _pc_store.get_latest_counts(tenant_id)
+        peak_rows = _pc_store.get_hourly_peaks(tenant_id, hours=24)
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to read people-count store")
+        latest, peak_rows = [], []
 
     # Per-camera People Count toggle (default ON when never set).
     disabled_cams: set[str] = set()
@@ -956,7 +1002,7 @@ async def get_people_counts(
 
     cameras = []
     total = 0
-    for cam_id, (count, ts) in per_cam_raw.items():
+    for cam_id, count, ts in latest:
         if cam_id in disabled_cams:
             continue
         age = now - ts
@@ -970,10 +1016,9 @@ async def get_people_counts(
             "stale": stale,
         })
 
-    peaks = _hourly_people_peaks.get(tenant_id, {})
     history = [
         {"hour": h, "peak_count": c}
-        for h, c in sorted(peaks.items())
+        for h, c in peak_rows
     ]
 
     return {
