@@ -35,6 +35,8 @@ from ..db.models.camera import CameraConfig
 from ..db.models.event import DetectionEvent
 from ..middleware.tenant_middleware import get_current_user_id
 from ..services.tenant_alerts import dispatch_tenant_alert
+from ..services import staff_face_service
+from .watchlist_router import record_match
 
 edge_router = APIRouter(prefix="/api/edge", tags=["edge-agent"])
 
@@ -366,6 +368,7 @@ class DetectionEventBody(BaseModel):
     risk_score: float | None = None
     location: str | None = None
     snapshot_b64: str | None = None
+    person_crop_b64: str | None = None
     metadata: dict | None = None
 
 
@@ -678,6 +681,55 @@ async def ingest_event(
         except Exception:  # noqa: BLE001
             location = None
     store_id = (location or "auto-detected").split("–")[0].strip().lower().replace(" ", "_")
+
+    # 2b) Staff face suppression: the edge agent attaches a native-resolution
+    #     person crop to person-centric events. Match it against the enrolled
+    #     Staff Faces / Watchlist embeddings; when the person is enrolled as
+    #     STAFF the event is audited (record_match) but NOT persisted and NO
+    #     alert is dispatched. Non-staff watchlist hits (banned/suspect) are
+    #     recorded as watchlist matches and the event proceeds with enriched
+    #     metadata.
+    face_match = None
+    if body.person_crop_b64 and staff_face_service.is_available():
+        try:
+            face_match = await asyncio.to_thread(
+                staff_face_service.match_face_b64, body.person_crop_b64
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("Staff face matching failed for camera %s", body.camera_id)
+            face_match = None
+    if face_match:
+        try:
+            record_match(
+                entry_id=face_match["entry_id"],
+                camera_id=body.camera_id,
+                store_id=store_id,
+                confidence=face_match["similarity"],
+                snapshot_url=snapshot_url,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("record_match failed for entry %s", face_match["entry_id"])
+        if face_match.get("alert_level") == "staff":
+            logger.info(
+                "Suppressed %s event — recognised staff '%s' (sim=%.2f) | tenant=%s camera=%s",
+                event_type, face_match["name"], face_match["similarity"],
+                agent.tenant_id, body.camera_id,
+            )
+            return {
+                "ok": True,
+                "suppressed": True,
+                "reason": f"recognised staff: {face_match['name']}",
+                "similarity": face_match["similarity"],
+            }
+        # Known non-staff watchlist person — keep the event, tag identity.
+        body.metadata = {
+            **(body.metadata or {}),
+            "watchlist_match": {
+                "name": face_match["name"],
+                "alert_level": face_match["alert_level"],
+                "similarity": face_match["similarity"],
+            },
+        }
 
     # 3) Persist the audit row in the per-tenant detection_events table.
     event = DetectionEvent(

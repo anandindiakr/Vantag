@@ -76,6 +76,16 @@ def sanitize_rtsp_url(url: str) -> str:
 # (handled per-camera via the in-flight flag below), never blocking capture.
 _FRAME_PUSH_EXECUTOR = ThreadPoolExecutor(max_workers=8, thread_name_prefix="frame-push")
 
+# Person-centric event types eligible for staff face suppression on the
+# backend. Crowding is excluded (multi-person, no single identity).
+STAFF_FACE_EVENTS = {
+    "shoplifting",
+    "restricted_zone",
+    "loitering",
+    "suspicious_behavior",
+    "fall_detected",
+}
+
 # ---------------------------------------------------------------------------
 # Fall Detector
 # ---------------------------------------------------------------------------
@@ -664,7 +674,36 @@ class DetectionAnalyzer:
             if pose_evt:
                 events.append(pose_evt)
 
+        # Attach a full-resolution person crop so the backend can run staff
+        # face matching (Staff Faces enrolment) and suppress alerts for
+        # recognised staff. The 320x180 snapshot is too small for faces.
+        if events and persons:
+            crop_b64 = self._person_crop_b64(persons, frame)
+            if crop_b64:
+                for evt in events:
+                    if evt.get("event_type") in STAFF_FACE_EVENTS:
+                        evt["person_crop_b64"] = crop_b64
+
         return events
+
+    @staticmethod
+    def _person_crop_b64(persons: list, frame: np.ndarray) -> Optional[str]:
+        """JPEG-encode a native-resolution crop of the largest person box."""
+        try:
+            fh, fw = frame.shape[:2]
+            p = max(persons, key=lambda b: b.w * b.h)
+            x1 = max(0, int(p.x * fw) - 10)
+            y1 = max(0, int(p.y * fh) - 10)
+            x2 = min(fw, int((p.x + p.w) * fw) + 10)
+            y2 = min(fh, int((p.y + p.h) * fh) + 10)
+            if x2 - x1 < 40 or y2 - y1 < 40:
+                return None
+            _, buf = cv2.imencode(
+                ".jpg", frame[y1:y2, x1:x2], [cv2.IMWRITE_JPEG_QUALITY, 80]
+            )
+            return base64.b64encode(buf.tobytes()).decode()
+        except Exception:
+            return None
 
     def _count_people(self, persons: list, frame: np.ndarray) -> int:
         if not self._people_count_zones:
