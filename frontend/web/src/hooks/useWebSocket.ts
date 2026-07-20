@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useVantagStore, VantagEvent, RiskScore, QueueStatus, DoorState } from '../store/useVantagStore';
+import {
+  useVantagStore,
+  VantagEvent,
+  RiskScore,
+  QueueStatus,
+  DoorState,
+  EventType,
+  Severity,
+} from '../store/useVantagStore';
 
 // Dynamically derive WS URL from the current page host so it works
 // in dev (Vite proxy → localhost:8800) and production (nginx → backend) alike.
@@ -31,7 +39,51 @@ type IncomingMessage =
   | { type: 'risk_score';   payload: RiskScore }
   | { type: 'queue_status'; payload: QueueStatus }
   | { type: 'door_state';   payload: { doorId: string; state: DoorState } }
-  | { type: 'ping' };
+  | { type: 'ping' }
+  | IncidentMessage;
+
+/**
+ * Real backend incident broadcast (edge agent / pipeline / demo router).
+ * Flat snake_case shape — mapped into a VantagEvent before hitting the store.
+ */
+interface IncidentMessage {
+  type: 'incident';
+  incident_id?: string;
+  id?: string;
+  store_id?: string;
+  camera_id?: string;
+  camera_name?: string;
+  event_type?: string;
+  severity?: string;
+  description?: string;
+  confidence?: number;
+  occurred_at?: string;
+  timestamp?: string;
+  snapshot_url?: string | null;
+  is_demo?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+const _VALID_SEVERITIES: ReadonlySet<string> = new Set([
+  'LOW', 'MEDIUM', 'HIGH', 'CRITICAL', 'STAFF',
+]);
+
+function mapIncidentToEvent(m: IncidentMessage): VantagEvent {
+  const sev = String(m.severity ?? 'MEDIUM').toUpperCase();
+  return {
+    id: m.incident_id ?? m.id ?? `inc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    storeId: m.store_id ?? '',
+    cameraId: m.camera_id ?? '',
+    cameraName: m.camera_name ?? m.camera_id ?? 'Camera',
+    type: (m.event_type ?? 'tamper') as EventType,
+    severity: (_VALID_SEVERITIES.has(sev) ? sev : 'MEDIUM') as Severity,
+    description: m.description ?? `${(m.event_type ?? 'event').replace(/_/g, ' ')} detected`,
+    confidence: typeof m.confidence === 'number' ? m.confidence : 0,
+    ts: m.occurred_at ?? m.timestamp ?? new Date().toISOString(),
+    metadata: { ...(m.metadata ?? {}), is_demo: Boolean(m.is_demo) },
+    thumbnailUrl: m.snapshot_url ?? undefined,
+  };
+}
 
 export function useWebSocket(): UseWebSocketReturn {
   const [connected, setConnected]           = useState(false);
@@ -55,6 +107,12 @@ export function useWebSocket(): UseWebSocketReturn {
         case 'event': {
           addEvent(msg.payload);
           setLastEvent(msg.payload);
+          break;
+        }
+        case 'incident': {
+          const mapped = mapIncidentToEvent(msg);
+          addEvent(mapped);
+          setLastEvent(mapped);
           break;
         }
         case 'risk_score': {
