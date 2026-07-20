@@ -88,6 +88,13 @@ export default function Onboarding() {
   const [cameras, setCameras] = useState<CameraEntry[]>([{ ip: '', name: '', location: '', rtsp_url: '', brand: '', probeStatus: 'idle' }]);
   const [shopForm, setShopForm] = useState({ shop_name: '', address: '', city: '', language: 'en', phone: '' });
   const [dlBusy, setDlBusy] = useState<string | null>(null);
+  const [paywall, setPaywall] = useState<{ status: string; email: string } | null>(null);
+
+  const signOutSwitchAccount = () => {
+    localStorage.removeItem('vantag_token');
+    localStorage.removeItem('vantag_tenant');
+    window.location.href = '/login';
+  };
 
   // Authenticated edge-agent download. A plain <a href> can't send the
   // Authorization header, so the browser would just open a 401 JSON page in a
@@ -118,13 +125,22 @@ export default function Onboarding() {
   useEffect(() => {
     // Redirected here by the global 402 handler (trial expired / suspended)?
     const params = new URLSearchParams(window.location.search);
-    const paywall = params.get('reason') === 'subscription_required';
-    if (paywall) {
-      const status = params.get('status');
+    const isPaywall = params.get('reason') === 'subscription_required';
+    if (isPaywall) {
+      const status = params.get('status') || 'expired';
+      // Which account is actually expired? Decode the JWT so the user can see
+      // it — avoids confusion when someone has multiple accounts (e.g. an old
+      // expired trial account still logged in on the same browser).
+      let email = '';
+      try {
+        email = JSON.parse(atob((token() || '').split('.')[1] || 'e30='))?.email || '';
+      } catch { /* ignore */ }
+      setPaywall({ status, email });
       toast.error(
-        status === 'trial_expired'
+        (status === 'trial_expired'
           ? 'Your 3-day free trial has ended. Choose a plan to keep your cameras and AI protection running.'
-          : 'Your subscription is inactive. Choose a plan to continue.',
+          : 'Your subscription is inactive. Choose a plan to continue.') +
+        (email ? ` (Account: ${email})` : ''),
         { duration: 8000 }
       );
     }
@@ -132,12 +148,12 @@ export default function Onboarding() {
     api.get('/onboarding/status').then(({ data }) => {
       // Expired-trial users land directly on the Plan step, even if their
       // onboarding was already completed earlier.
-      setStep(paywall ? 2 : Math.min(data.onboarding_step || 1, 5));
+      setStep(isPaywall ? 2 : Math.min(data.onboarding_step || 1, 5));
       // Only override with the saved tenant country; otherwise keep the
       // domain-detected region (e.g. retailpantau.com -> ID) instead of
       // falling back to India.
       if (data.country) setCountry(data.country);
-    }).catch(() => { if (paywall) setStep(2); });
+    }).catch(() => { if (isPaywall) setStep(2); });
   }, []);
 
   // ── Step handlers ─────────────────────────────────────────────────────
@@ -345,8 +361,39 @@ export default function Onboarding() {
           {/* ── STEP 2: Plan Selection ── */}
           {step === 2 && (
             <motion.div key="s2" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} className="bg-white/3 border border-white/8 rounded-2xl p-8">
+              {/* Paywall banner: shown only when redirected by the global 402
+                  handler. Tells the user WHICH account is expired and lets
+                  them sign out to switch accounts. */}
+              {paywall && (
+                <div className="mb-6 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-amber-300">
+                        {paywall.status === 'trial_expired'
+                          ? 'Your 3-day free trial has ended'
+                          : 'Your subscription is inactive'}
+                      </p>
+                      {paywall.email && (
+                        <p className="text-xs text-white/50 mt-1">
+                          Signed in as <span className="text-white/80 font-medium">{paywall.email}</span>
+                        </p>
+                      )}
+                      <p className="text-xs text-white/50 mt-1">
+                        Choose a plan below to reactivate your cameras and AI protection — or switch to a different account.
+                      </p>
+                      <button
+                        onClick={signOutSwitchAccount}
+                        className="mt-3 px-3 py-1.5 text-xs font-medium rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all"
+                      >
+                        Sign out &amp; switch account
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               <h2 className="text-2xl font-bold mb-1">Choose your plan</h2>
-              <p className="text-white/40 text-sm mb-8">Start with a 3-day free trial. Cancel anytime.</p>
+              <p className="text-white/40 text-sm mb-8">{paywall ? 'Reactivate your account by choosing a plan.' : 'Start with a 3-day free trial. Cancel anytime.'}</p>
               <div className="space-y-3 mb-8">
                 {(REGIONS[country as Region] ?? regionData).plans.map(plan => {
                   const price = `${plan.symbol}${plan.monthlyPrice.toLocaleString()}`;
