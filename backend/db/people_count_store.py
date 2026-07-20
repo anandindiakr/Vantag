@@ -74,6 +74,15 @@ def init_db() -> None:
                 peak      INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (tenant_id, hour_iso)
             );
+            CREATE TABLE IF NOT EXISTS people_daily_entries (
+                tenant_id  TEXT NOT NULL,
+                camera_id  TEXT NOT NULL,
+                day        TEXT NOT NULL,
+                entries    INTEGER NOT NULL DEFAULT 0,
+                agent_last INTEGER NOT NULL DEFAULT 0,
+                updated_ts REAL NOT NULL,
+                PRIMARY KEY (tenant_id, camera_id, day)
+            );
             """
         )
     logger.info("People-count store ready at %s", _DB_PATH)
@@ -125,6 +134,75 @@ def record_counts(tenant_id: str, counts: Dict[str, int]) -> None:
             "DELETE FROM people_hourly_peaks WHERE tenant_id = ? AND hour_iso < ?",
             (tenant_id, cutoff),
         )
+
+
+def record_entries(tenant_id: str, entries: Dict[str, int]) -> None:
+    """Accumulate per-camera "visitors today" from the agent's cumulative counter.
+
+    The agent sends its own cumulative ``entries_today`` per camera (resets at
+    the agent's local midnight and whenever the agent restarts). The backend
+    keeps its own daily total using delta accumulation:
+
+    * new >= agent_last  → add (new - agent_last)   (normal progression)
+    * new <  agent_last  → add new                  (agent restarted / reset)
+
+    so a restart never loses previously-accumulated visitors and never
+    double-counts.
+    """
+    if not entries:
+        return
+    now = time.time()
+    day = datetime.now().strftime("%Y-%m-%d")
+    conn = _get_conn()
+    with _lock, conn:
+        for cam_id, n in entries.items():
+            try:
+                n = max(int(n), 0)
+            except (TypeError, ValueError):
+                continue
+            row = conn.execute(
+                "SELECT entries, agent_last FROM people_daily_entries"
+                " WHERE tenant_id = ? AND camera_id = ? AND day = ?",
+                (tenant_id, str(cam_id), day),
+            ).fetchone()
+            if row is None:
+                conn.execute(
+                    "INSERT INTO people_daily_entries"
+                    " (tenant_id, camera_id, day, entries, agent_last, updated_ts)"
+                    " VALUES (?, ?, ?, ?, ?, ?)",
+                    (tenant_id, str(cam_id), day, n, n, now),
+                )
+            else:
+                prev_entries = int(row["entries"])
+                agent_last = int(row["agent_last"])
+                delta = (n - agent_last) if n >= agent_last else n
+                conn.execute(
+                    "UPDATE people_daily_entries"
+                    " SET entries = ?, agent_last = ?, updated_ts = ?"
+                    " WHERE tenant_id = ? AND camera_id = ? AND day = ?",
+                    (prev_entries + max(delta, 0), n, now,
+                     tenant_id, str(cam_id), day),
+                )
+        # Trim history older than 30 days.
+        cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+        conn.execute(
+            "DELETE FROM people_daily_entries WHERE tenant_id = ? AND day < ?",
+            (tenant_id, cutoff),
+        )
+
+
+def get_daily_entries(tenant_id: str, day: Optional[str] = None) -> Dict[str, int]:
+    """Return {camera_id: entries_today} for a tenant (today by default)."""
+    if day is None:
+        day = datetime.now().strftime("%Y-%m-%d")
+    conn = _get_conn()
+    with _lock:
+        rows = conn.execute(
+            "SELECT camera_id, entries FROM people_daily_entries"
+            " WHERE tenant_id = ? AND day = ?",
+            (tenant_id, day),
+        ).fetchall()
+    return {r["camera_id"]: int(r["entries"]) for r in rows}
 
 
 def get_latest_counts(tenant_id: str) -> List[Tuple[str, int, float]]:

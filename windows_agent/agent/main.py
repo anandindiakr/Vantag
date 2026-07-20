@@ -351,6 +351,7 @@ def start_monitoring():
         camera_statuses = {}
         fps_per_camera = {}
         person_counts = {}
+        person_entries = {}
         for w in _workers:
             cam_id = w.config.id
             camera_statuses[cam_id] = "online" if w.is_connected else "offline"
@@ -361,13 +362,22 @@ def start_monitoring():
                 person_counts[cam_id] = int(w._analyzer.recent_person_count())
             except Exception:  # noqa: BLE001
                 person_counts[cam_id] = 0
+            try:
+                # Cumulative visitors today (debounced occupancy rises,
+                # resets at local midnight).
+                person_entries[cam_id] = int(w._analyzer.entries_today)
+            except Exception:  # noqa: BLE001
+                person_entries[cam_id] = 0
         # Visible proof in the agent console of what is being counted
         counted = {w.config.name: person_counts.get(w.config.id, 0) for w in _workers}
+        entries = {w.config.name: person_entries.get(w.config.id, 0) for w in _workers}
         log.info(f"People counts (30s peak): {counted}")
+        log.info(f"Visitors today (cumulative entries): {entries}")
         resp = _api.heartbeat({
             "camera_statuses": camera_statuses,
             "fps_per_camera": fps_per_camera,
             "person_counts": person_counts,
+            "person_entries": person_entries,
             "cpu_percent": psutil.cpu_percent(interval=None),
             "memory_percent": psutil.virtual_memory().percent,
         })

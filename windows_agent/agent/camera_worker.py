@@ -563,6 +563,13 @@ class DetectionAnalyzer:
         # happened to be analysed last (people are often mid-stride/occluded
         # in one frame — a single-frame sample constantly flickers to 0).
         self._count_window: collections.deque = collections.deque(maxlen=600)
+        # Cumulative "visitors today" — increments every time the debounced
+        # occupancy RISES (someone entered the view/zone). Resets at local
+        # midnight. Unlike the live count this never drops back to 0 when
+        # people leave, which is what a footfall dashboard actually needs.
+        self.entries_today: int = 0
+        self._entries_day: str = time.strftime("%Y-%m-%d")
+        self._occupancy_baseline: int = 0
 
         self._fall_detector = FallDetector(camera_id, cooldown_sec)
         self._loiter_detector = LoiteringDetector(camera_id, cooldown_sec)
@@ -625,6 +632,7 @@ class DetectionAnalyzer:
             count_persons if count_persons is not None else persons, frame
         )
         self._count_window.append((now, self.last_person_count))
+        self._update_entries(now)
 
         # 1. Shoplifting: person near high-value item for >2s
         # Key on the ITEM's position (items are stationary — backpack/bag on shelf).
@@ -763,6 +771,40 @@ class DetectionAnalyzer:
         if not counts:
             return self.last_person_count
         return max(counts)
+
+    def _update_entries(self, now: float) -> None:
+        """Accumulate cumulative footfall (entries) from occupancy rises.
+
+        Debounced: the candidate occupancy is the highest count seen in at
+        least 3 samples within the last 15s, so a single-frame false
+        detection cannot inflate the visitor count, and a person briefly
+        occluded (detection flickering to 0 for a few seconds) is NOT
+        re-counted when they re-appear. When the debounced occupancy rises
+        above the previous baseline, the difference is added to
+        ``entries_today``; when it falls (people left), the baseline decays
+        without adding entries. Resets at local midnight.
+        """
+        day = time.strftime("%Y-%m-%d", time.localtime(now))
+        if day != self._entries_day:
+            self._entries_day = day
+            self.entries_today = 0
+            self._occupancy_baseline = 0
+        cutoff = now - 15.0
+        recent = [c for (ts, c) in self._count_window if ts >= cutoff]
+        if not recent:
+            return
+        candidate = 0
+        for level in sorted(set(recent), reverse=True):
+            if level <= 0:
+                break
+            if sum(1 for c in recent if c >= level) >= 3:
+                candidate = level
+                break
+        if candidate > self._occupancy_baseline:
+            self.entries_today += candidate - self._occupancy_baseline
+            self._occupancy_baseline = candidate
+        elif candidate < self._occupancy_baseline:
+            self._occupancy_baseline = candidate
 
     @staticmethod
     def _boxes_overlap(a, b, threshold: float = 0.3) -> bool:

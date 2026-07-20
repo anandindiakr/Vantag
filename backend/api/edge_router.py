@@ -358,6 +358,7 @@ class HeartbeatBody(BaseModel):
     memory_percent: float | None = None
     fps_per_camera: dict[str, float] | None = None
     person_counts: dict[str, int] | None = None  # camera_id → live person count
+    person_entries: dict[str, int] | None = None  # camera_id → cumulative visitors today (agent-side)
 
 
 # ---------------------------------------------------------------------------
@@ -512,6 +513,12 @@ async def heartbeat(
     # Record live per-camera person counts (in-memory footfall store)
     if body.person_counts:
         _record_person_counts(str(agent.tenant_id), body.person_counts)
+    # Accumulate cumulative daily visitor entries (survives agent restarts)
+    if body.person_entries:
+        try:
+            _pc_store.record_entries(str(agent.tenant_id), body.person_entries)
+        except Exception:  # noqa: BLE001 — never fail a heartbeat over entry storage
+            logger.exception("Failed to persist person entries for tenant %s", agent.tenant_id)
     await session.commit()
     return {
         "ok": True,
@@ -1059,6 +1066,10 @@ async def get_people_counts(
     except Exception:  # noqa: BLE001
         logger.exception("Failed to read people-count store")
         latest, peak_rows = [], []
+    try:
+        daily_entries = _pc_store.get_daily_entries(tenant_id)
+    except Exception:  # noqa: BLE001
+        daily_entries = {}
 
     # Per-camera People Count toggle (default ON when never set).
     disabled_cams: set[str] = set()
@@ -1098,6 +1109,7 @@ async def get_people_counts(
         cameras.append({
             "camera_id": cam_id,
             "person_count": count,
+            "entries_today": int(daily_entries.get(cam_id, 0)),
             "age_seconds": int(age),
             "stale": stale,
             "snapshot_url": snapshot_url,
@@ -1108,8 +1120,13 @@ async def get_people_counts(
         for h, c in peak_rows
     ]
 
+    total_entries = sum(
+        v for k, v in daily_entries.items() if k not in disabled_cams
+    )
+
     return {
         "total_people": total,
+        "total_entries_today": total_entries,
         "cameras": cameras,
         "hourly_peaks": history,
         "updated_at": datetime.now(timezone.utc).isoformat(),

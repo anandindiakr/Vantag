@@ -7,6 +7,7 @@ import { api } from '../hooks/useApi';
 interface CameraCount {
   camera_id: string;
   person_count: number;
+  entries_today?: number;
   age_seconds: number;
   stale: boolean;
   snapshot_url?: string | null;
@@ -19,6 +20,7 @@ interface HourlyPeak {
 
 interface PeopleCountsResponse {
   total_people: number;
+  total_entries_today?: number;
   cameras: CameraCount[];
   hourly_peaks: HourlyPeak[];
   updated_at: string;
@@ -52,6 +54,7 @@ function printReport(data: PeopleCountsResponse | undefined) {
         return `<tr>
         <td>${c.camera_id}</td>
         <td style="text-align:center;font-weight:bold">${c.person_count}</td>
+        <td style="text-align:center;font-weight:bold">${c.entries_today ?? 0}</td>
         <td>${snapCell}</td>
         <td>${c.age_seconds < 60 ? `${c.age_seconds}s ago` : `${Math.floor(c.age_seconds / 60)}m ago`}</td>
         <td>${c.stale ? 'STALE' : 'LIVE'}</td>
@@ -84,12 +87,13 @@ function printReport(data: PeopleCountsResponse | undefined) {
     <div class="sub">Generated: ${now} &nbsp;|&nbsp; Data updated: ${data.updated_at}</div>
     <div class="cards">
       <div class="card"><div class="label">People in store (live)</div><div class="value">${data.total_people}</div></div>
+      <div class="card"><div class="label">Visitors today</div><div class="value">${data.total_entries_today ?? 0}</div></div>
       <div class="card"><div class="label">Cameras reporting</div><div class="value">${data.cameras.filter((c) => !c.stale).length} / ${data.cameras.length}</div></div>
       <div class="card"><div class="label">Peak (24h)</div><div class="value">${data.hourly_peaks.length ? Math.max(...data.hourly_peaks.map((p) => p.peak_count)) : 0}</div></div>
     </div>
     <h2>Per-camera counts</h2>
-    <table><thead><tr><th>Camera</th><th>People</th><th>Detection snapshot</th><th>Last update</th><th>Status</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="5">No data</td></tr>'}</tbody></table>
+    <table><thead><tr><th>Camera</th><th>People (live)</th><th>Visitors today</th><th>Detection snapshot</th><th>Last update</th><th>Status</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="6">No data</td></tr>'}</tbody></table>
     <h2>Hourly footfall peaks (last 24h)</h2>
     <table><thead><tr><th>Hour</th><th>Peak occupancy</th></tr></thead>
     <tbody>${peakRows || '<tr><td colspan="2">No history yet</td></tr>'}</tbody></table>
@@ -171,13 +175,20 @@ export default function PeopleCountPage() {
       )}
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl bg-vantag-card border border-slate-700/60">
           <p className="text-xs uppercase tracking-wider text-slate-500">People in store (live)</p>
           <p className="text-4xl font-bold text-slate-100 mt-2">
             {isLoading ? '—' : data?.total_people ?? 0}
           </p>
           <p className="text-xs text-slate-500 mt-1">Sum across all live cameras</p>
+        </div>
+        <div className="p-5 rounded-2xl bg-vantag-card border border-slate-700/60">
+          <p className="text-xs uppercase tracking-wider text-slate-500">Visitors today</p>
+          <p className="text-4xl font-bold text-violet-300 mt-2">
+            {isLoading ? '—' : data?.total_entries_today ?? 0}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">Cumulative entries since midnight</p>
         </div>
         <div className="p-5 rounded-2xl bg-vantag-card border border-slate-700/60">
           <p className="text-xs uppercase tracking-wider text-slate-500">Cameras reporting</p>
@@ -213,7 +224,8 @@ export default function PeopleCountPage() {
             <thead>
               <tr className="text-left text-xs uppercase tracking-wider text-slate-500 border-b border-slate-700/60">
                 <th className="px-5 py-3">Camera</th>
-                <th className="px-5 py-3">People</th>
+                <th className="px-5 py-3">People (live)</th>
+                <th className="px-5 py-3">Visitors today</th>
                 <th className="px-5 py-3">Detection snapshot</th>
                 <th className="px-5 py-3">Last update</th>
                 <th className="px-5 py-3">Status</th>
@@ -231,6 +243,14 @@ export default function PeopleCountPage() {
                       c.stale ? 'bg-slate-700/50 text-slate-500' : 'bg-violet-500/15 text-violet-300'
                     )}>
                       {c.person_count}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={clsx(
+                      'inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-lg font-bold',
+                      c.stale ? 'bg-slate-700/50 text-slate-500' : 'bg-emerald-500/15 text-emerald-300'
+                    )}>
+                      {c.entries_today ?? 0}
                     </span>
                   </td>
                   <td className="px-5 py-3">
