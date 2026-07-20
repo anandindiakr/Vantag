@@ -9,6 +9,7 @@ import {
   Camera, Wifi, WifiOff, Plus, Trash2, TestTube2,
   Loader2, CheckCircle2, XCircle, ArrowLeft, Network, Sparkles,
   MessageCircle, SlidersHorizontal, Pencil, Save,
+  HelpCircle, ChevronDown, Link2, Copy,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useQueryClient } from '@tanstack/react-query';
@@ -48,6 +49,66 @@ const BRAND_OPTIONS = [
   { value: 'xiaomi',    label: 'Xiaomi / Mi' },
   { value: 'onvif',     label: 'ONVIF (auto-detect)' },
 ];
+
+// ─── Brand-specific RTSP guidance (used by the URL Builder wizard) ───────────
+
+const BRAND_RTSP_GUIDE: Record<string, string[]> = {
+  hikvision: [
+    'Default username is "admin"; the password is the one you set during camera activation (or printed on the sticker).',
+    'Use /Streaming/Channels/101 for the main (HD) stream, /Streaming/Channels/102 for the lighter sub-stream.',
+    'If connecting through an NVR, channel 2 becomes /Streaming/Channels/201, channel 3 → /Streaming/Channels/301, and so on.',
+  ],
+  dahua: [
+    'Default username is "admin". Enable RTSP in camera settings if the stream does not respond.',
+    'channel=1 selects the camera / NVR channel; subtype=0 is the main stream, subtype=1 is the sub-stream.',
+    'For an NVR, just change channel= to the camera number, e.g. channel=3 for camera 3.',
+  ],
+  cpplus: [
+    'CP Plus cameras use the Dahua URL format: /cam/realmonitor?channel=1&subtype=0.',
+    'Change channel= for NVR channels; subtype=1 gives the lower-bandwidth sub-stream.',
+  ],
+  tplink: [
+    'In the Tapo app: Camera Settings → Advanced → Camera Account — create a local account (this is your RTSP username/password, NOT your TP-Link cloud login).',
+    '/stream1 is Full HD, /stream2 is the lighter 360p stream.',
+  ],
+  reolink: [
+    'Use your Reolink login. /h264Preview_01_main is the HD stream; /h264Preview_01_sub is lighter.',
+    'On NVRs, change 01 to the channel number (e.g. _02_ for camera 2).',
+  ],
+  uniview: [
+    'Default is /media/video1 for main stream and /media/video2 for sub-stream.',
+    'Make sure RTSP is enabled under Network → Port settings in the camera UI.',
+  ],
+  axis: [
+    'Use /axis-media/media.amp — works on virtually all Axis models.',
+    'Add ?resolution=1280x720 to the path to request a specific resolution.',
+  ],
+  bosch: ['Use /rtsp_tunnel and make sure RTSP is enabled in camera web settings.'],
+  ezviz: [
+    'Enable RTSP in the Ezviz app first: Settings → Advanced → Video encryption OFF (or note the verification code as password).',
+    'Username is "admin"; password is the 6-character verification code on the camera sticker.',
+  ],
+  xiaomi: [
+    'Stock Xiaomi/Mi cameras do NOT expose RTSP by default — you may need to enable it via the Mi Home lab features or use custom firmware.',
+    'Once enabled, the stream path is usually /live/ch00_0.',
+  ],
+  onvif: [
+    'ONVIF cameras publish their stream address automatically — click "Auto-Detect Path (AI)" and we will query the camera for it.',
+  ],
+  generic: [
+    'Check the camera manual or the sticker for the default RTSP path, or simply click "Auto-Detect Path (AI)" and we will try all known paths for you.',
+    'Common paths: /stream, /stream1, /live, /live.sdp, /11, /h264.',
+  ],
+};
+
+// Builds the full RTSP URL from the current form values.
+function buildRtspUrl(f: { username: string; password: string; ip: string; port: number | string; rtsp_path: string }, maskPassword = true): string {
+  const user = f.username || 'admin';
+  const pass = f.password ? (maskPassword ? '••••••' : f.password) : 'password';
+  const ip   = f.ip || '192.168.1.100';
+  const path = f.rtsp_path?.startsWith('/') ? f.rtsp_path : `/${f.rtsp_path || ''}`;
+  return `rtsp://${user}:${pass}@${ip}:${f.port || 554}${path}`;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -468,6 +529,7 @@ function ManualAddSectionWrapper({
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   // Auto-detect state
   const [detecting, setDetecting] = useState(false);
@@ -782,6 +844,79 @@ function ManualAddSectionWrapper({
               ))}
             </div>
           )}
+        </div>
+
+        {/* ─── RTSP URL Builder wizard ─────────────────────────────── */}
+        <div className="sm:col-span-2">
+          {/* Live URL preview */}
+          <div className="flex items-center gap-2 bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2">
+            <Link2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <code className="flex-1 text-xs text-cyan-200/90 break-all font-mono">
+              {buildRtspUrl(form)}
+            </code>
+            <button
+              type="button"
+              title="Copy full RTSP URL (with real password) to clipboard"
+              onClick={() => {
+                navigator.clipboard.writeText(buildRtspUrl(form, false));
+                toast.success('RTSP URL copied to clipboard');
+              }}
+              className="p-1.5 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/10 transition-all shrink-0"
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <p className="mt-1 text-[11px] text-white/30">
+            This is the full stream URL built live from the fields above — it updates as you type.
+          </p>
+
+          {/* Collapsible guide */}
+          <button
+            type="button"
+            onClick={() => setWizardOpen((o) => !o)}
+            className="mt-2 flex items-center gap-1.5 text-xs font-medium text-violet-300/80 hover:text-violet-300 transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            How do I write my RTSP URL? ({BRAND_OPTIONS.find((b) => b.value === selectedBrand)?.label})
+            <ChevronDown className={clsx('w-3.5 h-3.5 transition-transform', wizardOpen && 'rotate-180')} />
+          </button>
+          <AnimatePresence>
+            {wizardOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-2 bg-violet-500/5 border border-violet-500/20 rounded-xl p-4 space-y-3">
+                  <p className="text-xs text-white/60">
+                    Every RTSP URL follows the same pattern:
+                  </p>
+                  <code className="block text-xs font-mono text-white/80 bg-slate-900/60 rounded-lg px-3 py-2">
+                    rtsp://<span className="text-amber-300">username</span>:<span className="text-amber-300">password</span>@<span className="text-cyan-300">camera-ip</span>:<span className="text-cyan-300">port</span><span className="text-violet-300">/stream-path</span>
+                  </code>
+                  <ol className="space-y-1.5 text-xs text-white/55 list-decimal list-inside">
+                    <li><span className="text-amber-300/90">username / password</span> — the camera's local login (not your cloud app account, unless noted below).</li>
+                    <li><span className="text-cyan-300/90">camera-ip</span> — the camera or NVR's local IP (check your router's device list). <span className="text-cyan-300/90">port</span> is almost always 554.</li>
+                    <li><span className="text-violet-300/90">/stream-path</span> — brand-specific. Pick your brand above and we auto-fill it, or use the tips below.</li>
+                  </ol>
+                  <div className="border-t border-white/10 pt-3">
+                    <p className="text-xs font-semibold text-white/70 mb-1.5">
+                      Tips for {BRAND_OPTIONS.find((b) => b.value === selectedBrand)?.label}:
+                    </p>
+                    <ul className="space-y-1 text-xs text-white/55 list-disc list-inside">
+                      {(BRAND_RTSP_GUIDE[selectedBrand] ?? BRAND_RTSP_GUIDE.generic).map((tip, i) => (
+                        <li key={i}>{tip}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <p className="text-[11px] text-white/35">
+                    Still stuck? Click <span className="text-cyan-300/80">Auto-Detect Path (AI)</span> above — we try every known path for you automatically.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Resolution */}

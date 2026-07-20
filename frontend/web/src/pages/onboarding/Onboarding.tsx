@@ -116,14 +116,28 @@ export default function Onboarding() {
   };
 
   useEffect(() => {
+    // Redirected here by the global 402 handler (trial expired / suspended)?
+    const params = new URLSearchParams(window.location.search);
+    const paywall = params.get('reason') === 'subscription_required';
+    if (paywall) {
+      const status = params.get('status');
+      toast.error(
+        status === 'trial_expired'
+          ? 'Your 3-day free trial has ended. Choose a plan to keep your cameras and AI protection running.'
+          : 'Your subscription is inactive. Choose a plan to continue.',
+        { duration: 8000 }
+      );
+    }
     // Load saved step from server
     api.get('/onboarding/status').then(({ data }) => {
-      setStep(Math.min(data.onboarding_step || 1, 5));
+      // Expired-trial users land directly on the Plan step, even if their
+      // onboarding was already completed earlier.
+      setStep(paywall ? 2 : Math.min(data.onboarding_step || 1, 5));
       // Only override with the saved tenant country; otherwise keep the
       // domain-detected region (e.g. retailpantau.com -> ID) instead of
       // falling back to India.
       if (data.country) setCountry(data.country);
-    }).catch(() => {});
+    }).catch(() => { if (paywall) setStep(2); });
   }, []);
 
   // ── Step handlers ─────────────────────────────────────────────────────

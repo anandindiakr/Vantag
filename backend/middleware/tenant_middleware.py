@@ -4,7 +4,7 @@ Tenant middleware — extracts tenant_id from JWT and injects into request.state
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Request, status
@@ -167,12 +167,19 @@ async def require_active_tenant(
 
     if tenant.status == "trial":
         if tenant.trial_ends_at is None:
-            # No expiry set — block access; trial_ends_at must always be set
-            raise HTTPException(
-                status_code=402,
-                detail="subscription_required",
-                headers={"X-Subscription-Status": "trial_expired"},
-            )
+            # Legacy/migration gap: trial tenant without an expiry timestamp.
+            # Backfill it as created_at + 3 days instead of hard-blocking a
+            # legitimate trial user, then persist so future requests are fast.
+            created = tenant.created_at or now
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            backfilled_end = created + timedelta(days=3)
+            async with AsyncSessionLocal() as session:
+                db_tenant = await session.get(Tenant, tenant.id)
+                if db_tenant is not None and db_tenant.trial_ends_at is None:
+                    db_tenant.trial_ends_at = backfilled_end
+                    await session.commit()
+            tenant.trial_ends_at = backfilled_end
         trial_end = tenant.trial_ends_at
         if trial_end.tzinfo is None:
             trial_end = trial_end.replace(tzinfo=timezone.utc)

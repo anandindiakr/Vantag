@@ -44,6 +44,26 @@ api.interceptors.response.use(
         window.location.href = '/login?reason=session_expired';
       }
     }
+    // 402 Payment Required → trial expired / subscription inactive → paywall.
+    // Backend sets X-Subscription-Status: trial_expired | suspended | ...
+    if (
+      err.response?.status === 402 &&
+      (err.response?.data as { detail?: string })?.detail === 'subscription_required'
+    ) {
+      const subStatus =
+        err.response?.headers?.['x-subscription-status'] ?? 'expired';
+      // Avoid redirect loop if already on the upgrade/plan flow
+      if (!window.location.pathname.startsWith('/onboarding')) {
+        window.location.href = `/onboarding?reason=subscription_required&status=${subStatus}`;
+      }
+      return Promise.reject(
+        new Error(
+          subStatus === 'trial_expired'
+            ? 'Your 3-day free trial has ended. Please choose a plan to continue.'
+            : 'Your subscription is inactive. Please subscribe to continue.'
+        )
+      );
+    }
     const message =
       (err.response?.data as { detail?: string })?.detail ??
       err.message ??

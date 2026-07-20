@@ -91,6 +91,13 @@ export default function AlertFeed({ storeId, maxItems = 50, className }: AlertFe
         <div className="flex items-center gap-2">
           <AlertCircle size={15} className="text-vantag-red" />
           <span className="text-sm font-semibold text-slate-100">Live Event Feed</span>
+          <span className="flex items-center gap-1.5 ml-1 px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+            </span>
+            <span className="text-[10px] font-semibold text-emerald-400 tracking-wide">LIVE</span>
+          </span>
         </div>
         <span className="text-xs text-slate-500">{events.length} events</span>
       </div>
@@ -101,8 +108,12 @@ export default function AlertFeed({ storeId, maxItems = 50, className }: AlertFe
         style={{ maxHeight: '480px' }}
       >
         {events.length === 0 ? (
-          <div className="flex items-center justify-center py-12 text-sm text-slate-500">
-            No events yet
+          <div className="flex flex-col items-center justify-center gap-2 py-12 px-4 text-center">
+            <Shield size={22} className="text-emerald-400/70" />
+            <p className="text-sm text-slate-300 font-medium">Monitoring active — no incidents detected</p>
+            <p className="text-xs text-slate-500">
+              AI detections from your cameras will appear here in real time. No news is good news.
+            </p>
           </div>
         ) : (
           events.map((event, idx) => (
