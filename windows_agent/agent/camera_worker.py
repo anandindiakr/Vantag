@@ -558,6 +558,11 @@ class DetectionAnalyzer:
 
         # Live person count from the most recent analysed frame (footfall)
         self.last_person_count: int = 0
+        # Rolling (timestamp, count) window so the 30s heartbeat reports the
+        # PEAK count seen in the interval instead of whatever single frame
+        # happened to be analysed last (people are often mid-stride/occluded
+        # in one frame — a single-frame sample constantly flickers to 0).
+        self._count_window: collections.deque = collections.deque(maxlen=600)
 
         self._fall_detector = FallDetector(camera_id, cooldown_sec)
         self._loiter_detector = LoiteringDetector(camera_id, cooldown_sec)
@@ -595,8 +600,20 @@ class DetectionAnalyzer:
             },
         }
 
-    def analyse(self, boxes: list, frame: np.ndarray) -> list[dict]:
-        """Given a list of BoundingBox, return list of events to emit."""
+    def analyse(
+        self,
+        boxes: list,
+        frame: np.ndarray,
+        count_persons: Optional[list] = None,
+    ) -> list[dict]:
+        """Given a list of BoundingBox, return list of events to emit.
+
+        ``boxes`` are the high-confidence detections used for alerting.
+        ``count_persons`` (optional) are person boxes detected at a LOWER
+        confidence threshold, used only for people counting — ceiling-mounted
+        cameras at steep angles produce small/foreshortened person boxes that
+        YOLO scores 0.3–0.55, well below the 0.6 alert threshold.
+        """
         events = []
         now = time.time()
 
@@ -604,7 +621,10 @@ class DetectionAnalyzer:
         items       = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "high_value_item"]
         shelf_items = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "shelf_item"]
 
-        self.last_person_count = self._count_people(persons, frame)
+        self.last_person_count = self._count_people(
+            count_persons if count_persons is not None else persons, frame
+        )
+        self._count_window.append((now, self.last_person_count))
 
         # 1. Shoplifting: person near high-value item for >2s
         # Key on the ITEM's position (items are stationary — backpack/bag on shelf).
@@ -730,6 +750,20 @@ class DetectionAnalyzer:
                     break
         return count
 
+    def recent_person_count(self, window_sec: float = 35.0) -> int:
+        """Peak person count over the last ``window_sec`` seconds.
+
+        The heartbeat samples every 30s; the instantaneous last-frame count
+        flickers to 0 whenever someone is mid-stride or briefly occluded, so
+        the dashboard looked "stuck at zero". The window max reports the true
+        occupancy seen during the interval.
+        """
+        cutoff = time.time() - window_sec
+        counts = [c for (ts, c) in self._count_window if ts >= cutoff]
+        if not counts:
+            return self.last_person_count
+        return max(counts)
+
     @staticmethod
     def _boxes_overlap(a, b, threshold: float = 0.3) -> bool:
         x_overlap = max(0, min(a.x + a.w, b.x + b.w) - max(a.x, b.x))
@@ -804,6 +838,8 @@ class CameraWorker:
             max_workers=1, thread_name_prefix=f"infer-{config.id}"
         )
         self._infer_inflight = threading.Event()
+        # Annotated people-count snapshot push (rate-limited)
+        self._last_count_snapshot = 0.0
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -824,6 +860,14 @@ class CameraWorker:
         self._infer_executor.shutdown(wait=False)
         log.info(f"[{self.config.name}] Worker stopped")
 
+    # People counting uses a LOWER confidence than alerting: overhead/angled
+    # CCTV shots of stationary or partially-occluded people typically score
+    # 0.35-0.55 — below the 0.6 alert threshold, so they were invisible to the
+    # counter. Alerts keep the strict threshold to avoid false positives.
+    COUNT_CONF = 0.35
+    # Minimum seconds between annotated people-count snapshot uploads.
+    COUNT_SNAPSHOT_INTERVAL = 20.0
+
     def _run_inference(self, frame: np.ndarray) -> None:
         """Runs YOLO detection + event analysis off the capture thread.
 
@@ -832,8 +876,17 @@ class CameraWorker:
         fps instead of freezing the live view.
         """
         try:
-            boxes = self._inference.detect(frame, conf_threshold=self._conf)
-            events = self._analyzer.analyse(boxes, frame)
+            # Single YOLO pass at the LOW threshold, then split by confidence:
+            # low-conf persons feed the people counter, high-conf boxes feed
+            # the alert analyser. (One pass ~ same cost as before.)
+            low_conf = min(self.COUNT_CONF, self._conf)
+            all_boxes = self._inference.detect(frame, conf_threshold=low_conf)
+            count_persons = [b for b in all_boxes if b.label == "person"]
+            alert_boxes = [b for b in all_boxes if b.confidence >= self._conf]
+            events = self._analyzer.analyse(
+                alert_boxes, frame, count_persons=count_persons
+            )
+            self._maybe_push_count_snapshot(frame, count_persons)
             for event in events:
                 log.info(
                     f"[{self.config.name}] Event: {event['event_type']} "
@@ -846,6 +899,43 @@ class CameraWorker:
             log.warning(f"[{self.config.name}] Inference error: {e}")
         finally:
             self._infer_inflight.clear()
+
+    def _maybe_push_count_snapshot(self, frame: np.ndarray, persons: list) -> None:
+        """Upload an annotated snapshot (person boxes drawn) so the People
+        Count page can show visual proof of WHO is being counted.
+
+        Rate-limited; only sent when at least one person is detected.
+        """
+        now = time.time()
+        if not persons or (now - self._last_count_snapshot) < self.COUNT_SNAPSHOT_INTERVAL:
+            return
+        self._last_count_snapshot = now
+        try:
+            fh, fw = frame.shape[:2]
+            annotated = frame.copy()
+            for p in persons:
+                x1, y1 = int(p.x * fw), int(p.y * fh)
+                x2, y2 = int((p.x + p.w) * fw), int((p.y + p.h) * fh)
+                cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 200, 60), 2)
+                cv2.putText(
+                    annotated, f"person {p.confidence:.2f}",
+                    (x1, max(14, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.45, (0, 200, 60), 1, cv2.LINE_AA,
+                )
+            count = self._analyzer.last_person_count
+            cv2.putText(
+                annotated, f"Count: {count}", (10, 28),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 200, 60), 2, cv2.LINE_AA,
+            )
+            # Keep upload small: 640-wide JPEG q70
+            if fw > 640:
+                scale = 640 / fw
+                annotated = cv2.resize(annotated, (640, int(fh * scale)))
+            _, buf = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            snap_b64 = base64.b64encode(buf.tobytes()).decode()
+            self._api.post_count_snapshot(self.config.id, count, snap_b64)
+        except Exception as e:  # noqa: BLE001 — snapshot is best-effort
+            log.debug(f"[{self.config.name}] Count snapshot push failed: {e}")
 
     def _run(self):
         frame_interval = 1.0 / self._target_fps

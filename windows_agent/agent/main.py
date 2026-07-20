@@ -356,9 +356,14 @@ def start_monitoring():
             camera_statuses[cam_id] = "online" if w.is_connected else "offline"
             fps_per_camera[cam_id] = round(w.current_fps, 1)
             try:
-                person_counts[cam_id] = int(w._analyzer.last_person_count)
+                # Peak count over the last ~35s (not the instantaneous last
+                # frame, which flickers to 0 between detections).
+                person_counts[cam_id] = int(w._analyzer.recent_person_count())
             except Exception:  # noqa: BLE001
                 person_counts[cam_id] = 0
+        # Visible proof in the agent console of what is being counted
+        counted = {w.config.name: person_counts.get(w.config.id, 0) for w in _workers}
+        log.info(f"People counts (30s peak): {counted}")
         resp = _api.heartbeat({
             "camera_statuses": camera_statuses,
             "fps_per_camera": fps_per_camera,

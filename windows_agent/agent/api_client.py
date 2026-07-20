@@ -107,6 +107,24 @@ class VantagApiClient:
             log.warning(f"post_event failed: {e}")
             return False
 
+    def post_count_snapshot(self, camera_id: str, count: int, snapshot_b64: str) -> bool:
+        """Upload an annotated people-count snapshot (best-effort)."""
+        try:
+            resp = self._session.post(
+                f"{self.base_url}/api/edge/people-count-snapshot",
+                json={
+                    "camera_id": camera_id,
+                    "count": count,
+                    "snapshot_b64": snapshot_b64,
+                },
+                timeout=(3.05, 10),
+            )
+            resp.raise_for_status()
+            return True
+        except Exception as e:
+            log.debug(f"post_count_snapshot failed: {e}")
+            return False
+
     def heartbeat(self, status: dict) -> Optional[dict]:
         """Send agent heartbeat. Returns the parsed response dict, or None on failure.
 

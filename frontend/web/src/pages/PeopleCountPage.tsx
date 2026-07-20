@@ -9,6 +9,7 @@ interface CameraCount {
   person_count: number;
   age_seconds: number;
   stale: boolean;
+  snapshot_url?: string | null;
 }
 
 interface HourlyPeak {
@@ -28,18 +29,34 @@ async function fetchPeopleCounts(): Promise<PeopleCountsResponse> {
   return data;
 }
 
+// Snapshot endpoints accept the JWT via ?token= for <img> tags (browsers
+// cannot attach an Authorization header to image requests).
+function snapshotSrc(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const token = localStorage.getItem('vantag_token');
+  if (!token) return null;
+  return `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
+}
+
 // Build a light-themed, print-friendly report in a new window.
 function printReport(data: PeopleCountsResponse | undefined) {
   if (!data) return;
   const now = new Date().toLocaleString();
   const rows = data.cameras
     .map(
-      (c) => `<tr>
+      (c) => {
+        const src = snapshotSrc(c.snapshot_url);
+        const snapCell = src
+          ? `<img src="${src}" style="width:160px;height:90px;object-fit:cover;border-radius:4px;border:1px solid #cbd5e1" />`
+          : '<span style="color:#94a3b8;font-size:11px">No snapshot</span>';
+        return `<tr>
         <td>${c.camera_id}</td>
         <td style="text-align:center;font-weight:bold">${c.person_count}</td>
+        <td>${snapCell}</td>
         <td>${c.age_seconds < 60 ? `${c.age_seconds}s ago` : `${Math.floor(c.age_seconds / 60)}m ago`}</td>
         <td>${c.stale ? 'STALE' : 'LIVE'}</td>
-      </tr>`
+      </tr>`;
+      }
     )
     .join('');
   const peakRows = data.hourly_peaks
@@ -71,13 +88,27 @@ function printReport(data: PeopleCountsResponse | undefined) {
       <div class="card"><div class="label">Peak (24h)</div><div class="value">${data.hourly_peaks.length ? Math.max(...data.hourly_peaks.map((p) => p.peak_count)) : 0}</div></div>
     </div>
     <h2>Per-camera counts</h2>
-    <table><thead><tr><th>Camera</th><th>People</th><th>Last update</th><th>Status</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="4">No data</td></tr>'}</tbody></table>
+    <table><thead><tr><th>Camera</th><th>People</th><th>Detection snapshot</th><th>Last update</th><th>Status</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5">No data</td></tr>'}</tbody></table>
     <h2>Hourly footfall peaks (last 24h)</h2>
     <table><thead><tr><th>Hour</th><th>Peak occupancy</th></tr></thead>
     <tbody>${peakRows || '<tr><td colspan="2">No history yet</td></tr>'}</tbody></table>
     <div class="footer">Counts are produced by YOLO person detection on the Edge Agent. Overlapping camera views may double-count.</div>
-    <script>window.onload = function () { window.print(); };</script>
+    <script>
+      // Wait for snapshot images to load (or fail) before printing.
+      window.onload = function () {
+        var printed = false;
+        var doPrint = function () { if (!printed) { printed = true; window.print(); } };
+        var imgs = Array.prototype.slice.call(document.images);
+        var pending = imgs.filter(function (i) { return !i.complete; }).length;
+        if (pending === 0) { doPrint(); return; }
+        var done = function () { if (--pending <= 0) doPrint(); };
+        imgs.forEach(function (i) {
+          if (!i.complete) { i.onload = done; i.onerror = done; }
+        });
+        setTimeout(doPrint, 5000); // safety net
+      };
+    </script>
     </body></html>`;
   const w = window.open('', '_blank', 'width=900,height=700');
   if (w) {
@@ -183,12 +214,15 @@ export default function PeopleCountPage() {
               <tr className="text-left text-xs uppercase tracking-wider text-slate-500 border-b border-slate-700/60">
                 <th className="px-5 py-3">Camera</th>
                 <th className="px-5 py-3">People</th>
+                <th className="px-5 py-3">Detection snapshot</th>
                 <th className="px-5 py-3">Last update</th>
                 <th className="px-5 py-3">Status</th>
               </tr>
             </thead>
             <tbody>
-              {cameras.map((c) => (
+              {cameras.map((c) => {
+                const snap = snapshotSrc(c.snapshot_url);
+                return (
                 <tr key={c.camera_id} className="border-b border-slate-800/60 last:border-0">
                   <td className="px-5 py-3 font-medium text-slate-200">{c.camera_id}</td>
                   <td className="px-5 py-3">
@@ -198,6 +232,20 @@ export default function PeopleCountPage() {
                     )}>
                       {c.person_count}
                     </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    {snap ? (
+                      <a href={snap} target="_blank" rel="noopener noreferrer" title="Open full-size snapshot">
+                        <img
+                          src={snap}
+                          alt={`Detections on ${c.camera_id}`}
+                          className="w-28 h-16 object-cover rounded-md border border-slate-700 hover:border-violet-500 transition-colors"
+                          loading="lazy"
+                        />
+                      </a>
+                    ) : (
+                      <span className="text-xs text-slate-600">No snapshot yet</span>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-slate-400">
                     <span className="inline-flex items-center gap-1.5">
@@ -216,7 +264,8 @@ export default function PeopleCountPage() {
                     </span>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}

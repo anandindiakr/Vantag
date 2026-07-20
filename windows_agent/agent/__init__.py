@@ -1,2 +1,2 @@
 """Vantag Windows Edge Agent"""
-__version__ = "1.4.7"
+__version__ = "1.4.8"

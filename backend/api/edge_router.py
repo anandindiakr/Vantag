@@ -395,6 +395,52 @@ class DetectionEventBody(BaseModel):
     metadata: dict | None = None
 
 
+class CountSnapshotBody(BaseModel):
+    camera_id: str
+    count: int
+    snapshot_b64: str
+
+
+# Fixed filename so each camera keeps exactly ONE annotated count snapshot on
+# disk (overwritten in place) — no unbounded disk growth.
+_COUNT_SNAPSHOT_NAME = "people_count_latest.jpg"
+# Snapshot considered stale/hidden after this many seconds without an update.
+_COUNT_SNAPSHOT_STALE_SEC = 300.0
+
+
+def _count_snapshot_path(tenant_id: str, camera_id: str) -> Path:
+    return _SNAPSHOTS_ROOT / str(tenant_id) / str(camera_id) / _COUNT_SNAPSHOT_NAME
+
+
+@edge_router.post("/people-count-snapshot")
+async def post_people_count_snapshot(
+    body: CountSnapshotBody,
+    agent: EdgeAgent = Depends(_verify_agent),
+) -> dict:
+    """Store the latest annotated people-count snapshot for a camera.
+
+    The Edge Agent pushes a JPEG with green person bounding boxes drawn
+    (rate-limited to one every ~20s) so the dashboard can show visual proof
+    of what is being counted. One file per camera, overwritten in place.
+    """
+    b64 = body.snapshot_b64
+    try:
+        if "," in b64 and b64.strip().lower().startswith("data:"):
+            b64 = b64.split(",", 1)[1]
+        raw = base64.b64decode(b64)
+        if len(raw) > 2_000_000:  # sanity cap: 2 MB
+            raise HTTPException(status_code=413, detail="Snapshot too large")
+        path = _count_snapshot_path(str(agent.tenant_id), body.camera_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(raw)
+    except HTTPException:
+        raise
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to store count snapshot for %s", body.camera_id)
+        raise HTTPException(status_code=500, detail="Failed to store snapshot")
+    return {"ok": True}
+
+
 @edge_router.post("/register")
 async def register_agent(
     body: RegisterBody,
@@ -1036,11 +1082,25 @@ async def get_people_counts(
         stale = age > _PERSON_COUNT_STALE_SEC
         if not stale:
             total += count
+        # Latest annotated count snapshot (green boxes) pushed by the agent.
+        snapshot_url = None
+        try:
+            snap = _count_snapshot_path(tenant_id, cam_id)
+            if snap.exists():
+                mtime = snap.stat().st_mtime
+                if (now - mtime) <= _COUNT_SNAPSHOT_STALE_SEC:
+                    snapshot_url = (
+                        f"/api/snapshots/{tenant_id}/{cam_id}/{_COUNT_SNAPSHOT_NAME}"
+                        f"?t={int(mtime)}"
+                    )
+        except Exception:  # noqa: BLE001
+            pass
         cameras.append({
             "camera_id": cam_id,
             "person_count": count,
             "age_seconds": int(age),
             "stale": stale,
+            "snapshot_url": snapshot_url,
         })
 
     history = [

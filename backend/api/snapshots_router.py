@@ -32,7 +32,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
-from ..middleware.tenant_middleware import get_current_user_id
+from ..middleware.tenant_middleware import get_current_user_id, get_current_user_id_img
 
 snapshots_router = APIRouter(prefix="/api/snapshots", tags=["snapshots"])
 
@@ -68,9 +68,9 @@ async def get_camera_snapshot(
     tenant_id: str,
     camera_id: str,
     filename: str,
-    user: dict = Depends(get_current_user_id),
+    user: dict = Depends(get_current_user_id_img),
 ) -> FileResponse:
-    """Serve a camera snapshot — JWT required, tenant-scoped."""
+    """Serve a camera snapshot — JWT required (header or ?token=), tenant-scoped."""
     _reject_traversal(tenant_id)
     _reject_traversal(camera_id)
     _reject_traversal(filename)
