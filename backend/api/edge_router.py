@@ -42,6 +42,41 @@ edge_router = APIRouter(prefix="/api/edge", tags=["edge-agent"])
 
 logger = logging.getLogger("vantag.edge")
 
+
+def _normalized_people_count_zones(c) -> list[dict]:
+    """Return the camera's people-count zones with bbox normalized to 0-1.
+
+    Zones are stored in reference-resolution pixels (the camera's configured
+    resolution, default 1920x1080). The edge agent processes downscaled
+    frames, so absolute pixel bboxes never match. Sending normalized
+    fractions lets the agent scale to whatever frame size it decodes.
+    """
+    zones = (
+        (getattr(c, "analyzer_config", None) or {})
+        .get("people_count", {})
+        .get("zones", [])
+    )
+    ref_w = float(getattr(c, "resolution_width", None) or 1920)
+    ref_h = float(getattr(c, "resolution_height", None) or 1080)
+    out: list[dict] = []
+    for z in zones:
+        bbox = z.get("bbox") or []
+        if len(bbox) != 4:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in bbox)
+        # Already normalized (legacy safety): all values within [0, 1].
+        if max(x1, y1, x2, y2) <= 1.0:
+            norm = [x1, y1, x2, y2]
+        else:
+            norm = [
+                max(0.0, min(1.0, x1 / ref_w)),
+                max(0.0, min(1.0, y1 / ref_h)),
+                max(0.0, min(1.0, x2 / ref_w)),
+                max(0.0, min(1.0, y2 / ref_h)),
+            ]
+        out.append({**z, "bbox": norm, "normalized": True})
+    return out
+
 # ---------------------------------------------------------------------------
 # Live pipeline wiring (populated by main.py via set_pipeline) + snapshot store
 # ---------------------------------------------------------------------------
@@ -398,11 +433,7 @@ async def register_agent(
                 "fps_target": c.fps_target,
                 "resolution_width": c.resolution_width,
                 "resolution_height": c.resolution_height,
-                "people_count_zones": (
-                    (getattr(c, "analyzer_config", None) or {})
-                    .get("people_count", {})
-                    .get("zones", [])
-                ),
+                "people_count_zones": _normalized_people_count_zones(c),
             }
             for c in cameras
         ],
@@ -902,11 +933,7 @@ async def get_config(
                 "location": c.location,
                 "fps_target": c.fps_target,
                 "confidence_threshold": (getattr(c, "analyzer_config", None) or {}).get("confidence_threshold"),
-                "people_count_zones": (
-                    (getattr(c, "analyzer_config", None) or {})
-                    .get("people_count", {})
-                    .get("zones", [])
-                ),
+                "people_count_zones": _normalized_people_count_zones(c),
             }
             for c in cameras
         ]

@@ -152,12 +152,48 @@ export default function CameraView() {
       return;
     }
     try {
-      await api.post(`/cameras/${cameraId}/zones`, { points: zonePoints });
-      toast.success('Zone saved successfully');
+      // Load the camera's current zone config (and reference resolution) so
+      // we merge with existing zones instead of overwriting them.
+      const { data: cfg } = await api.get(`/zones/cameras/${cameraId}`);
+      const resW = cfg?.resolution?.width  || 1920;
+      const resH = cfg?.resolution?.height || 1080;
+
+      // Points are drawn as percentages (0-100) of the video overlay.
+      // Convert the polygon's bounding box to pixel coords in the camera's
+      // reference resolution — the format the backend zone store expects.
+      const xs = zonePoints.map((p) => (p.x / 100) * resW);
+      const ys = zonePoints.map((p) => (p.y / 100) * resH);
+      const bbox = [
+        Math.max(0, Math.round(Math.min(...xs))),
+        Math.max(0, Math.round(Math.min(...ys))),
+        Math.min(resW, Math.round(Math.max(...xs))),
+        Math.min(resH, Math.round(Math.max(...ys))),
+      ];
+
+      const zones = cfg?.zones ?? {};
+      const existing = zones.people_count_zones ?? [];
+      await api.put(`/zones/cameras/${cameraId}`, {
+        shelf_zones:      zones.shelf_zones ?? [],
+        restricted_zones: zones.restricted_zones ?? [],
+        queue_zones:      zones.queue_zones ?? [],
+        people_count_zones: [
+          ...existing,
+          {
+            label: `Count Area ${existing.length + 1}`,
+            bbox,
+            zone_type: 'people_count',
+          },
+        ],
+      });
+      toast.success('Zone saved — people counting will use this area within ~1 minute');
       setIsDrawing(false);
       clearZone();
-    } catch {
-      toast.error('Failed to save zone');
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: unknown } } })
+        ?.response?.data?.detail;
+      toast.error(
+        typeof detail === 'string' ? `Failed to save zone: ${detail}` : 'Failed to save zone'
+      );
     }
   };
 

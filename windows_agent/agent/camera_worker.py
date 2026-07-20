@@ -718,7 +718,14 @@ class DetectionAnalyzer:
                 bbox = zone.get("bbox", [])
                 if len(bbox) != 4:
                     continue
-                if bbox[0] <= center_x <= bbox[2] and bbox[1] <= center_y <= bbox[3]:
+                x1, y1, x2, y2 = (float(v) for v in bbox)
+                # Backend sends zones normalized to 0-1 ("normalized": True).
+                # Scale to this frame's actual pixel size. Legacy pixel-based
+                # zones (all values > 1) are used as-is.
+                if zone.get("normalized") or max(x1, y1, x2, y2) <= 1.0:
+                    x1, x2 = x1 * frame_width, x2 * frame_width
+                    y1, y2 = y1 * frame_height, y2 * frame_height
+                if x1 <= center_x <= x2 and y1 <= center_y <= y2:
                     count += 1
                     break
         return count
