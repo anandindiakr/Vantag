@@ -563,10 +563,15 @@ class DetectionAnalyzer:
         # happened to be analysed last (people are often mid-stride/occluded
         # in one frame — a single-frame sample constantly flickers to 0).
         self._count_window: collections.deque = collections.deque(maxlen=600)
+        # Zone-filtered count of the most recent frame. When a people-count
+        # zone is drawn (e.g. across the doorway) this counts only persons
+        # inside it — used for ENTRIES (footfall), NOT for the live count.
+        self.last_zone_count: int = 0
+        self._entry_window: collections.deque = collections.deque(maxlen=600)
         # Cumulative "visitors today" — increments every time the debounced
-        # occupancy RISES (someone entered the view/zone). Resets at local
-        # midnight. Unlike the live count this never drops back to 0 when
-        # people leave, which is what a footfall dashboard actually needs.
+        # zone occupancy RISES (someone entered the view/zone). Resets at
+        # local midnight. Unlike the live count this never drops back to 0
+        # when people leave, which is what a footfall dashboard actually needs.
         self.entries_today: int = 0
         self._entries_day: str = time.strftime("%Y-%m-%d")
         self._occupancy_baseline: int = 0
@@ -628,10 +633,17 @@ class DetectionAnalyzer:
         items       = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "high_value_item"]
         shelf_items = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "shelf_item"]
 
-        self.last_person_count = self._count_people(
-            count_persons if count_persons is not None else persons, frame
-        )
+        # LIVE count = every person visible in the frame (what the user sees
+        # in the snapshot). The people-count zone must NOT filter this — a
+        # doorway zone would otherwise report 0 whenever nobody is standing
+        # exactly in the doorway, which reads as "broken" on the dashboard.
+        count_boxes = count_persons if count_persons is not None else persons
+        self.last_person_count = len(count_boxes)
         self._count_window.append((now, self.last_person_count))
+        # ZONE count = persons inside the drawn zone (falls back to the full
+        # frame when no zone is configured). This drives "visitors today".
+        self.last_zone_count = self._count_people(count_boxes, frame)
+        self._entry_window.append((now, self.last_zone_count))
         self._update_entries(now)
 
         # 1. Shoplifting: person near high-value item for >2s
@@ -734,6 +746,9 @@ class DetectionAnalyzer:
             return None
 
     def _count_people(self, persons: list, frame: np.ndarray) -> int:
+        """Zone-filtered person count (footfall). Falls back to everyone in
+        frame when no people-count zone is configured. NOT used for the live
+        occupancy figure — that is always the total in-frame count."""
         if not self._people_count_zones:
             return len(persons)
 
@@ -783,6 +798,10 @@ class DetectionAnalyzer:
         above the previous baseline, the difference is added to
         ``entries_today``; when it falls (people left), the baseline decays
         without adding entries. Resets at local midnight.
+
+        Uses the ZONE-filtered window: when a people-count zone (e.g. a
+        doorway strip) is drawn, only people passing through it register as
+        entries — matching the retail meaning of "visitors today".
         """
         day = time.strftime("%Y-%m-%d", time.localtime(now))
         if day != self._entries_day:
@@ -790,7 +809,7 @@ class DetectionAnalyzer:
             self.entries_today = 0
             self._occupancy_baseline = 0
         cutoff = now - 15.0
-        recent = [c for (ts, c) in self._count_window if ts >= cutoff]
+        recent = [c for (ts, c) in self._entry_window if ts >= cutoff]
         if not recent:
             return
         candidate = 0
@@ -955,6 +974,24 @@ class CameraWorker:
         try:
             fh, fw = frame.shape[:2]
             annotated = frame.copy()
+            # Draw the people-count zone (yellow) so the snapshot explains
+            # itself: green boxes inside the zone count towards footfall.
+            for zone in getattr(self._analyzer, "_people_count_zones", []) or []:
+                bbox = zone.get("bbox", [])
+                if len(bbox) != 4:
+                    continue
+                zx1, zy1, zx2, zy2 = (float(v) for v in bbox)
+                if zone.get("normalized") or max(zx1, zy1, zx2, zy2) <= 1.0:
+                    zx1, zx2 = zx1 * fw, zx2 * fw
+                    zy1, zy2 = zy1 * fh, zy2 * fh
+                cv2.rectangle(
+                    annotated, (int(zx1), int(zy1)), (int(zx2), int(zy2)),
+                    (0, 200, 255), 2,
+                )
+                cv2.putText(
+                    annotated, "count zone", (int(zx1) + 4, max(14, int(zy1) - 6)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 200, 255), 1, cv2.LINE_AA,
+                )
             for p in persons:
                 x1, y1 = int(p.x * fw), int(p.y * fh)
                 x2, y2 = int((p.x + p.w) * fw), int((p.y + p.h) * fh)
@@ -964,6 +1001,7 @@ class CameraWorker:
                     (x1, max(14, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX,
                     0.45, (0, 200, 60), 1, cv2.LINE_AA,
                 )
+            # Live count = everyone in frame (matches the boxes drawn above).
             count = self._analyzer.last_person_count
             cv2.putText(
                 annotated, f"Count: {count}", (10, 28),
