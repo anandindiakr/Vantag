@@ -553,9 +553,20 @@ class DetectionAnalyzer:
         self.cooldown_sec = cooldown_sec
         self.fps = fps
         self._last_event: dict[str, float] = {}
-        self._person_with_items: dict[str, float] = {}
+        # {key: [first_seen, last_seen]} — last_seen enables the continuous-
+        # presence (temporal smoothing) check in analyse() below (v1.5.1):
+        # without it, a single stray overlap frame months apart could
+        # accumulate toward the 2s dwell threshold across unrelated visits.
+        self._person_with_items: dict[str, list] = {}
         self._person_frame_counts: dict[str, int] = {}
+        self._person_dwell_last_seen: dict[str, float] = {}
         self._shelf_empty_since: Optional[float] = None
+        # Max gap (seconds) tolerated between consecutive detections of the
+        # same dwell/proximity key before it's treated as a NEW encounter
+        # rather than a continuation. ~7-8 missed frames at 5fps — enough to
+        # survive brief occlusion/motion-blur misses without letting
+        # disjoint, unrelated visits accumulate toward an alert threshold.
+        self._continuity_grace_sec = 1.5
 
         # Live person count from the most recent analysed frame (footfall)
         self.last_person_count: int = 0
@@ -663,25 +674,48 @@ class DetectionAnalyzer:
         # Keying on the person would reset the timer whenever they walk a grid cell
         # width (~64px at 640p) before the 2s window closes.
         if persons and items:
+            overlapping_keys: set[str] = set()
             for p in persons:
                 for item in items:
                     if self._boxes_overlap(p, item, threshold=0.3):
                         key = f"sweep_{int(item.x*10)}_{int(item.y*10)}"
-                        self._person_with_items.setdefault(key, now)
-                        if now - self._person_with_items[key] >= 2.0:
+                        overlapping_keys.add(key)
+                        entry = self._person_with_items.get(key)
+                        if entry is None:
+                            entry = [now, now]  # [first_seen, last_seen]
+                            self._person_with_items[key] = entry
+                        else:
+                            entry[1] = now  # last_seen
+                        if now - entry[0] >= 2.0:
                             evt = self._emit("shoplifting", max(p.confidence, item.confidence), [p, item], frame)
                             if evt:
                                 events.append(evt)
-            # Prune item slots where no person has been nearby for >30s
-            stale = [k for k, t in self._person_with_items.items() if now - t > 30]
+            # Temporal smoothing (v1.5.1): a key that loses overlap for
+            # longer than the continuity grace window is a NEW encounter,
+            # not a continuation — reset it instead of letting disjoint,
+            # unrelated brief overlaps accumulate toward the 2s threshold.
+            stale = [
+                k for k, (_, last_seen) in self._person_with_items.items()
+                if k not in overlapping_keys and now - last_seen > self._continuity_grace_sec
+            ]
             for k in stale:
                 del self._person_with_items[k]
         else:
             self._person_with_items.clear()
 
         # 2. Restricted Zone: person stationary for >30s
+        dwell_seen_keys: set[str] = set()
         for p in persons:
             key = f"dwell_{int(p.x * 100)}_{int(p.y * 100)}"
+            dwell_seen_keys.add(key)
+            # Temporal smoothing (v1.5.1): if this exact spot wasn't matched
+            # recently, this is a NEW visit — start the dwell count over
+            # instead of adding to a count left over from a past, unrelated
+            # visit to the same coordinates.
+            last_seen = self._person_dwell_last_seen.get(key)
+            if last_seen is not None and now - last_seen > self._continuity_grace_sec:
+                self._person_frame_counts[key] = 0
+            self._person_dwell_last_seen[key] = now
             self._person_frame_counts[key] = self._person_frame_counts.get(key, 0) + 1
             frames_needed = int(30 * self.fps)
             if self._person_frame_counts[key] >= frames_needed:
@@ -690,11 +724,25 @@ class DetectionAnalyzer:
                     events.append(evt)
                 self._person_frame_counts[key] = 0
 
-        # Clean up stale dwell counters
-        if len(self._person_frame_counts) > 20:
-            oldest = sorted(self._person_frame_counts, key=lambda k: self._person_frame_counts[k])[:10]
+        # Expire dwell counters for spots not matched this frame once the
+        # continuity grace window has elapsed (bounds memory AND prevents a
+        # stale count from being resumed by an unrelated later visit).
+        expired = [
+            k for k, last_seen in self._person_dwell_last_seen.items()
+            if k not in dwell_seen_keys and now - last_seen > self._continuity_grace_sec
+        ]
+        for k in expired:
+            self._person_dwell_last_seen.pop(k, None)
+            self._person_frame_counts.pop(k, None)
+        # Backstop cap in case pruning above ever lags (e.g. many distinct
+        # spots seen briefly) — keep memory bounded regardless.
+        if len(self._person_frame_counts) > 50:
+            oldest = sorted(
+                self._person_frame_counts, key=lambda k: self._person_dwell_last_seen.get(k, 0)
+            )[:20]
             for k in oldest:
-                del self._person_frame_counts[k]
+                self._person_frame_counts.pop(k, None)
+                self._person_dwell_last_seen.pop(k, None)
 
         # Inventory movement is configured and evaluated by the dedicated
         # detector on the backend. Do not create a generic incident merely
