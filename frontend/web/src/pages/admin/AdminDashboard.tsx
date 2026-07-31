@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Users, CreditCard, AlertTriangle,
   Network, ShieldAlert, CheckCircle, XCircle,
   RefreshCw, Download, Search, Ban, Play, Trash2,
-  ChevronRight, Activity, Globe, Bell,
+  ChevronRight, Activity, Globe, Bell, Handshake,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -386,6 +386,17 @@ export default function AdminDashboard() {
                 )}
               </button>
             ))}
+
+            {/* Partner Portal — separate full-page route, not a local tab */}
+            <div className="pt-3 mt-3 border-t border-white/10">
+              <button
+                onClick={() => navigate('/admin/partners')}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/40 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <Handshake size={16} />
+                Partners
+              </button>
+            </div>
           </nav>
         </aside>
 
