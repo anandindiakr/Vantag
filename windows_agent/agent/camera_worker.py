@@ -38,6 +38,7 @@ from .inference import (
     YoloPoseInference, PersonPose,
     KP_L_SHOULDER, KP_R_SHOULDER, KP_L_WRIST, KP_R_WRIST, KP_L_HIP, KP_R_HIP,
 )
+from .tracker import ByteTracker
 
 log = logging.getLogger("vantag.camera")
 
@@ -574,7 +575,14 @@ class DetectionAnalyzer:
         # when people leave, which is what a footfall dashboard actually needs.
         self.entries_today: int = 0
         self._entries_day: str = time.strftime("%Y-%m-%d")
-        self._occupancy_baseline: int = 0
+        # Persistent-ID tracker (v1.5.0) — replaces the old occupancy-rise
+        # heuristic. Each confirmed track is counted as a visitor exactly
+        # ONCE, the first time it appears inside the count zone, instead of
+        # inferring entries from the occupancy number going up or down
+        # (which could not tell "2 people walked in" from "1 person walked
+        # in then out" — both look like a rise then a fall).
+        self._tracker = ByteTracker()
+        self._counted_track_ids: set[int] = set()
 
         self._fall_detector = FallDetector(camera_id, cooldown_sec)
         self._loiter_detector = LoiteringDetector(camera_id, cooldown_sec)
@@ -638,13 +646,17 @@ class DetectionAnalyzer:
         # doorway zone would otherwise report 0 whenever nobody is standing
         # exactly in the doorway, which reads as "broken" on the dashboard.
         count_boxes = count_persons if count_persons is not None else persons
-        self.last_person_count = len(count_boxes)
+        # Assign persistent track IDs (v1.5.0 ByteTrack-inspired tracker) —
+        # used for accurate, never-double-counted footfall below. Does not
+        # change the live count itself.
+        tracked = self._tracker.update(count_boxes)
+        self.last_person_count = len(tracked)
         self._count_window.append((now, self.last_person_count))
         # ZONE count = persons inside the drawn zone (falls back to the full
         # frame when no zone is configured). This drives "visitors today".
-        self.last_zone_count = self._count_people(count_boxes, frame)
+        self.last_zone_count = self._count_people(tracked, frame)
         self._entry_window.append((now, self.last_zone_count))
-        self._update_entries(now)
+        self._update_entries_via_tracks(tracked, frame)
 
         # 1. Shoplifting: person near high-value item for >2s
         # Key on the ITEM's position (items are stationary — backpack/bag on shelf).
@@ -787,43 +799,63 @@ class DetectionAnalyzer:
             return self.last_person_count
         return max(counts)
 
-    def _update_entries(self, now: float) -> None:
-        """Accumulate cumulative footfall (entries) from occupancy rises.
+    def _update_entries_via_tracks(self, tracked_persons: list, frame: np.ndarray) -> None:
+        """Accumulate cumulative footfall (entries) using persistent track
+        IDs (v1.5.0 — replaces the old occupancy-rise heuristic).
 
-        Debounced: the candidate occupancy is the highest count seen in at
-        least 3 samples within the last 15s, so a single-frame false
-        detection cannot inflate the visitor count, and a person briefly
-        occluded (detection flickering to 0 for a few seconds) is NOT
-        re-counted when they re-appear. When the debounced occupancy rises
-        above the previous baseline, the difference is added to
-        ``entries_today``; when it falls (people left), the baseline decays
-        without adding entries. Resets at local midnight.
+        Each CONFIRMED track (matched by the tracker at least twice, so a
+        single-frame false detection can never count) is added to
+        ``entries_today`` exactly ONCE, the first time it is seen inside
+        the count zone (or anywhere in frame, when no zone is configured).
+        Because counting is keyed on the track's own identity rather than
+        an aggregate occupancy number, this correctly tells "2 people
+        walked in" apart from "1 person walked in then back out" — both of
+        which look identical to a level-based heuristic. A track that
+        flickers in and out of the zone boundary is also never re-counted,
+        since its ID (not its zone membership) is what's remembered.
 
-        Uses the ZONE-filtered window: when a people-count zone (e.g. a
-        doorway strip) is drawn, only people passing through it register as
-        entries — matching the retail meaning of "visitors today".
+        Resets ``entries_today`` and the counted-ID set at local midnight.
         """
-        day = time.strftime("%Y-%m-%d", time.localtime(now))
+        day = time.strftime("%Y-%m-%d")
         if day != self._entries_day:
             self._entries_day = day
             self.entries_today = 0
-            self._occupancy_baseline = 0
-        cutoff = now - 15.0
-        recent = [c for (ts, c) in self._entry_window if ts >= cutoff]
-        if not recent:
-            return
-        candidate = 0
-        for level in sorted(set(recent), reverse=True):
-            if level <= 0:
-                break
-            if sum(1 for c in recent if c >= level) >= 3:
-                candidate = level
-                break
-        if candidate > self._occupancy_baseline:
-            self.entries_today += candidate - self._occupancy_baseline
-            self._occupancy_baseline = candidate
-        elif candidate < self._occupancy_baseline:
-            self._occupancy_baseline = candidate
+            self._counted_track_ids.clear()
+
+        frame_height, frame_width = frame.shape[:2]
+        for p in tracked_persons:
+            tid = getattr(p, "track_id", None)
+            if tid is None or not getattr(p, "track_confirmed", False):
+                continue
+            if tid in self._counted_track_ids:
+                continue
+            if self._people_count_zones:
+                center_x = (p.x + p.w / 2) * frame_width
+                center_y = (p.y + p.h / 2) * frame_height
+                in_zone = False
+                for zone in self._people_count_zones:
+                    bbox = zone.get("bbox", [])
+                    if len(bbox) != 4:
+                        continue
+                    x1, y1, x2, y2 = (float(v) for v in bbox)
+                    if zone.get("normalized") or max(x1, y1, x2, y2) <= 1.0:
+                        x1, x2 = x1 * frame_width, x2 * frame_width
+                        y1, y2 = y1 * frame_height, y2 * frame_height
+                    if x1 <= center_x <= x2 and y1 <= center_y <= y2:
+                        in_zone = True
+                        break
+                if not in_zone:
+                    continue
+            # No zone configured → the whole frame is the zone (matches the
+            # previous fallback behaviour of `_count_people`).
+            self._counted_track_ids.add(tid)
+            self.entries_today += 1
+
+        # Bound memory on very long-running/very busy days; the tracker
+        # itself already caps active tracks, this just prevents the
+        # counted-ID set from growing without limit.
+        if len(self._counted_track_ids) > 5000:
+            self._counted_track_ids = set(list(self._counted_track_ids)[-2000:])
 
     @staticmethod
     def _boxes_overlap(a, b, threshold: float = 0.3) -> bool:
