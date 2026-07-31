@@ -548,6 +548,7 @@ class DetectionAnalyzer:
         fps: float = 5.0,
         pose_inference: Optional["YoloPoseInference"] = None,
         people_count_zones: Optional[list[dict]] = None,
+        exclusion_zones: Optional[list[dict]] = None,
     ):
         self.camera_id = camera_id
         self.cooldown_sec = cooldown_sec
@@ -604,6 +605,12 @@ class DetectionAnalyzer:
             if pose_inference is not None else None
         )
         self._people_count_zones = people_count_zones or []
+        # ROI masking (Tier 3 add-on): zones EXCLUDED from all detection —
+        # e.g. a public sidewalk visible through a storefront window, a
+        # mirror/TV reflecting people, or an out-of-scope neighboring aisle.
+        # Any box whose center falls inside one of these is dropped before
+        # any alert/count logic runs (see _filter_exclusions below).
+        self._exclusion_zones = exclusion_zones or []
 
     def _can_emit(self, event_type: str) -> bool:
         last = self._last_event.get(event_type, 0)
@@ -631,6 +638,31 @@ class DetectionAnalyzer:
             },
         }
 
+    def _in_exclusion_zone(self, box, frame_w: int, frame_h: int) -> bool:
+        """True if ``box``'s center falls inside any configured exclusion
+        (ROI mask) zone. Mirrors the normalized-vs-pixel bbox handling used
+        by ``_count_people`` for people-count zones."""
+        if not self._exclusion_zones:
+            return False
+        center_x = (box.x + box.w / 2) * frame_w
+        center_y = (box.y + box.h / 2) * frame_h
+        for zone in self._exclusion_zones:
+            bbox = zone.get("bbox", [])
+            if len(bbox) != 4:
+                continue
+            x1, y1, x2, y2 = (float(v) for v in bbox)
+            if zone.get("normalized") or max(x1, y1, x2, y2) <= 1.0:
+                x1, x2 = x1 * frame_w, x2 * frame_w
+                y1, y2 = y1 * frame_h, y2 * frame_h
+            if x1 <= center_x <= x2 and y1 <= center_y <= y2:
+                return True
+        return False
+
+    def _filter_exclusions(self, boxes: list, frame_w: int, frame_h: int) -> list:
+        if not self._exclusion_zones or not boxes:
+            return boxes
+        return [b for b in boxes if not self._in_exclusion_zone(b, frame_w, frame_h)]
+
     def analyse(
         self,
         boxes: list,
@@ -647,6 +679,15 @@ class DetectionAnalyzer:
         """
         events = []
         now = time.time()
+
+        # ROI masking: drop anything inside an excluded area BEFORE it can
+        # trigger an alert or be counted — e.g. a public sidewalk visible
+        # through a storefront window, or a TV/mirror reflecting people.
+        if self._exclusion_zones:
+            fh, fw = frame.shape[:2]
+            boxes = self._filter_exclusions(boxes, fw, fh)
+            if count_persons is not None:
+                count_persons = self._filter_exclusions(count_persons, fw, fh)
 
         persons     = [b for b in boxes if b.label == "person"]
         items       = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "high_value_item"]
@@ -934,6 +975,7 @@ class CameraWorker:
         on_event: Optional[Callable[[dict], None]] = None,
         pose_inference: Optional[YoloPoseInference] = None,
         people_count_zones: Optional[list[dict]] = None,
+        exclusion_zones: Optional[list[dict]] = None,
     ):
         self.config = config
         self._inference = inference
@@ -946,6 +988,7 @@ class CameraWorker:
             cooldown_sec=event_cooldown_sec,
             fps=float(target_fps),
             pose_inference=pose_inference,
+            exclusion_zones=exclusion_zones,
             people_count_zones=people_count_zones,
         )
 

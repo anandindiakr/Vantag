@@ -51,6 +51,9 @@ class ZoneConfig(BaseModel):
     restricted_zones: list[PolygonZone] = []
     queue_zones:      list[BboxZone]    = []
     people_count_zones: list[BboxZone] = []
+    # ROI masking: areas EXCLUDED from all detection (public sidewalk seen
+    # through a window, a mirror/TV reflecting people, out-of-scope aisle).
+    exclusion_zones:  list[BboxZone]    = []
 
 
 class ZoneConfigResponse(BaseModel):
@@ -138,11 +141,24 @@ def _parse_zones(ac: dict[str, Any]) -> ZoneConfig:
         if "bbox" in z
     ]
 
+    excl_cfg = ac.get("exclusion") or {}
+    raw_exclusion = excl_cfg.get("zones") or []
+    exclusion = [
+        BboxZone(
+            label=z.get("label", "Excluded Area"),
+            bbox=z["bbox"],
+            zone_type="exclusion",
+        )
+        for z in raw_exclusion
+        if "bbox" in z
+    ]
+
     return ZoneConfig(
         shelf_zones=shelves,
         restricted_zones=restricted,
         queue_zones=queues,
         people_count_zones=people_count,
+        exclusion_zones=exclusion,
     )
 
 
@@ -245,6 +261,14 @@ async def save_zones(
         for z in body.people_count_zones
     ]
     ac["people_count"] = pc_cfg
+
+    # -- Exclusion zones (ROI masking) → exclusion.zones --
+    excl_cfg = dict(ac.get("exclusion") or {})
+    excl_cfg["zones"] = [
+        {"label": z.label, "bbox": z.bbox}
+        for z in body.exclusion_zones
+    ]
+    ac["exclusion"] = excl_cfg
 
     # Reassign (not mutate in place) so SQLAlchemy detects the JSONB change.
     row.analyzer_config = ac

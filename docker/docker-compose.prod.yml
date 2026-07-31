@@ -118,6 +118,11 @@ services:
       RAZORPAY_KEY_SECRET_SG: ${RAZORPAY_KEY_SECRET_SG}
       RAZORPAY_KEY_ID_MY:   ${RAZORPAY_KEY_ID_MY}
       RAZORPAY_KEY_SECRET_MY: ${RAZORPAY_KEY_SECRET_MY}
+      # VLM-based alert verification (Tier 3, opt-in — unset/false = no
+      # behaviour change, alerts dispatch exactly as before).
+      VLM_VERIFICATION_ENABLED: ${VLM_VERIFICATION_ENABLED:-false}
+      OPENAI_API_KEY:       ${OPENAI_API_KEY:-}
+      VLM_VERIFICATION_MODEL: ${VLM_VERIFICATION_MODEL:-gpt-4o-mini}
       PYTHONUNBUFFERED:     1
     command: >
       python -m uvicorn backend.api.main:app

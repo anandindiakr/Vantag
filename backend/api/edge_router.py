@@ -36,6 +36,7 @@ from ..db.models.event import DetectionEvent
 from ..middleware.tenant_middleware import get_current_user_id
 from ..services.tenant_alerts import dispatch_tenant_alert
 from ..services import staff_face_service
+from ..services import vlm_verification_service
 from .watchlist_router import record_match
 
 edge_router = APIRouter(prefix="/api/edge", tags=["edge-agent"])
@@ -65,6 +66,39 @@ def _normalized_people_count_zones(c) -> list[dict]:
             continue
         x1, y1, x2, y2 = (float(v) for v in bbox)
         # Already normalized (legacy safety): all values within [0, 1].
+        if max(x1, y1, x2, y2) <= 1.0:
+            norm = [x1, y1, x2, y2]
+        else:
+            norm = [
+                max(0.0, min(1.0, x1 / ref_w)),
+                max(0.0, min(1.0, y1 / ref_h)),
+                max(0.0, min(1.0, x2 / ref_w)),
+                max(0.0, min(1.0, y2 / ref_h)),
+            ]
+        out.append({**z, "bbox": norm, "normalized": True})
+    return out
+
+
+def _normalized_exclusion_zones(c) -> list[dict]:
+    """Return the camera's ROI-exclusion zones with bbox normalized to 0-1.
+
+    Same reference-resolution → fraction conversion as
+    ``_normalized_people_count_zones`` above, applied to zones stored under
+    ``analyzer_config.exclusion.zones``.
+    """
+    zones = (
+        (getattr(c, "analyzer_config", None) or {})
+        .get("exclusion", {})
+        .get("zones", [])
+    )
+    ref_w = float(getattr(c, "resolution_width", None) or 1920)
+    ref_h = float(getattr(c, "resolution_height", None) or 1080)
+    out: list[dict] = []
+    for z in zones:
+        bbox = z.get("bbox") or []
+        if len(bbox) != 4:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in bbox)
         if max(x1, y1, x2, y2) <= 1.0:
             norm = [x1, y1, x2, y2]
         else:
@@ -481,6 +515,7 @@ async def register_agent(
                 "resolution_width": c.resolution_width,
                 "resolution_height": c.resolution_height,
                 "people_count_zones": _normalized_people_count_zones(c),
+                "exclusion_zones": _normalized_exclusion_zones(c),
             }
             for c in cameras
         ],
@@ -895,6 +930,36 @@ async def ingest_event(
             },
         }
 
+    # 2c) VLM verification (Tier 3, v1.5.2): for event types where a single
+    #     still frame can plausibly confirm/refute the claim, cross-check the
+    #     snapshot against a vision-language model before dispatching any
+    #     SMS/WhatsApp/email/webhook alert. Fails open — if verification is
+    #     disabled, unreachable, or errors, `vlm_result` stays None and the
+    #     alert dispatches exactly as before. The incident itself is ALWAYS
+    #     persisted and shown on the dashboard regardless of the verdict; only
+    #     outbound alert dispatch (step 5/6 below) is gated on a confident
+    #     "does not match" verdict.
+    vlm_result: dict | None = None
+    skip_alert_dispatch = False
+    if snapshot_url and body.snapshot_b64 and vlm_verification_service.is_verifiable_event(event_type):
+        try:
+            raw_snapshot = body.snapshot_b64
+            if "," in raw_snapshot and raw_snapshot.strip().lower().startswith("data:"):
+                raw_snapshot = raw_snapshot.split(",", 1)[1]
+            snapshot_bytes = base64.b64decode(raw_snapshot)
+            vlm_result = await vlm_verification_service.verify_incident(event_type, snapshot_bytes)
+        except Exception:  # noqa: BLE001 — verification must never break ingestion
+            logger.exception("VLM verification threw for event %s camera %s", event_type, body.camera_id)
+            vlm_result = None
+        if vlm_result is not None and not vlm_result["matches"] and vlm_result["confidence"] >= 0.5:
+            skip_alert_dispatch = True
+            logger.info(
+                "VLM verification rejected event | tenant=%s camera=%s type=%s confidence=%.2f reason=%s",
+                agent.tenant_id, body.camera_id, event_type,
+                vlm_result["confidence"], vlm_result["reasoning"],
+            )
+        body.metadata = {**(body.metadata or {}), "vlm_verification": vlm_result}
+
     # 3) Persist the audit row in the per-tenant detection_events table.
     event = DetectionEvent(
         id=str(uuid.uuid4()),
@@ -945,7 +1010,9 @@ async def ingest_event(
     # 5) Fan the incident out to any matching outbound alert subscriptions
     #    (SMS/WhatsApp via Twilio, Slack, Teams, generic HTTP) — fire-and-forget
     #    so a slow/unreachable webhook endpoint never delays the agent's response.
-    if _webhook_engine is not None:
+    #    Skipped only when VLM verification confidently rejected the event
+    #    (the incident record above is unaffected — it's still on the dashboard).
+    if _webhook_engine is not None and not skip_alert_dispatch:
         try:
             asyncio.create_task(_webhook_engine.dispatch(incident))
         except Exception:  # noqa: BLE001
@@ -954,16 +1021,17 @@ async def ingest_event(
     # 6) Fan the incident out to the tenant's own Alert Dispatch settings
     #    (SMS/WhatsApp via their own Twilio creds, Email) — configured from
     #    Account > Alert Dispatch. Independent of the platform webhooks.yaml.
-    try:
-        tenant_alert_settings = (
-            await session.execute(select(Tenant.alert_settings).where(Tenant.id == agent.tenant_id))
-        ).scalar_one_or_none()
-        if tenant_alert_settings:
-            asyncio.create_task(dispatch_tenant_alert(tenant_alert_settings, incident))
-    except Exception:  # noqa: BLE001
-        logger.exception("Failed to schedule tenant alert dispatch for event %s", event.id)
+    if not skip_alert_dispatch:
+        try:
+            tenant_alert_settings = (
+                await session.execute(select(Tenant.alert_settings).where(Tenant.id == agent.tenant_id))
+            ).scalar_one_or_none()
+            if tenant_alert_settings:
+                asyncio.create_task(dispatch_tenant_alert(tenant_alert_settings, incident))
+        except Exception:  # noqa: BLE001
+            logger.exception("Failed to schedule tenant alert dispatch for event %s", event.id)
 
-    return {"ok": True, "event_id": event.id}
+    return {"ok": True, "event_id": event.id, "vlm_verification": vlm_result}
 
 
 @edge_router.get("/config")
@@ -987,6 +1055,7 @@ async def get_config(
                 "fps_target": c.fps_target,
                 "confidence_threshold": (getattr(c, "analyzer_config", None) or {}).get("confidence_threshold"),
                 "people_count_zones": _normalized_people_count_zones(c),
+                "exclusion_zones": _normalized_exclusion_zones(c),
             }
             for c in cameras
         ]

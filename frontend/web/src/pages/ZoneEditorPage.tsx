@@ -7,7 +7,7 @@ import InfoTooltip from '../components/InfoTooltip';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type ZoneType = 'shelf' | 'restricted' | 'queue' | 'people_count';
+type ZoneType = 'shelf' | 'restricted' | 'queue' | 'people_count' | 'exclusion';
 
 interface Zone {
   id:       string;
@@ -68,6 +68,15 @@ const ZONE_META: Record<ZoneType, {
     tagline: 'PURPLE box',
     desc:    'Count people only inside this area',
     guide:   'Click and drag on the camera image to mark the people-count area',
+  },
+  exclusion: {
+    label:   'Excluded Area',
+    emoji:   '⬛',
+    color:   'slate',
+    hex:     '#64748b',
+    tagline: 'GRAY box',
+    desc:    'Ignore this area completely — no alerts, no counting',
+    guide:   'Click and drag over a sidewalk, mirror, TV or other out-of-scope area to exclude it from ALL detection',
   },
 };
 
@@ -205,6 +214,9 @@ export default function ZoneEditorPage() {
         }
         for (const p of data.zones?.people_count_zones ?? []) {
           loaded.push({ id: uid(), label: p.label, bbox: p.bbox, type: 'people_count' });
+        }
+        for (const e of data.zones?.exclusion_zones ?? []) {
+          loaded.push({ id: uid(), label: e.label, bbox: e.bbox, type: 'exclusion' });
         }
         for (const r of data.zones?.restricted_zones ?? []) {
           // Backend may store rectangle as 4-point polygon; convert to bbox if needed
@@ -461,6 +473,9 @@ export default function ZoneEditorPage() {
     people_count_zones: list
       .filter((z) => z.type === 'people_count')
       .map((z) => ({ label: z.label, bbox: z.bbox, zone_type: 'people_count' })),
+    exclusion_zones: list
+      .filter((z) => z.type === 'exclusion')
+      .map((z) => ({ label: z.label, bbox: z.bbox, zone_type: 'exclusion' })),
     restricted_zones: list
       .filter((z) => z.type === 'restricted')
       .map((z) => {
@@ -862,7 +877,7 @@ export default function ZoneEditorPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => testZone(zone)}
-                          disabled={testing === zone.id || deletingId === zone.id}
+                          disabled={zone.type === 'exclusion' || testing === zone.id || deletingId === zone.id}
                           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs hover:bg-blue-500/20 transition-colors disabled:opacity-50"
                         >
                           {zone.type === 'people_count'
@@ -870,7 +885,11 @@ export default function ZoneEditorPage() {
                             : testing === zone.id
                             ? <Loader2 size={11} className="animate-spin" />
                             : <CheckCircle size={11} />}
-                          {zone.type === 'people_count' ? 'Counting Area' : 'Test Event'}
+                          {zone.type === 'people_count'
+                            ? 'Counting Area'
+                            : zone.type === 'exclusion'
+                            ? 'Ignored Area'
+                            : 'Test Event'}
                         </button>
                         <button
                           onClick={() => startEditZone(zone)}

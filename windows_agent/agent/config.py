@@ -26,6 +26,12 @@ class CameraConfig:
     # agent falls back to the global AgentConfig.confidence_threshold.
     confidence: Optional[float] = None
     people_count_zones: list[dict] = field(default_factory=list)
+    # ROI masking: polygon/bbox areas to EXCLUDE from all detection (e.g. a
+    # public sidewalk visible through a window, a TV/mirror reflecting
+    # people, or a neighboring aisle out of scope). Any detection box whose
+    # center falls inside one of these zones is dropped before it can
+    # trigger a shoplifting/restricted-zone/loitering event or be counted.
+    exclusion_zones: list[dict] = field(default_factory=list)
 
 
 @dataclass
