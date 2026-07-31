@@ -68,6 +68,8 @@ from .support_router import support_router
 from .system_router import system_router
 from .snapshots_router import snapshots_router
 from .admin_router import admin_router
+from .partner_router import partner_router
+from .partner_admin_router import partner_admin_router
 from .seo_router import seo_router
 
 logger = logging.getLogger(__name__)
@@ -339,6 +341,8 @@ app.include_router(support_router)
 app.include_router(system_router)
 app.include_router(snapshots_router,  dependencies=_sub_gate)
 app.include_router(admin_router)
+app.include_router(partner_router)
+app.include_router(partner_admin_router)
 app.include_router(seo_router)
 
 # ---------------------------------------------------------------------------

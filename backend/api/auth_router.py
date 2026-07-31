@@ -136,6 +136,7 @@ class RegisterRequest(BaseModel):
     phone: str | None = None
     language: str = "en"
     plan_id: str = "starter"
+    referral_code: str | None = None  # optional partner referral (?ref=CODE)
 
 
 class LoginRequest(BaseModel):
@@ -181,6 +182,28 @@ async def register(
         plan_id=body.plan_id,
     )
     await session.commit()
+
+    # Permanently link this tenant to a referring partner, if a valid
+    # referral_code was supplied. Immutable — never reassigned afterwards.
+    if body.referral_code:
+        try:
+            from ..db.models.partner import Partner, PartnerReferral
+            partner_result = await session.execute(
+                select(Partner).where(
+                    Partner.referral_code == body.referral_code.strip().upper(),
+                    Partner.status == "active",
+                )
+            )
+            partner = partner_result.scalar_one_or_none()
+            if partner:
+                session.add(PartnerReferral(
+                    id=str(uuid.uuid4()),
+                    partner_id=partner.id,
+                    tenant_id=tenant.id,
+                ))
+                await session.commit()
+        except Exception:  # noqa: BLE001
+            pass  # Never block signup on referral attribution failure
 
     # Fire signup alert (non-blocking)
     import asyncio as _asyncio

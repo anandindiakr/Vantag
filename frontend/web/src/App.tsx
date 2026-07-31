@@ -49,6 +49,9 @@ const FAQ          = lazy(() => import('./pages/FAQ'));
 const HelpCenter   = lazy(() => import('./pages/HelpCenter'));
 const HealthCheck  = lazy(() => import('./pages/HealthCheck'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const PartnerAdminPage = lazy(() => import('./pages/admin/PartnerAdminPage'));
+const PartnerLoginPage = lazy(() => import('./pages/partner/PartnerLoginPage'));
+const PartnerDashboardPage = lazy(() => import('./pages/partner/PartnerDashboardPage'));
 const PrivacyPolicy  = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 
@@ -70,6 +73,13 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
   if (!isSuperAdmin()) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
+}
+
+/** Guard for /partner/dashboard — separate, isolated partner session token. */
+function PartnerRoute({ children }: { children: React.ReactNode }) {
+  return localStorage.getItem('vantag_partner_token')
+    ? <>{children}</>
+    : <Navigate to="/partner/login" replace />;
 }
 
 // ── Loading spinner ─────────────────────────────────────────────────────────
@@ -130,7 +140,13 @@ export default function App() {
 
             {/* Admin panel — super-admin only */}
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+            <Route path="/admin/partners" element={<AdminRoute><PartnerAdminPage /></AdminRoute>} />
             <Route path="/admin/*" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+
+            {/* Partner Portal — dealers/distributors/freelancers, isolated auth */}
+            <Route path="/partner/login" element={<PartnerLoginPage />} />
+            <Route path="/partner/dashboard" element={<PartnerRoute><PartnerDashboardPage /></PartnerRoute>} />
+            <Route path="/partner" element={<Navigate to="/partner/login" replace />} />
 
             {/* App shell — auth required, with sidebar + WebSocket */}
             <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>

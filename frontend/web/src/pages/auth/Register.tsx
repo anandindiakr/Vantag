@@ -41,6 +41,7 @@ export default function Register() {
     phone: '',
     country: params.get('country') || region.region,
     plan_id: params.get('plan') || 'starter',
+    referral_code: params.get('ref') || undefined,
   });
 
   const up = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));

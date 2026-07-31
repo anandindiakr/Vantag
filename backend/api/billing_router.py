@@ -22,6 +22,7 @@ from ..db.models.tenant import Tenant
 from ..middleware.tenant_middleware import get_current_user_id
 from ..services.razorpay_service import create_order, verify_payment_signature, verify_webhook_signature
 from ..services import xendit_service
+from ..services.commission_service import compute_commission_for_invoice
 from ..config.plans import get_plan, get_plan_price
 from ..config.regions import get_region
 
@@ -97,6 +98,18 @@ async def verify_payment(
         .where(Invoice.razorpay_order_id == body.razorpay_order_id)
         .values(status="paid", razorpay_payment_id=body.razorpay_payment_id)
     )
+
+    inv_result = await session.execute(
+        select(Invoice).where(Invoice.razorpay_order_id == body.razorpay_order_id)
+    )
+    inv = inv_result.scalar_one_or_none()
+    if inv:
+        try:
+            inv.status = "paid"
+            await compute_commission_for_invoice(inv, session)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Commission computation failed for invoice=%s: %s", inv.id, exc)
+
     await session.commit()
 
     return {"success": True, "status": "active"}
@@ -137,6 +150,12 @@ async def _process_webhook_event(
                         "Webhook payment.captured: activated tenant=%s order=%s",
                         inv.tenant_id, order_id,
                     )
+                    # Referral commission (no-op if this tenant has no partner referral)
+                    try:
+                        inv.status = "paid"  # ensure in-memory object reflects the update above
+                        await compute_commission_for_invoice(inv, session)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("Commission computation failed for invoice=%s: %s", inv.id, exc)
 
         # ── Subscription renewed ──────────────────────────────────────────────
         elif event_type == "subscription.charged":
@@ -345,6 +364,11 @@ async def xendit_webhook(
                     update(Tenant).where(Tenant.id == inv.tenant_id).values(status="active")
                 )
                 logger.info("Xendit %s: activated tenant=%s", event_type, inv.tenant_id)
+                try:
+                    inv.status = "paid"
+                    await compute_commission_for_invoice(inv, session)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Commission computation failed for invoice=%s: %s", inv.id, exc)
 
     await session.execute(
         update(PaymentEvent).where(PaymentEvent.id == pe.id).values(processed=True)
