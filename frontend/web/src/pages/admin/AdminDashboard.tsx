@@ -47,6 +47,23 @@ interface TenantRow {
   mrr: number;
   created_at: string;
   last_login: string | null;
+  last_seen: string | null;
+  login_count: number;
+}
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return 'Never';
+  const then = new Date(iso).getTime();
+  const diffMs = Date.now() - then;
+  if (diffMs < 0) return 'Just now';
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
 }
 
 interface PaymentRow {
@@ -510,6 +527,8 @@ export default function AdminDashboard() {
                       <th className="text-right py-3 pr-4">Cameras</th>
                       <th className="text-right py-3 pr-4">MRR</th>
                       <th className="text-left py-3 pr-4">Joined</th>
+                      <th className="text-left py-3 pr-4">Last Active</th>
+                      <th className="text-right py-3 pr-4">Logins</th>
                       <th className="text-center py-3">Actions</th>
                     </tr>
                   </thead>
@@ -528,6 +547,12 @@ export default function AdminDashboard() {
                         <td className="py-3 pr-4 text-white/40 text-xs">
                           {new Date(t.created_at).toLocaleDateString()}
                         </td>
+                        <td className="py-3 pr-4 text-xs">
+                          <span className={t.last_seen ? 'text-emerald-400/80' : 'text-white/30'}>
+                            {timeAgo(t.last_seen || t.last_login)}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4 text-right text-white/50 text-xs">{t.login_count || 0}</td>
                         <td className="py-3">
                           <div className="flex items-center justify-center gap-1.5">
                             <button
@@ -558,7 +583,7 @@ export default function AdminDashboard() {
                       </tr>
                     ))}
                     {tenants.length === 0 && !loading && (
-                      <tr><td colSpan={9} className="text-center py-12 text-white/30">No tenants found</td></tr>
+                      <tr><td colSpan={11} className="text-center py-12 text-white/30">No tenants found</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -731,6 +756,9 @@ export default function AdminDashboard() {
                       <div>
                         <p className="font-semibold text-sm">{u.email}</p>
                         <p className="text-xs text-white/40">{u.role}</p>
+                        <p className="text-[10px] text-white/30 mt-1">
+                          Last login: {timeAgo(u.last_login_at)} · Last active: {timeAgo(u.last_seen_at)} · {u.login_count || 0} logins
+                        </p>
                       </div>
                       <StatusBadge status={u.is_active ? 'active' : 'suspended'} />
                     </div>

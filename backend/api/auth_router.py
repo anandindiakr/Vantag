@@ -285,6 +285,14 @@ async def login(
                 timedelta(days=REFRESH_EXPIRE_DAYS),
             )
 
+            # Usage tracking: record this login so the admin dashboard can show
+            # real last-login / login-count / active-session stats per tenant.
+            now = datetime.now(timezone.utc)
+            user.last_login_at = now
+            user.last_seen_at = now
+            user.login_count = (user.login_count or 0) + 1
+            await session.commit()
+
             return {
                 "access_token": access,
                 "refresh_token": refresh,

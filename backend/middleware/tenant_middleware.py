@@ -50,6 +50,26 @@ async def get_current_tenant_id(
     return tenant_id
 
 
+_LAST_SEEN_THROTTLE = timedelta(minutes=2)
+
+
+async def _touch_last_seen(user_id: str) -> None:
+    """Update TenantUser.last_seen_at, throttled to avoid a write on every request."""
+    now = datetime.now(timezone.utc)
+    threshold = now - _LAST_SEEN_THROTTLE
+    async with AsyncSessionLocal() as session:
+        user = await session.get(TenantUser, user_id)
+        if user is None:
+            return
+        last_seen = user.last_seen_at
+        if last_seen is not None and last_seen.tzinfo is None:
+            last_seen = last_seen.replace(tzinfo=timezone.utc)
+        if last_seen is not None and last_seen > threshold:
+            return
+        user.last_seen_at = now
+        await session.commit()
+
+
 async def _user_from_token(token: str) -> dict:
     payload = _decode_token(token)
     user_id = payload.get("sub")
@@ -70,6 +90,14 @@ async def _user_from_token(token: str) -> dict:
                 detail="Session expired. Please sign in again.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+
+    # Usage tracking: opportunistically bump last_seen_at so the admin
+    # dashboard can show "active now" / real session-activity windows.
+    # Throttled to at most once every 2 minutes per user and fired in the
+    # background so it never adds latency to the actual request.
+    if user_id and not payload.get("is_super_admin"):
+        from ..utils.background_tasks import fire_and_forget
+        fire_and_forget(_touch_last_seen(user_id), name=f"touch_last_seen:{user_id}")
 
     return {
         "user_id": user_id,

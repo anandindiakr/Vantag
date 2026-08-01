@@ -72,6 +72,10 @@ class TenantUser(Base):
     pw_reset_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # ── Session epoch — bumped on password change to invalidate old JWTs ──
     token_version: Mapped[int] = mapped_column(Integer, default=0)
+    # ── Usage tracking — real login/activity stats for the admin dashboard ──
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    login_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     tenant: Mapped[Tenant] = relationship("Tenant", back_populates="users")

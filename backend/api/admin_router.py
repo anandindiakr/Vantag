@@ -240,14 +240,22 @@ async def list_tenants(
         except Exception:  # noqa: BLE001
             pass
 
-        # Get last login from most recent user
+        # Real usage stats: most recent login/activity across all users of
+        # this tenant (not a created_at proxy — actual last_login_at/
+        # last_seen_at written on login and on authenticated requests).
         last_login = None
+        last_seen = None
+        login_count = 0
         try:
-            owner = (await session.execute(
-                select(TenantUser).where(TenantUser.tenant_id == t.id, TenantUser.role == "owner")
-            )).scalars().first()
-            # We don't store last_login on TenantUser yet; return created_at as proxy
-            last_login = owner.created_at.isoformat() if owner else None
+            users_q = (await session.execute(
+                select(TenantUser).where(TenantUser.tenant_id == t.id)
+            )).scalars().all()
+            for u in users_q:
+                if u.last_login_at and (last_login is None or u.last_login_at > last_login):
+                    last_login = u.last_login_at
+                if u.last_seen_at and (last_seen is None or u.last_seen_at > last_seen):
+                    last_seen = u.last_seen_at
+                login_count += u.login_count or 0
         except Exception:  # noqa: BLE001
             pass
 
@@ -262,7 +270,9 @@ async def list_tenants(
             "incidents_30d": inc_30d,
             "mrr": mrr,
             "created_at": t.created_at.isoformat(),
-            "last_login": last_login,
+            "last_login": last_login.isoformat() if last_login else None,
+            "last_seen": last_seen.isoformat() if last_seen else None,
+            "login_count": login_count,
         })
 
     return {"total": total, "tenants": tenants}
@@ -323,6 +333,9 @@ async def get_tenant_detail(
             {
                 "id": u.id, "email": u.email, "role": u.role,
                 "is_active": u.is_active, "created_at": u.created_at.isoformat(),
+                "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+                "last_seen_at": u.last_seen_at.isoformat() if u.last_seen_at else None,
+                "login_count": u.login_count or 0,
             }
             for u in users
         ],
