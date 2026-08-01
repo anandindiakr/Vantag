@@ -152,7 +152,10 @@ async def partner_change_password(
 
 
 @partner_router.get("/me")
-async def get_me(partner: Partner = Depends(get_current_partner)) -> dict:
+async def get_me(
+    partner: Partner = Depends(get_current_partner),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
     region_domain_map = {
         "india": "retailnazar.com",
         "singapore": "retail-vantag.com",
@@ -161,6 +164,23 @@ async def get_me(partner: Partner = Depends(get_current_partner)) -> dict:
         "indonesia": "retailpantau.com",
     }
     domain = region_domain_map.get((partner.country or "").lower(), "retail-vantag.com")
+
+    commission_rule = None
+    if partner.commission_rule_id:
+        from ..db.models.partner import CommissionRule
+
+        rule_result = await session.execute(
+            select(CommissionRule).where(CommissionRule.id == partner.commission_rule_id)
+        )
+        rule = rule_result.scalar_one_or_none()
+        if rule:
+            commission_rule = {
+                "id": rule.id,
+                "rule_type": rule.rule_type,
+                "tier_name": rule.tier_name,
+                "rate_pct": float(rule.rate_pct),
+            }
+
     return {
         "id": partner.id,
         "name": partner.name,
@@ -171,6 +191,7 @@ async def get_me(partner: Partner = Depends(get_current_partner)) -> dict:
         "referral_link": f"https://{domain}/register?ref={partner.referral_code}",
         "status": partner.status,
         "created_at": partner.created_at.isoformat(),
+        "commission_rule": commission_rule,
     }
 
 
@@ -179,7 +200,14 @@ async def get_my_referrals(
     partner: Partner = Depends(get_current_partner),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """List every tenant permanently referred by the logged-in partner."""
+    """
+    List every tenant permanently referred by the logged-in partner, along
+    with their current subscription (plan/price/status) and full paid
+    invoice history — so a partner can see exactly which of their referred
+    customers are live-paying and what commission each invoice generated.
+    """
+    from ..db.models.billing import Invoice, Subscription
+    from ..db.models.partner import CommissionLedger
     from ..db.models.tenant import Tenant
 
     result = await session.execute(
@@ -189,20 +217,75 @@ async def get_my_referrals(
         .order_by(PartnerReferral.referred_at.desc())
     )
     rows = result.all()
-    return {
-        "referrals": [
-            {
-                "tenant_id": tenant.id,
-                "name": tenant.name,
-                "country": tenant.country,
-                "plan_id": tenant.plan_id,
-                "status": tenant.status,
-                "referred_at": referral.referred_at.isoformat(),
-            }
-            for referral, tenant in rows
-        ],
-        "total": len(rows),
-    }
+    tenant_ids = [tenant.id for _, tenant in rows]
+
+    subs_by_tenant: dict[str, Subscription] = {}
+    if tenant_ids:
+        subs_result = await session.execute(
+            select(Subscription)
+            .where(Subscription.tenant_id.in_(tenant_ids))
+            .order_by(Subscription.created_at.desc())
+        )
+        for sub in subs_result.scalars().all():
+            subs_by_tenant.setdefault(sub.tenant_id, sub)  # first = most recent
+
+    invoices_by_tenant: dict[str, list[Invoice]] = {}
+    commission_by_invoice: dict[str, CommissionLedger] = {}
+    if tenant_ids:
+        inv_result = await session.execute(
+            select(Invoice)
+            .where(Invoice.tenant_id.in_(tenant_ids))
+            .order_by(Invoice.created_at.desc())
+        )
+        for inv in inv_result.scalars().all():
+            invoices_by_tenant.setdefault(inv.tenant_id, []).append(inv)
+
+        ledger_result = await session.execute(
+            select(CommissionLedger).where(CommissionLedger.partner_id == partner.id)
+        )
+        for entry in ledger_result.scalars().all():
+            commission_by_invoice[entry.invoice_id] = entry
+
+    referrals = []
+    for referral, tenant in rows:
+        sub = subs_by_tenant.get(tenant.id)
+        tenant_invoices = invoices_by_tenant.get(tenant.id, [])
+        referrals.append({
+            "tenant_id": tenant.id,
+            "name": tenant.name,
+            "country": tenant.country,
+            "plan_id": tenant.plan_id,
+            "status": tenant.status,
+            "referred_at": referral.referred_at.isoformat(),
+            "subscription": {
+                "plan_id": sub.plan_id,
+                "status": sub.status,
+                "amount": float(sub.amount) if sub.amount is not None else None,
+                "currency": sub.currency,
+                "current_period_end": sub.current_period_end.isoformat() if sub.current_period_end else None,
+                "cancel_at_period_end": sub.cancel_at_period_end,
+            } if sub else None,
+            "payment_history": [
+                {
+                    "invoice_id": inv.id,
+                    "amount": float(inv.amount),
+                    "currency": inv.currency,
+                    "status": inv.status,
+                    "invoice_number": inv.invoice_number,
+                    "created_at": inv.created_at.isoformat(),
+                    "commission_amount": (
+                        float(commission_by_invoice[inv.id].commission_amount)
+                        if inv.id in commission_by_invoice else None
+                    ),
+                    "commission_status": (
+                        commission_by_invoice[inv.id].status if inv.id in commission_by_invoice else None
+                    ),
+                }
+                for inv in tenant_invoices
+            ],
+        })
+
+    return {"referrals": referrals, "total": len(referrals)}
 
 
 @partner_router.get("/me/earnings")

@@ -124,30 +124,50 @@ async def compute_commission_for_invoice(
     if existing.scalar_one_or_none():
         return None
 
-    rule_type_map = {
-        "installer": "fixed_pct",
-        "distributor": "tiered_volume",
-        "referrer": "flat_referral",
-    }
-    rule_type = rule_type_map.get(partner.partner_type, "fixed_pct")
-
     from ..db.models.tenant import Tenant
 
     tenant_result = await session.execute(select(Tenant).where(Tenant.id == invoice.tenant_id))
     tenant = tenant_result.scalar_one_or_none()
     region = tenant.region if tenant else None
 
-    stream_count = 0
-    if rule_type == "tiered_volume":
-        stream_count = await _active_stream_count(session, partner.id)
+    rule: CommissionRule | None = None
 
-    rule = await _find_rule(session, rule_type=rule_type, region=region, stream_count=stream_count)
-    if not rule:
-        logger.warning(
-            "No active commission_rule found for partner=%s type=%s region=%s — skipping commission",
-            partner.id, rule_type, region,
+    # An admin can pin an exact commission rule to a partner at onboarding
+    # time (e.g. a specific distributor tier) — when set, it always wins
+    # over the partner_type -> rule_type auto-lookup below.
+    if partner.commission_rule_id:
+        pinned = await session.execute(
+            select(CommissionRule).where(
+                CommissionRule.id == partner.commission_rule_id,
+                CommissionRule.is_active.is_(True),
+            )
         )
-        return None
+        rule = pinned.scalar_one_or_none()
+        if not rule:
+            logger.warning(
+                "Partner=%s has commission_rule_id=%s but it is missing/inactive — falling back to auto-lookup",
+                partner.id, partner.commission_rule_id,
+            )
+
+    if not rule:
+        rule_type_map = {
+            "installer": "fixed_pct",
+            "distributor": "tiered_volume",
+            "referrer": "flat_referral",
+        }
+        rule_type = rule_type_map.get(partner.partner_type, "fixed_pct")
+
+        stream_count = 0
+        if rule_type == "tiered_volume":
+            stream_count = await _active_stream_count(session, partner.id)
+
+        rule = await _find_rule(session, rule_type=rule_type, region=region, stream_count=stream_count)
+        if not rule:
+            logger.warning(
+                "No active commission_rule found for partner=%s type=%s region=%s — skipping commission",
+                partner.id, rule_type, region,
+            )
+            return None
 
     gross = float(invoice.amount)
     rate = float(rule.rate_pct)

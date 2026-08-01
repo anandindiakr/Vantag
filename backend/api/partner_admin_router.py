@@ -45,6 +45,7 @@ class CreatePartnerRequest(BaseModel):
     partner_type: str = "installer"  # installer/distributor/referrer
     country: str | None = None
     notes: str | None = None
+    commission_rule_id: str | None = None
 
 
 @partner_admin_router.post("/partners", status_code=201)
@@ -59,6 +60,11 @@ async def create_partner(
 
     if body.partner_type not in ("installer", "distributor", "referrer"):
         raise HTTPException(status_code=400, detail="partner_type must be installer/distributor/referrer")
+
+    if body.commission_rule_id:
+        rule_check = await session.execute(select(CommissionRule).where(CommissionRule.id == body.commission_rule_id))
+        if not rule_check.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="commission_rule_id does not exist")
 
     code = _generate_referral_code()
     while (await session.execute(select(Partner).where(Partner.referral_code == code))).scalar_one_or_none():
@@ -75,6 +81,7 @@ async def create_partner(
         partner_type=body.partner_type,
         country=body.country,
         notes=body.notes,
+        commission_rule_id=body.commission_rule_id,
         status="active",
     )
     session.add(partner)
@@ -121,6 +128,11 @@ async def list_partners(
     result = await session.execute(select(Partner).order_by(Partner.created_at.desc()))
     partners = result.scalars().all()
 
+    rule_names: dict[str, str] = {}
+    rules_result = await session.execute(select(CommissionRule))
+    for r in rules_result.scalars().all():
+        rule_names[r.id] = r.tier_name or r.rule_type.replace("_", " ").title()
+
     out = []
     for p in partners:
         ref_count = (
@@ -139,6 +151,8 @@ async def list_partners(
             "country": p.country,
             "referred_customers": len(ref_count),
             "created_at": p.created_at.isoformat(),
+            "commission_rule_id": p.commission_rule_id,
+            "commission_rule_name": rule_names.get(p.commission_rule_id) if p.commission_rule_id else None,
         })
     return {"partners": out, "total": len(out)}
 
@@ -147,6 +161,8 @@ class UpdatePartnerRequest(BaseModel):
     status: str | None = None  # active/suspended
     partner_type: str | None = None
     notes: str | None = None
+    commission_rule_id: str | None = None
+    clear_commission_rule: bool = False
 
 
 @partner_admin_router.patch("/partners/{partner_id}")
@@ -171,9 +187,21 @@ async def update_partner(
         partner.partner_type = body.partner_type
     if body.notes is not None:
         partner.notes = body.notes
+    if body.clear_commission_rule:
+        partner.commission_rule_id = None
+    elif body.commission_rule_id:
+        rule_check = await session.execute(select(CommissionRule).where(CommissionRule.id == body.commission_rule_id))
+        if not rule_check.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="commission_rule_id does not exist")
+        partner.commission_rule_id = body.commission_rule_id
 
     await session.commit()
-    return {"id": partner.id, "status": partner.status, "partner_type": partner.partner_type}
+    return {
+        "id": partner.id,
+        "status": partner.status,
+        "partner_type": partner.partner_type,
+        "commission_rule_id": partner.commission_rule_id,
+    }
 
 
 # ── Commission rules (admin-editable rate table) ────────────────────────

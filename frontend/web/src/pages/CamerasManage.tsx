@@ -195,10 +195,28 @@ function AutoScanSection({ onAdd }: { onAdd: (ip: string, port: number) => void 
   const [scanning, setScanning] = useState(false);
   const [discovered, setDiscovered] = useState<DiscoveredCamera[]>([]);
   const [subnet, setSubnet] = useState('');
+  const [activityLog, setActivityLog] = useState<string[]>([]);
+
+  const SCAN_STEPS = [
+    'Detecting your local subnet…',
+    'Pinging live hosts on the network…',
+    'Probing RTSP port 554 on discovered hosts…',
+    'Checking ONVIF discovery (port 3702)…',
+    'Matching vendor fingerprints…',
+    'Finalizing results…',
+  ];
 
   const handleScan = async () => {
     setScanning(true);
     setDiscovered([]);
+    setActivityLog([SCAN_STEPS[0]]);
+    let step = 0;
+    const stepTimer = setInterval(() => {
+      step += 1;
+      if (step < SCAN_STEPS.length) {
+        setActivityLog(log => [...log, SCAN_STEPS[step]]);
+      }
+    }, 1800);
     try {
       const res = await api.post<DiscoveredCamera[]>('/cameras/scan', {
         subnet: subnet.trim() || undefined,
@@ -206,12 +224,16 @@ function AutoScanSection({ onAdd }: { onAdd: (ip: string, port: number) => void 
       setDiscovered(res.data ?? []);
       if ((res.data ?? []).length === 0) {
         toast('No cameras found on the network.', { icon: '🔍' });
+        setActivityLog(log => [...log, 'Scan complete — no cameras found on this subnet.']);
       } else {
         toast.success(`Found ${res.data.length} camera(s).`);
+        setActivityLog(log => [...log, `Scan complete — found ${res.data.length} camera(s).`]);
       }
     } catch (err: unknown) {
       toast.error((err as Error).message ?? 'Scan failed.');
+      setActivityLog(log => [...log, 'Scan failed — see error above.']);
     } finally {
+      clearInterval(stepTimer);
       setScanning(false);
     }
   };
@@ -235,10 +257,18 @@ function AutoScanSection({ onAdd }: { onAdd: (ip: string, port: number) => void 
         </button>
       </div>
 
-      {scanning && (
-        <div className="flex items-center gap-3 text-sm text-white/50 py-4">
-          <Loader2 className="w-5 h-5 animate-spin text-violet-400" />
-          Probing port 554 across your subnet…
+      {activityLog.length > 0 && (
+        <div className="bg-black/30 border border-white/10 rounded-xl p-3 mb-4 space-y-1.5 max-h-40 overflow-y-auto">
+          {activityLog.map((line, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs text-white/50">
+              {i === activityLog.length - 1 && scanning ? (
+                <Loader2 className="w-3 h-3 animate-spin text-violet-400 flex-shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-3 h-3 text-emerald-500/70 flex-shrink-0" />
+              )}
+              {line}
+            </div>
+          ))}
         </div>
       )}
 
@@ -409,6 +439,7 @@ function EdgeDiscoverySection() {
   const [requesting, setRequesting] = useState(false);
   const [polling, setPolling] = useState(false);
   const [cameras, setCameras] = useState<EdgeDiscoveredCamera[]>([]);
+  const [activityLog, setActivityLog] = useState<string[]>([]);
 
   const fetchDiscovered = async () => {
     try {
@@ -434,11 +465,14 @@ function EdgeDiscoverySection() {
 
   const handleAutoScan = async () => {
     setRequesting(true);
+    setActivityLog(['Sending scan request to your Edge Agent…']);
     try {
       await api.post('/cameras/scan-request', {});
       toast.success('Scan requested. Your edge agent is scanning the store network…');
+      setActivityLog(log => [...log, 'Edge Agent received the scan request.']);
     } catch (err: unknown) {
       toast.error((err as Error).message ?? 'Could not request a scan.');
+      setActivityLog(log => [...log, 'Failed to reach the Edge Agent — is it running and connected?']);
       setRequesting(false);
       return;
     }
@@ -447,18 +481,25 @@ function EdgeDiscoverySection() {
     // Poll for discovered cameras for up to ~60s.
     let attempts = 0;
     const before = cameras.length;
+    setActivityLog(log => [...log, 'Waiting for the Edge Agent to scan your local network (this can take up to a minute)…']);
     const timer = setInterval(async () => {
       attempts += 1;
       const found = await fetchDiscovered();
+      if (attempts % 4 === 0 && attempts < 15) {
+        setActivityLog(log => [...log, `Still scanning… (${attempts * 4}s elapsed, ${found.length} camera(s) reported so far)`]);
+      }
       if (found.length > before || attempts >= 15) {
         clearInterval(timer);
         setPolling(false);
         if (found.length > before) {
           toast.success(`Found ${found.length} camera(s) on your network.`);
+          setActivityLog(log => [...log, `Scan complete — found ${found.length} camera(s) on your network.`]);
         } else if (found.length > 0) {
           toast.success(`Showing ${found.length} camera(s) your Edge Agent has found.`);
+          setActivityLog(log => [...log, `Scan complete — showing ${found.length} previously discovered camera(s).`]);
         } else if (attempts >= 15) {
           toast('No new cameras yet. Make sure the edge agent is running.', { icon: '🔍' });
+          setActivityLog(log => [...log, 'Scan timed out — no cameras found. Make sure the Edge Agent is running on a machine on the same network as your cameras.']);
         }
       }
     }, 4000);
@@ -493,10 +534,18 @@ function EdgeDiscoverySection() {
         </button>
       </div>
 
-      {polling && (
-        <div className="flex items-center gap-3 text-sm text-white/50 py-2">
-          <Loader2 className="w-5 h-5 animate-spin text-violet-400" />
-          Waiting for the edge agent to report discovered cameras…
+      {activityLog.length > 0 && (
+        <div className="bg-black/30 border border-white/10 rounded-xl p-3 mb-4 space-y-1.5 max-h-40 overflow-y-auto">
+          {activityLog.map((line, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs text-white/50">
+              {i === activityLog.length - 1 && (requesting || polling) ? (
+                <Loader2 className="w-3 h-3 animate-spin text-violet-400 flex-shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-3 h-3 text-emerald-500/70 flex-shrink-0" />
+              )}
+              {line}
+            </div>
+          ))}
         </div>
       )}
 

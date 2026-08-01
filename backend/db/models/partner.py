@@ -66,6 +66,15 @@ class Partner(Base):
     parent_partner_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("partners.id", ondelete="SET NULL")
     )
+    # Optional explicit commission rule assignment. When set, this exact
+    # rule is used for every invoice this partner earns on — bypassing the
+    # partner_type -> rule_type auto-lookup in commission_service.py. Lets
+    # an admin pin e.g. a specific distributor tier to a partner at
+    # onboarding time instead of relying purely on live stream-count
+    # thresholds.
+    commission_rule_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("commission_rules.id", ondelete="SET NULL")
+    )
     status: Mapped[str] = mapped_column(String(20), default="active")  # active/suspended
     country: Mapped[str | None] = mapped_column(String(5))
     notes: Mapped[str | None] = mapped_column(Text)

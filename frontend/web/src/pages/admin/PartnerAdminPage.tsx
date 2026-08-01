@@ -21,6 +21,7 @@ interface Partner {
   id: string; name: string; email: string; phone: string | null;
   partner_type: string; referral_code: string; status: string;
   country: string | null; referred_customers: number; created_at: string;
+  commission_rule_id: string | null; commission_rule_name: string | null;
 }
 interface CommissionRule {
   id: string; rule_type: string; product_plan: string; region: string;
@@ -42,6 +43,7 @@ export default function PartnerAdminPage() {
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [showAddRule, setShowAddRule] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,6 +80,18 @@ export default function PartnerAdminPage() {
     try {
       await axios.patch(`/api/admin/commission-rules/${rule.id}`, { rate_pct: rate }, { headers: authHeaders() });
       toast.success('Rate updated');
+      load();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Update failed');
+    }
+  };
+
+  const assignPartnerRule = async (p: Partner, ruleId: string) => {
+    try {
+      await axios.patch(`/api/admin/partners/${p.id}`,
+        ruleId ? { commission_rule_id: ruleId } : { clear_commission_rule: true },
+        { headers: authHeaders() });
+      toast.success('Commission rule updated');
       load();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Update failed');
@@ -125,20 +139,24 @@ export default function PartnerAdminPage() {
         {loading ? (
           <div className="py-20 flex justify-center"><div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
         ) : tab === 'partners' ? (
-          <PartnersTable partners={partners} onToggle={togglePartnerStatus} />
+          <PartnersTable partners={partners} rules={rules} onToggle={togglePartnerStatus} onAssignRule={assignPartnerRule} />
         ) : tab === 'rules' ? (
-          <RulesTable rules={rules} onUpdate={updateRuleRate} />
+          <RulesTable rules={rules} onUpdate={updateRuleRate} onAddRule={() => setShowAddRule(true)} />
         ) : (
           <LedgerTable ledger={ledger} onMark={markLedger} />
         )}
       </main>
 
-      {showCreate && <CreatePartnerModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load(); }} />}
+      {showCreate && <CreatePartnerModal rules={rules} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load(); }} />}
+      {showAddRule && <AddRuleModal onClose={() => setShowAddRule(false)} onCreated={() => { setShowAddRule(false); load(); }} />}
     </div>
   );
 }
 
-function PartnersTable({ partners, onToggle }: { partners: Partner[]; onToggle: (p: Partner) => void }) {
+function PartnersTable({ partners, rules, onToggle, onAssignRule }: {
+  partners: Partner[]; rules: CommissionRule[]; onToggle: (p: Partner) => void;
+  onAssignRule: (p: Partner, ruleId: string) => void;
+}) {
   return (
     <div className="bg-white/3 border border-white/8 rounded-2xl overflow-hidden">
       <table className="w-full text-sm">
@@ -148,6 +166,7 @@ function PartnersTable({ partners, onToggle }: { partners: Partner[]; onToggle: 
             <th className="text-left px-6 py-3">Email</th>
             <th className="text-left px-6 py-3">Type</th>
             <th className="text-left px-6 py-3">Referral Code</th>
+            <th className="text-left px-6 py-3">Commission Rule</th>
             <th className="text-left px-6 py-3">Referred</th>
             <th className="text-left px-6 py-3">Status</th>
             <th className="text-left px-6 py-3">Action</th>
@@ -155,7 +174,7 @@ function PartnersTable({ partners, onToggle }: { partners: Partner[]; onToggle: 
         </thead>
         <tbody>
           {partners.length === 0 && (
-            <tr><td colSpan={7} className="px-6 py-10 text-center text-white/30">No partners yet — click "New Partner" to invite one.</td></tr>
+            <tr><td colSpan={8} className="px-6 py-10 text-center text-white/30">No partners yet — click "New Partner" to invite one.</td></tr>
           )}
           {partners.map(p => (
             <tr key={p.id} className="border-t border-white/5">
@@ -163,6 +182,20 @@ function PartnersTable({ partners, onToggle }: { partners: Partner[]; onToggle: 
               <td className="px-6 py-3 text-white/60">{p.email}</td>
               <td className="px-6 py-3 text-white/60 capitalize">{p.partner_type}</td>
               <td className="px-6 py-3 font-mono text-emerald-400">{p.referral_code}</td>
+              <td className="px-6 py-3">
+                <select
+                  value={p.commission_rule_id || ''}
+                  onChange={e => onAssignRule(p, e.target.value)}
+                  className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs max-w-[180px]"
+                >
+                  <option value="">No rule assigned</option>
+                  {rules.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {(r.tier_name || r.rule_type.replace('_', ' '))} ({r.rate_pct}%)
+                    </option>
+                  ))}
+                </select>
+              </td>
               <td className="px-6 py-3">{p.referred_customers}</td>
               <td className="px-6 py-3">
                 <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${p.status === 'active' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'}`}>
@@ -182,12 +215,17 @@ function PartnersTable({ partners, onToggle }: { partners: Partner[]; onToggle: 
   );
 }
 
-function RulesTable({ rules, onUpdate }: { rules: CommissionRule[]; onUpdate: (r: CommissionRule, rate: number) => void }) {
+function RulesTable({ rules, onUpdate, onAddRule }: {
+  rules: CommissionRule[]; onUpdate: (r: CommissionRule, rate: number) => void; onAddRule: () => void;
+}) {
   const [edits, setEdits] = useState<Record<string, number>>({});
   return (
     <div className="bg-white/3 border border-white/8 rounded-2xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-white/8 text-sm text-white/50 flex items-center gap-2">
-        <Percent className="w-4 h-4" /> Rates are fully editable — changes apply to the next commission calculation onward.
+      <div className="px-6 py-4 border-b border-white/8 text-sm text-white/50 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2"><Percent className="w-4 h-4" /> Rates are fully editable — changes apply to the next commission calculation onward.</span>
+        <button onClick={onAddRule} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 flex-shrink-0">
+          <Plus className="w-3.5 h-3.5" /> Add Rule
+        </button>
       </div>
       <table className="w-full text-sm">
         <thead className="text-white/40 text-xs uppercase">
@@ -267,15 +305,19 @@ function LedgerTable({ ledger, onMark }: { ledger: LedgerEntry[]; onMark: (e: Le
   );
 }
 
-function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', partner_type: 'installer', country: '' });
+function CreatePartnerModal({ rules, onClose, onCreated }: {
+  rules: CommissionRule[]; onClose: () => void; onCreated: () => void;
+}) {
+  const [form, setForm] = useState({ name: '', email: '', phone: '', partner_type: 'installer', country: '', commission_rule_id: '' });
   const [saving, setSaving] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const { data } = await axios.post('/api/admin/partners', form, { headers: authHeaders() });
+      const { commission_rule_id, ...rest } = form;
+      const payload = commission_rule_id ? { ...rest, commission_rule_id } : rest;
+      const { data } = await axios.post('/api/admin/partners', payload, { headers: authHeaders() });
       toast.success(`Partner created — referral code ${data.referral_code}`);
       onCreated();
     } catch (err: any) {
@@ -284,6 +326,12 @@ function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCre
       setSaving(false);
     }
   };
+
+  const rulesForType = rules.filter(r => {
+    if (form.partner_type === 'installer') return r.rule_type === 'fixed_pct';
+    if (form.partner_type === 'distributor') return r.rule_type === 'tiered_volume';
+    return r.rule_type === 'flat_referral';
+  });
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
@@ -299,7 +347,7 @@ function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCre
             className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2" />
           <input placeholder="Phone (optional)" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
             className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2" />
-          <select value={form.partner_type} onChange={e => setForm(f => ({ ...f, partner_type: e.target.value }))}
+          <select value={form.partner_type} onChange={e => setForm(f => ({ ...f, partner_type: e.target.value, commission_rule_id: '' }))}
             className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
             <option value="installer">Installer / Dealer (fixed % cut)</option>
             <option value="distributor">Distributor (volume-tiered)</option>
@@ -307,8 +355,93 @@ function CreatePartnerModal({ onClose, onCreated }: { onClose: () => void; onCre
           </select>
           <input placeholder="Country code (IN/SG/MY/PH/ID)" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
             className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2" />
+          <div>
+            <label className="text-xs text-white/40 mb-1 block">Commission rule (optional — pin a specific tier now, or leave blank to auto-resolve by type)</label>
+            <select value={form.commission_rule_id} onChange={e => setForm(f => ({ ...f, commission_rule_id: e.target.value }))}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+              <option value="">Auto-resolve by partner type</option>
+              {rulesForType.map(r => (
+                <option key={r.id} value={r.id}>{(r.tier_name || r.rule_type.replace('_', ' '))} ({r.rate_pct}%)</option>
+              ))}
+            </select>
+          </div>
           <button type="submit" disabled={saving} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg font-medium mt-2">
             {saving ? 'Creating...' : 'Create Partner'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AddRuleModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [form, setForm] = useState({
+    rule_type: 'fixed_pct', product_plan: '*', region: '*', tier_name: '',
+    tier_min_streams: 0, tier_max_streams: '', rate_pct: '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = {
+        rule_type: form.rule_type,
+        product_plan: form.product_plan || '*',
+        region: form.region || '*',
+        tier_name: form.tier_name || null,
+        tier_min_streams: Number(form.tier_min_streams) || 0,
+        tier_max_streams: form.tier_max_streams === '' ? null : Number(form.tier_max_streams),
+        rate_pct: Number(form.rate_pct),
+        is_active: true,
+      };
+      await axios.post('/api/admin/commission-rules', payload, { headers: authHeaders() });
+      toast.success('Commission rule created');
+      onCreated();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Failed to create rule');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+      <div className="bg-[#12121a] border border-white/10 rounded-2xl p-6 w-full max-w-md">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-lg">Add Commission Rule</h2>
+          <button onClick={onClose} className="text-white/40 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+        <form onSubmit={submit} className="space-y-3">
+          <select value={form.rule_type} onChange={e => setForm(f => ({ ...f, rule_type: e.target.value }))}
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+            <option value="fixed_pct">Fixed % dealer cut</option>
+            <option value="tiered_volume">Volume-tiered distributor margin</option>
+            <option value="flat_referral">Flat % lifetime referral</option>
+          </select>
+          <input placeholder="Tier / rule name (e.g. Tier 1, Field Installer)" value={form.tier_name}
+            onChange={e => setForm(f => ({ ...f, tier_name: e.target.value }))}
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2" />
+          <div className="flex gap-2">
+            <input required type="number" step="0.1" placeholder="Rate %" value={form.rate_pct}
+              onChange={e => setForm(f => ({ ...f, rate_pct: e.target.value }))}
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2" />
+          </div>
+          {form.rule_type === 'tiered_volume' && (
+            <div className="flex gap-2">
+              <input type="number" placeholder="Min streams" value={form.tier_min_streams}
+                onChange={e => setForm(f => ({ ...f, tier_min_streams: Number(e.target.value) }))}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2" />
+              <input type="number" placeholder="Max streams (blank = ∞)" value={form.tier_max_streams}
+                onChange={e => setForm(f => ({ ...f, tier_max_streams: e.target.value }))}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2" />
+            </div>
+          )}
+          <input placeholder="Region (default * = all)" value={form.region}
+            onChange={e => setForm(f => ({ ...f, region: e.target.value }))}
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2" />
+          <button type="submit" disabled={saving} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 rounded-lg font-medium mt-2">
+            {saving ? 'Creating...' : 'Create Rule'}
           </button>
         </form>
       </div>

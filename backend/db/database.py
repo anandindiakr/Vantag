@@ -91,6 +91,8 @@ async def init_db() -> None:
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS pw_reset_expires_at TIMESTAMPTZ",
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 0",
             "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS alert_settings JSONB",
+            "ALTER TABLE partners ADD COLUMN IF NOT EXISTS commission_rule_id VARCHAR(36) "
+            "REFERENCES commission_rules(id) ON DELETE SET NULL",
         )
         for _sql in _stmts:
             try:

@@ -4,16 +4,28 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import {
   Handshake, Copy, LogOut, Users, Wallet, Clock, CheckCircle2, QrCode,
+  ChevronDown, ChevronRight, Percent,
 } from 'lucide-react';
 
 interface MeResp {
   id: string; name: string; email: string; phone: string | null;
   partner_type: string; referral_code: string; referral_link: string;
   status: string; created_at: string;
+  commission_rule: { id: string; rule_type: string; tier_name: string | null; rate_pct: number } | null;
+}
+interface PaymentHistoryEntry {
+  invoice_id: string; amount: number; currency: string; status: string;
+  invoice_number: string | null; created_at: string;
+  commission_amount: number | null; commission_status: string | null;
 }
 interface Referral {
   tenant_id: string; name: string; country: string; plan_id: string;
   status: string; referred_at: string;
+  subscription: {
+    plan_id: string; status: string; amount: number | null; currency: string;
+    current_period_end: string | null; cancel_at_period_end: boolean;
+  } | null;
+  payment_history: PaymentHistoryEntry[];
 }
 interface Earning {
   id: string; tenant_id: string; invoice_id: string; gross_amount: number;
@@ -131,6 +143,15 @@ export default function PartnerDashboardPage() {
               <QrCode className="w-3 h-3" /> Share this link or QR — every customer who signs up through it is permanently linked to you.
             </p>
           </div>
+          {me?.commission_rule && (
+            <div className="flex-shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-5 py-4 text-center">
+              <div className="flex items-center justify-center gap-1 text-xs uppercase tracking-wide text-emerald-400/80 mb-1">
+                <Percent className="w-3 h-3" /> Your commission
+              </div>
+              <div className="text-3xl font-bold text-emerald-400">{me.commission_rule.rate_pct}%</div>
+              <div className="text-xs text-white/40 mt-1">{me.commission_rule.tier_name || me.commission_rule.rule_type.replace('_', ' ')}</div>
+            </div>
+          )}
         </section>
 
         {/* Summary cards */}
@@ -148,25 +169,21 @@ export default function PartnerDashboardPage() {
             <table className="w-full text-sm">
               <thead className="text-white/40 text-xs uppercase">
                 <tr>
+                  <th className="text-left px-6 py-3"></th>
                   <th className="text-left px-6 py-3">Customer</th>
                   <th className="text-left px-6 py-3">Country</th>
-                  <th className="text-left px-6 py-3">Plan</th>
+                  <th className="text-left px-6 py-3">Subscription</th>
+                  <th className="text-left px-6 py-3">Price</th>
                   <th className="text-left px-6 py-3">Status</th>
                   <th className="text-left px-6 py-3">Referred</th>
                 </tr>
               </thead>
               <tbody>
                 {referrals.length === 0 && (
-                  <tr><td colSpan={5} className="px-6 py-8 text-center text-white/30">No referrals yet — share your link above to get started.</td></tr>
+                  <tr><td colSpan={7} className="px-6 py-8 text-center text-white/30">No referrals yet — share your link above to get started.</td></tr>
                 )}
                 {referrals.map(r => (
-                  <tr key={r.tenant_id} className="border-t border-white/5">
-                    <td className="px-6 py-3">{r.name}</td>
-                    <td className="px-6 py-3 text-white/60">{r.country}</td>
-                    <td className="px-6 py-3 text-white/60 capitalize">{r.plan_id}</td>
-                    <td className="px-6 py-3"><StatusPill status={r.status} /></td>
-                    <td className="px-6 py-3 text-white/40">{new Date(r.referred_at).toLocaleDateString()}</td>
-                  </tr>
+                  <ReferralRow key={r.tenant_id} r={r} />
                 ))}
               </tbody>
             </table>
@@ -224,6 +241,63 @@ function fmtMoney(amount: number, totals: Record<string, number>) {
   const currencies = Object.keys(totals);
   const currency = currencies[0] || 'USD';
   return `${currency} ${amount.toFixed(2)}`;
+}
+
+function ReferralRow({ r }: { r: Referral }) {
+  const [open, setOpen] = useState(false);
+  const sub = r.subscription;
+  return (
+    <>
+      <tr className="border-t border-white/5 cursor-pointer hover:bg-white/3" onClick={() => setOpen(o => !o)}>
+        <td className="px-3 py-3 text-white/40">
+          {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </td>
+        <td className="px-6 py-3">{r.name}</td>
+        <td className="px-6 py-3 text-white/60">{r.country}</td>
+        <td className="px-6 py-3 text-white/60 capitalize">{sub?.plan_id || r.plan_id}</td>
+        <td className="px-6 py-3 text-white/60">
+          {sub?.amount != null ? `${sub.currency} ${sub.amount.toFixed(2)}` : '—'}
+        </td>
+        <td className="px-6 py-3"><StatusPill status={sub?.status || r.status} /></td>
+        <td className="px-6 py-3 text-white/40">{new Date(r.referred_at).toLocaleDateString()}</td>
+      </tr>
+      {open && (
+        <tr className="border-t border-white/5 bg-white/2">
+          <td colSpan={7} className="px-6 py-4">
+            <div className="text-xs uppercase tracking-wide text-white/40 mb-2">Payment history</div>
+            {r.payment_history.length === 0 ? (
+              <div className="text-sm text-white/30">No invoices yet for this customer.</div>
+            ) : (
+              <table className="w-full text-xs">
+                <thead className="text-white/40 uppercase">
+                  <tr>
+                    <th className="text-left py-1.5 pr-4">Invoice #</th>
+                    <th className="text-left py-1.5 pr-4">Amount</th>
+                    <th className="text-left py-1.5 pr-4">Status</th>
+                    <th className="text-left py-1.5 pr-4">Date</th>
+                    <th className="text-left py-1.5 pr-4">Your commission</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {r.payment_history.map(p => (
+                    <tr key={p.invoice_id} className="border-t border-white/5">
+                      <td className="py-1.5 pr-4 text-white/60">{p.invoice_number || p.invoice_id.slice(0, 8)}</td>
+                      <td className="py-1.5 pr-4">{p.currency} {p.amount.toFixed(2)}</td>
+                      <td className="py-1.5 pr-4"><StatusPill status={p.status} /></td>
+                      <td className="py-1.5 pr-4 text-white/40">{new Date(p.created_at).toLocaleDateString()}</td>
+                      <td className="py-1.5 pr-4 font-medium text-emerald-400">
+                        {p.commission_amount != null ? `${p.currency} ${p.commission_amount.toFixed(2)} (${p.commission_status})` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
 }
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
