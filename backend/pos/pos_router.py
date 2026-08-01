@@ -169,9 +169,9 @@ async def ingest_transaction(
     if anomaly is not None:
         if _webhook_engine is not None:
             try:
-                import asyncio
+                from ..utils.background_tasks import fire_and_forget
 
-                asyncio.create_task(
+                fire_and_forget(
                     _webhook_engine.dispatch(
                         {
                             "id": anomaly.transaction_id,
@@ -187,7 +187,8 @@ async def ingest_transaction(
                                 f"{anomaly.cashier_id}: {anomaly.notes}"
                             ),
                         }
-                    )
+                    ),
+                    name=f"pos_anomaly_{anomaly.transaction_id}",
                 )
             except Exception:  # noqa: BLE001
                 logger.exception(

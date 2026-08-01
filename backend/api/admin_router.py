@@ -422,8 +422,8 @@ async def soft_delete_tenant(
     # Fire churn alert
     try:
         from ..services.alert_monitor import create_churn_alert
-        import asyncio
-        asyncio.create_task(create_churn_alert(tenant.name, tenant.country))
+        from ..utils.background_tasks import fire_and_forget
+        fire_and_forget(create_churn_alert(tenant.name, tenant.country), name="churn_alert")
     except Exception:  # noqa: BLE001
         pass
 

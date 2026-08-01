@@ -1014,7 +1014,8 @@ async def ingest_event(
     #    (the incident record above is unaffected — it's still on the dashboard).
     if _webhook_engine is not None and not skip_alert_dispatch:
         try:
-            asyncio.create_task(_webhook_engine.dispatch(incident))
+            from ..utils.background_tasks import fire_and_forget
+            fire_and_forget(_webhook_engine.dispatch(incident), name=f"webhook_dispatch_{event.id}")
         except Exception:  # noqa: BLE001
             logger.exception("Failed to schedule webhook dispatch for event %s", event.id)
 
@@ -1027,7 +1028,8 @@ async def ingest_event(
                 await session.execute(select(Tenant.alert_settings).where(Tenant.id == agent.tenant_id))
             ).scalar_one_or_none()
             if tenant_alert_settings:
-                asyncio.create_task(dispatch_tenant_alert(tenant_alert_settings, incident))
+                from ..utils.background_tasks import fire_and_forget
+                fire_and_forget(dispatch_tenant_alert(tenant_alert_settings, incident), name=f"tenant_alert_{event.id}")
         except Exception:  # noqa: BLE001
             logger.exception("Failed to schedule tenant alert dispatch for event %s", event.id)
 

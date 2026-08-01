@@ -205,9 +205,12 @@ async def register(
         except Exception:  # noqa: BLE001
             pass  # Never block signup on referral attribution failure
 
-    # Fire signup alert (non-blocking)
-    import asyncio as _asyncio
-    _asyncio.create_task(_fire_signup_notifications(tenant.name, tenant.country))
+    # Fire signup alert (non-blocking). Uses fire_and_forget() instead of a
+    # bare asyncio.create_task() so the task can't be silently garbage
+    # collected before it runs (the event loop only holds a weak reference
+    # to unreferenced tasks).
+    from ..utils.background_tasks import fire_and_forget
+    fire_and_forget(_fire_signup_notifications(tenant.name, tenant.country), name="signup_notify")
 
     access = make_token(
         {"sub": user.id, "tenant_id": tenant.id, "email": user.email,
@@ -345,9 +348,10 @@ async def send_otp(
     tenant = tenant_result.scalar_one_or_none()
     name = tenant.name if tenant else "there"
 
-    # Fire-and-forget email (non-blocking)
-    import asyncio
-    asyncio.create_task(send_verification_email(body.email.lower(), name, otp))
+    # Fire-and-forget email (non-blocking, but reliably executed — see
+    # backend/utils/background_tasks.py for why bare create_task() is unsafe).
+    from ..utils.background_tasks import fire_and_forget
+    fire_and_forget(send_verification_email(body.email.lower(), name, otp), name="send_verification_email")
 
     # In dev mode (no SMTP configured), return the OTP in the response so it
     # can be auto-filled in the browser — never do this in production.
@@ -464,9 +468,10 @@ async def forgot_password(
         reset_link = f"https://{region_domain}/reset-password?token={reset_token}"
 
         from ..services.email_service import send_password_reset_email
-        import asyncio
-        asyncio.create_task(
-            send_password_reset_email(email_lower, tenant.name if tenant else "there", reset_link)
+        from ..utils.background_tasks import fire_and_forget
+        fire_and_forget(
+            send_password_reset_email(email_lower, tenant.name if tenant else "there", reset_link),
+            name="send_password_reset_email",
         )
 
     return {"message": "If this email is registered, a password-reset link has been sent."}

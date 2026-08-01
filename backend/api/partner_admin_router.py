@@ -100,8 +100,8 @@ async def create_partner(
             f"<p>Please log in and change your password immediately.</p>"
         )
         text = f"Login: https://{domain}/partner/login | Email: {body.email} | Temp password: {temp_password} | Referral link: {referral_link}"
-        import asyncio
-        asyncio.create_task(send_email(body.email.lower(), subject, html, text))
+        from ..utils.background_tasks import fire_and_forget
+        fire_and_forget(send_email(body.email.lower(), subject, html, text), name="partner_invite_email")
     except Exception:  # noqa: BLE001
         pass
 
