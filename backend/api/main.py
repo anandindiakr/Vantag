@@ -57,6 +57,7 @@ from .auth_router import auth_router
 from .onboarding_router import onboarding_router
 from .tenants_router import tenants_router
 from .edge_router import edge_router, agent_download_router
+from .manual_router import manual_router
 from .edge_router import set_pipeline as edge_set_pipeline
 from .edge_router import set_webhook_engine as edge_set_webhook_engine
 from .billing_router import billing_router
@@ -333,6 +334,7 @@ app.include_router(onboarding_router)
 app.include_router(tenants_router)
 app.include_router(edge_router)
 app.include_router(agent_download_router)
+app.include_router(manual_router)
 app.include_router(billing_router)
 app.include_router(camera_probe_router)
 app.include_router(demo_router,       dependencies=_sub_gate)

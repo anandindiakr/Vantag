@@ -42,6 +42,27 @@ export default function HelpCenter() {
     { icon: <MessageCircle size={20} />, title: t('help.ql.chat', 'Chat with AI Assistant'), action: 'chat' },
   ];
 
+  const handleManualDownload = async () => {
+    try {
+      const token = localStorage.getItem('vantag_token') || '';
+      const res = await fetch('/api/support/manual', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error('download failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Vantag_User_Manual.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      window.open('/api/support/manual', '_blank');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white p-8 max-w-5xl mx-auto">
       <h1 className="text-4xl font-bold mb-2">{t('help.title', 'Help Center')}</h1>
@@ -50,7 +71,7 @@ export default function HelpCenter() {
       </p>
 
       {/* Quick actions */}
-      <div className="grid md:grid-cols-4 gap-3 mb-10">
+      <div className="grid md:grid-cols-5 gap-3 mb-10">
         {quicklinks.map((q, i) =>
           q.to ? (
             <Link key={i} to={q.to}
@@ -72,6 +93,12 @@ export default function HelpCenter() {
             </div>
           )
         )}
+        <button
+          onClick={handleManualDownload}
+          className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl p-5 transition-all text-left">
+          <div className="text-violet-400 mb-2"><BookOpen size={20} /></div>
+          <div className="font-bold">{t('help.ql.manual', 'Download User Manual')}</div>
+        </button>
       </div>
 
       {/* FAQ */}
