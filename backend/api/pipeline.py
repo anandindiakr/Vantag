@@ -308,12 +308,24 @@ class VantagPipeline:
         self._start_time = time.monotonic()
 
         # Hydrate in-memory recent_events from SQLite (last 500 per store).
+        #
+        # Convention: recent_events[store_id] always holds newest-first
+        # (index 0 = most recent), because live events are added via
+        # appendleft() in _emit_edge_event()/demo_router._inject(). SQLite's
+        # query_incidents() already returns rows newest-first (ORDER BY
+        # occurred_at DESC), so we must append them in that same order to
+        # preserve the newest-first convention. Previously this reversed the
+        # list before appending, which put the OLDEST hydrated row at index 0
+        # — any new live event (added at index 0 via appendleft) then looked
+        # older than 500 stale hydrated rows and got pushed off the end of
+        # the bounded deque, making genuinely new incidents invisible on the
+        # first page of the Incident Log after every backend restart/deploy.
         try:
             from ..db import incident_store as _istore  # lazy import
             for sid in _istore.get_all_store_ids():
                 items, _, _ = _istore.query_incidents(sid, page=1, limit=500)
                 dq = self.recent_events[sid]
-                for item in reversed(items):   # oldest first → deque order matches insertion order
+                for item in items:   # already newest first
                     dq.append(item)
             logger.info("SQLite hydration complete")
         except Exception as exc:  # noqa: BLE001
@@ -510,8 +522,9 @@ class VantagPipeline:
 
     async def _emit_event(self, ev: dict, store_id: str) -> None:
         """Push an event to the in-memory log, WebSocket, MQTT, and SQLite."""
-        # Append to recent events.
-        self.recent_events[store_id].append(ev)
+        # Append to recent events. Newest-first convention (index 0 = most
+        # recent) — matches _emit_edge_event()/demo_router._inject().
+        self.recent_events[store_id].appendleft(ev)
 
         # Persist to SQLite (fire-and-forget, best-effort).
         try:

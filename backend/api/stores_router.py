@@ -161,7 +161,7 @@ async def list_stores(
         )
         last_events = recent_events.get(store_id, [])
         last_event_at = (
-            (last_events[-1].get("timestamp") or last_events[-1].get("occurred_at"))
+            (last_events[0].get("timestamp") or last_events[0].get("occurred_at"))
             if last_events else None
         )
         location_label = next(
@@ -245,7 +245,7 @@ async def get_store(
     )
     last_events = recent_events.get(store_id, [])
     last_event_at = (
-        (last_events[-1].get("timestamp") or last_events[-1].get("occurred_at"))
+        (last_events[0].get("timestamp") or last_events[0].get("occurred_at"))
         if last_events else None
     )
 
@@ -413,9 +413,12 @@ async def list_incidents(
         )
 
     pipeline = _pipeline
-    all_incidents: List[dict] = list(
-        reversed(pipeline.recent_events.get(store_id, []))
-    )
+    # recent_events[store_id] is already newest-first (index 0 = most
+    # recent) — both live events (appendleft in _emit_edge_event /
+    # demo_router._inject) and SQLite hydration on startup preserve this
+    # convention. Do NOT reverse here — doing so previously put the oldest
+    # entries first, burying brand-new incidents on the last page.
+    all_incidents: List[dict] = list(pipeline.recent_events.get(store_id, []))
 
     # Server-side event_type filter — applied before pagination so page counts are correct.
     if event_type and event_type != "all":
