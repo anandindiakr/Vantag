@@ -654,6 +654,16 @@ class DetectionAnalyzer:
         # showing no one at all in the evidence.
         self._inventory_last_person_seen: dict[str, float] = {}
         self._inventory_last_person_jpeg: dict[str, bytes] = {}
+        # Frame-level (not per-cell) fallback evidence: the last time ANY
+        # person was visible anywhere in this camera's frame, plus that
+        # frame's JPEG. A person reaching into a shelf is often detected
+        # with a bbox that does not overlap the specific small grid cell
+        # they disturbed (arm reaches in, body stands to the side), which
+        # left confirmed changes with no person photo at all. This gives
+        # every inventory event a person image to show whenever a person
+        # was recently visible on that camera.
+        self._inventory_frame_person_seen: float = 0.0
+        self._inventory_frame_person_jpeg: Optional[bytes] = None
         # Tier 2: open-vocabulary product counter (YOLO-World), shared
         # singleton passed in from main.py. Only invoked at the exact
         # moment Tier 1's CV signal proposes a candidate change (see
@@ -794,6 +804,18 @@ class DetectionAnalyzer:
         fh, fw = frame.shape[:2]
         seen_keys: set[str] = set()
 
+        # Frame-level person evidence (fallback for the per-cell capture).
+        # Throttled to ~2s so we don't re-encode a JPEG every frame.
+        if persons and now - self._inventory_frame_person_seen >= 2.0:
+            try:
+                _, _fbuf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                self._inventory_frame_person_jpeg = _fbuf.tobytes()
+                self._inventory_frame_person_seen = now
+            except Exception:  # noqa: BLE001
+                pass
+        elif persons:
+            self._inventory_frame_person_seen = now
+
         for idx, zone in enumerate(self._inventory_zones):
             zone_key = str(zone.get("id") or idx)
             seen_keys.add(zone_key)
@@ -807,6 +829,16 @@ class DetectionAnalyzer:
             if zone_w < 60 or zone_h < 60:
                 # Too small to subdivide meaningfully — treat as one cell.
                 rows, cols = 1, 1
+
+            # Collect this pass's confirmed candidates for the whole zone
+            # FIRST, then decide. Emitting inside the cell loop meant a
+            # single global scene change (someone walking past, camera
+            # auto-exposure, lights switching) tripped every cell at once
+            # and produced one incident per cell — reporting several
+            # different "locations" for one real event, which is worse
+            # than useless to the operator.
+            candidates: list[dict] = []
+            evaluated_cells = 0
 
             for r in range(rows):
                 for c in range(cols):
@@ -834,6 +866,7 @@ class DetectionAnalyzer:
                         self._inventory_last_person_seen[key] = now
                         continue
 
+                    evaluated_cells += 1
                     crop = frame[cy1:cy2, cx1:cx2]
                     gray = cv2.cvtColor(cv2.resize(crop, (64, 64)), cv2.COLOR_BGR2GRAY)
                     hist = cv2.calcHist([gray], [0], None, [32], [0, 256])
@@ -865,86 +898,150 @@ class DetectionAnalyzer:
                     self._inventory_change_last_seen[key] = now
 
                     if now - first_seen >= self._INVENTORY_DEBOUNCE_SEC:
-                        ref_crop = self._inventory_baseline_crop.get(key, crop)
-                        _, ref_buf = cv2.imencode(".jpg", ref_crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
-                        _, cur_buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                        candidates.append({
+                            "key": key,
+                            "row": r,
+                            "col": c,
+                            "bbox": (cx1, cy1, cx2, cy2),
+                            "crop": crop,
+                            "hist": hist,
+                            "change_score": change_score,
+                        })
 
-                        # Tier 2: enrich the candidate change with a real
-                        # open-vocabulary product count on both crops. This
-                        # NEVER blocks or suppresses the Tier 1 event — if
-                        # the detector is unavailable or errors, product
-                        # counts stay empty and the event still fires using
-                        # only the Tier 1 CV signal.
-                        extra_metadata = {
-                            "zone_id": zone_key,
-                            "zone_label": zone.get("label") or "Shelf zone",
-                            "cell": [r, c],
-                            "cell_bbox_px": [cx1, cy1, cx2, cy2],
-                            "reference_snapshot_b64": base64.b64encode(ref_buf.tobytes()).decode(),
-                            "current_crop_b64": base64.b64encode(cur_buf.tobytes()).decode(),
-                        }
-                        # Attach a photo of whoever was last seen at this
-                        # cell (if recent enough to plausibly be the person
-                        # who made the change) so the incident isn't
-                        # evidence-less just because the detector only
-                        # judges the shelf once the zone is person-free.
-                        person_seen_at = self._inventory_last_person_seen.get(key)
-                        person_jpeg = self._inventory_last_person_jpeg.get(key)
-                        if person_seen_at is not None and person_jpeg is not None:
-                            age_sec = now - person_seen_at
-                            if age_sec <= self._INVENTORY_PERSON_EVIDENCE_MAX_AGE_SEC:
-                                extra_metadata["person_snapshot_b64"] = base64.b64encode(
-                                    person_jpeg
-                                ).decode()
-                                extra_metadata["person_seen_seconds_ago"] = round(age_sec, 1)
-                        if self._product_count_detector is not None:
-                            try:
-                                baseline_pc = self._product_count_detector.count_products(ref_crop)
-                                current_pc = self._product_count_detector.count_products(crop)
-                                if baseline_pc is not None and current_pc is not None:
-                                    extra_metadata["baseline_product_count"] = baseline_pc["count"]
-                                    extra_metadata["current_product_count"] = current_pc["count"]
-                                    extra_metadata["product_count_delta"] = (
-                                        current_pc["count"] - baseline_pc["count"]
-                                    )
-                            except Exception as e:  # noqa: BLE001
-                                log.warning(f"Tier 2 product count enrichment failed (non-fatal): {e}")
+            if not candidates:
+                continue
 
-                        # Draw the changed cell (yellow box + zone label) on
-                        # the alert snapshot so the Incident evidence image
-                        # actually shows the zone that triggered the alert —
-                        # mirrors the annotated-snapshot pattern already used
-                        # for people-count evidence.
-                        annotated = frame.copy()
-                        cv2.rectangle(annotated, (cx1, cy1), (cx2, cy2), (0, 200, 255), 3)
-                        cv2.putText(
-                            annotated, zone.get("label") or "Shelf zone",
-                            (cx1 + 4, max(14, cy1 - 8)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 200, 255), 2, cv2.LINE_AA,
+            # A real item removal affects ONE product slot. If most of the
+            # zone's cells changed at the same time it is a whole-scene
+            # change (lighting, auto-exposure, camera moved, large occlusion)
+            # — not inventory movement. Re-baseline everything and stay
+            # silent rather than emitting a burst of misleading incidents.
+            if evaluated_cells >= 3 and len(candidates) >= max(2, int(evaluated_cells * 0.6)):
+                log.info(
+                    "Inventory: suppressed whole-scene change on zone '%s' "
+                    "(%d/%d cells changed together — lighting/exposure, not an item)",
+                    zone.get("label") or zone_key, len(candidates), evaluated_cells,
+                )
+                for cand in candidates:
+                    k = cand["key"]
+                    self._inventory_baseline_hist[k] = cand["hist"]
+                    self._inventory_baseline_crop[k] = cand["crop"].copy()
+                    self._inventory_change_since.pop(k, None)
+                    self._inventory_change_last_seen.pop(k, None)
+                continue
+
+            # Otherwise report the single most-changed cell — the one that
+            # actually looks like the product slot that changed.
+            best = max(candidates, key=lambda x: x["change_score"])
+            key = best["key"]
+            r, c = best["row"], best["col"]
+            cx1, cy1, cx2, cy2 = best["bbox"]
+            crop = best["crop"]
+            hist = best["hist"]
+            change_score = best["change_score"]
+
+            ref_crop = self._inventory_baseline_crop.get(key, crop)
+            _, ref_buf = cv2.imencode(".jpg", ref_crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            _, cur_buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
+
+            # Tier 2: enrich the candidate change with a real
+            # open-vocabulary product count on both crops. This
+            # NEVER blocks or suppresses the Tier 1 event — if
+            # the detector is unavailable or errors, product
+            # counts stay empty and the event still fires using
+            # only the Tier 1 CV signal.
+            extra_metadata = {
+                "zone_id": zone_key,
+                "zone_label": zone.get("label") or "Shelf zone",
+                "cell": [r, c],
+                "cell_bbox_px": [cx1, cy1, cx2, cy2],
+                "cells_changed": len(candidates),
+                "cells_evaluated": evaluated_cells,
+                "reference_snapshot_b64": base64.b64encode(ref_buf.tobytes()).decode(),
+                "current_crop_b64": base64.b64encode(cur_buf.tobytes()).decode(),
+            }
+            # Attach a photo of whoever was last seen (preferring someone
+            # seen at this exact cell, falling back to the last person seen
+            # anywhere on this camera) so the incident isn't evidence-less
+            # just because the detector only judges the shelf once the zone
+            # is person-free.
+            person_seen_at = self._inventory_last_person_seen.get(key)
+            person_jpeg = self._inventory_last_person_jpeg.get(key)
+            person_source = "cell"
+            if (
+                person_jpeg is None
+                or person_seen_at is None
+                or (
+                    self._inventory_frame_person_jpeg is not None
+                    and self._inventory_frame_person_seen > (person_seen_at or 0)
+                )
+            ):
+                # Nobody was matched to this specific cell (common — an arm
+                # reaching in rarely puts the person's bbox inside the cell),
+                # or somebody was seen more recently elsewhere in frame.
+                if self._inventory_frame_person_jpeg is not None:
+                    person_jpeg = self._inventory_frame_person_jpeg
+                    person_seen_at = self._inventory_frame_person_seen
+                    person_source = "frame"
+            if person_seen_at and person_jpeg is not None:
+                age_sec = now - person_seen_at
+                if age_sec <= self._INVENTORY_PERSON_EVIDENCE_MAX_AGE_SEC:
+                    extra_metadata["person_snapshot_b64"] = base64.b64encode(
+                        person_jpeg
+                    ).decode()
+                    extra_metadata["person_seen_seconds_ago"] = round(age_sec, 1)
+                    extra_metadata["person_evidence_source"] = person_source
+            if self._product_count_detector is not None:
+                try:
+                    baseline_pc = self._product_count_detector.count_products(ref_crop)
+                    current_pc = self._product_count_detector.count_products(crop)
+                    if baseline_pc is not None and current_pc is not None:
+                        extra_metadata["baseline_product_count"] = baseline_pc["count"]
+                        extra_metadata["current_product_count"] = current_pc["count"]
+                        extra_metadata["product_count_delta"] = (
+                            current_pc["count"] - baseline_pc["count"]
                         )
+                except Exception as e:  # noqa: BLE001
+                    log.warning(f"Tier 2 product count enrichment failed (non-fatal): {e}")
 
-                        evt = self._emit(
-                            "inventory_movement",
-                            min(0.95, 0.5 + change_score / 2),
-                            [],
-                            annotated,
-                            extra_metadata=extra_metadata,
-                            cooldown_key=f"inventory_movement:{key}",
-                        )
-                        if evt:
-                            events.append(evt)
-                            # Re-baseline to the new state so the same
-                            # change doesn't keep re-firing every debounce
-                            # window while it persists.
-                            self._inventory_baseline_hist[key] = hist
-                            self._inventory_baseline_crop[key] = crop.copy()
-                            self._inventory_change_since.pop(key, None)
-                            self._inventory_change_last_seen.pop(key, None)
-                        # If evt is None (this cell's own cooldown hasn't
-                        # elapsed yet), deliberately do NOT re-baseline or
-                        # clear the streak — otherwise a confirmed change
-                        # would be silently discarded and never emitted at
-                        # all instead of firing as soon as cooldown clears.
+            # Draw the changed cell (yellow box + zone label) on
+            # the alert snapshot so the Incident evidence image
+            # actually shows the zone that triggered the alert —
+            # mirrors the annotated-snapshot pattern already used
+            # for people-count evidence.
+            annotated = frame.copy()
+            cv2.rectangle(annotated, (cx1, cy1), (cx2, cy2), (0, 200, 255), 3)
+            cv2.putText(
+                annotated, zone.get("label") or "Shelf zone",
+                (cx1 + 4, max(14, cy1 - 8)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 200, 255), 2, cv2.LINE_AA,
+            )
+
+            evt = self._emit(
+                "inventory_movement",
+                min(0.95, 0.5 + change_score / 2),
+                [],
+                annotated,
+                extra_metadata=extra_metadata,
+                cooldown_key=f"inventory_movement:{zone_key}",
+            )
+            if evt:
+                events.append(evt)
+                # Re-baseline every cell that was a candidate this pass so
+                # the same change doesn't keep re-firing (and so the cells
+                # we deliberately did NOT report don't fire on the next
+                # pass as if they were separate events).
+                for cand in candidates:
+                    k = cand["key"]
+                    self._inventory_baseline_hist[k] = cand["hist"]
+                    self._inventory_baseline_crop[k] = cand["crop"].copy()
+                    self._inventory_change_since.pop(k, None)
+                    self._inventory_change_last_seen.pop(k, None)
+            # If evt is None (this zone's cooldown hasn't elapsed yet),
+            # deliberately do NOT re-baseline or clear the streak —
+            # otherwise a confirmed change would be silently discarded and
+            # never emitted at all instead of firing as soon as cooldown
+            # clears.
 
         # Drop state for cells whose parent zone was removed/edited out of
         # existence in the UI. Keys are "{zone_key}:{r}_{c}".

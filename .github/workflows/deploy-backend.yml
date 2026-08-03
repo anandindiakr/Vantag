@@ -28,6 +28,13 @@ on:
     branches: [main]
     paths:
       - "backend/**"
+      # The Edge Agent download zip is built from the copy of
+      # windows_agent/ baked INTO the backend image (docker/Dockerfile
+      # COPYs it), and /api/edge/agent/version reads its __init__.py.
+      # So agent-only changes still require a backend image rebuild —
+      # without this path the VPS would keep serving the previous agent
+      # code even though the repo has a newer version.
+      - "windows_agent/**"
       - "docker/Dockerfile"
       - "docker/docker-compose.prod.yml"
       - ".github/workflows/deploy-backend.yml"
