@@ -209,8 +209,8 @@ const fetchIncidents = async (
 ): Promise<{ items: Incident[]; total: number; page: number; pages: number }> => {
   const PAGE_SIZE = 25;
 
-  // Build server-side filter params
-  const filterParams: Record<string, unknown> = { page, page_size: PAGE_SIZE };
+  // Build server-side filter params. NOTE: backend expects `limit`, not `page_size`.
+  const filterParams: Record<string, unknown> = { page, limit: PAGE_SIZE };
   if (typeFilter && typeFilter !== 'all') filterParams.event_type = typeFilter;
 
   if (storeId) {
@@ -232,13 +232,15 @@ const fetchIncidents = async (
   }
 
   // All-stores path: query every store in parallel and merge
-  // Use a larger page_size so all incidents are fetched and server-side type filter works.
+  // Use a larger limit so all incidents are fetched and server-side type filter works.
+  // NOTE: the backend's query param is named `limit` (max 200), not `page_size` —
+  // sending `page_size` was silently ignored, capping every store to the default of 20.
   const ids = storeIds.length ? storeIds : [];
   if (ids.length === 0) {
     return { items: [], total: 0, page: 1, pages: 1 };
   }
 
-  const allStoreParams: Record<string, unknown> = { page: 1, page_size: 200 };
+  const allStoreParams: Record<string, unknown> = { page: 1, limit: 200 };
   if (typeFilter && typeFilter !== 'all') allStoreParams.event_type = typeFilter;
 
   const responses = await Promise.allSettled(
