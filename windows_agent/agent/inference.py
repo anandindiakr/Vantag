@@ -13,8 +13,10 @@ end-to-end head removes that failure mode entirely, on top of being
 ~2x faster on CPU, which is what makes the 5fps ByteTrack pipeline
 affordable on a normal shop laptop.
 """
+import json
 import logging
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Tuple, Optional
 
@@ -74,11 +76,28 @@ class YoloInference:
         "https://huggingface.co/Xenova/yolov8n/resolve/main/onnx/model.onnx",
     ]
 
+    # The model this build is SUPPOSED to run. Anything else is a fallback and
+    # is reported as such rather than passing silently.
+    PREFERRED_MODEL = "yolo26n"
+    PREFERRED_WEIGHTS = "yolo26n.pt"
+
     def __init__(self, model_path: Optional[str] = None, device: str = "cpu"):
         self._session = None
         self._input_name = None
         self._img_size = 640
         self.device = device
+        # Machine-readable record of what actually loaded, sent to the backend
+        # in the heartbeat and shown on the admin panel. "unknown" until the
+        # ONNX graph has been inspected — never optimistically "yolo26".
+        self.status: dict = {
+            "architecture": "unknown",
+            "is_preferred": False,
+            "model": None,
+            "expected_model": self.PREFERRED_MODEL,
+            "ultralytics": self._ultralytics_version(),
+            "acquire_error": None,
+            "error": None,
+        }
         self._load_model(model_path)
 
     def _load_model(self, model_path: Optional[str]):
@@ -91,7 +110,33 @@ class YoloInference:
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 model_path = str(cache_dir / "yolo26n.onnx")
 
-                if not Path(model_path).exists():
+                # A cache file may have been written by an OLDER agent build
+                # that fell back to YOLOv8n — it is still named
+                # "yolo26n.onnx", so its NAME proves nothing. The manifest
+                # records what actually landed there. If it is missing (old
+                # cache) or records a fallback, re-acquire so a one-off
+                # network/export failure cannot pin this machine to YOLOv8n
+                # permanently.
+                manifest = Path(model_path).with_suffix(".json")
+                stale = False
+                if Path(model_path).exists():
+                    try:
+                        rec = json.loads(manifest.read_text(encoding="utf-8"))
+                        stale = rec.get("model") != self.PREFERRED_MODEL
+                        if stale:
+                            log.warning(
+                                "Cached detector is %s, not %s — re-acquiring.",
+                                rec.get("model"), self.PREFERRED_MODEL,
+                            )
+                    except Exception:  # noqa: BLE001 — missing/corrupt manifest
+                        stale = True
+                        log.warning(
+                            "Cached detector at %s has no manifest (written by an "
+                            "older agent) — re-acquiring to confirm YOLO26.",
+                            model_path,
+                        )
+
+                if stale or not Path(model_path).exists():
                     self._acquire_model(model_path)
 
             providers = ["CPUExecutionProvider"]
@@ -105,12 +150,59 @@ class YoloInference:
             opts.intra_op_num_threads = 4
             self._session = ort.InferenceSession(model_path, sess_options=opts, providers=providers)
             self._input_name = self._session.get_inputs()[0].name
+            self._verify_architecture(model_path)
             log.info(f"ONNX model loaded: {model_path} providers={providers}")
 
         except ImportError:
             log.warning("onnxruntime not installed — inference disabled (install: pip install onnxruntime)")
+            self.status["error"] = "onnxruntime not installed"
         except Exception as e:
             log.error(f"Failed to load ONNX model: {e}")
+            self.status["error"] = str(e)[:300]
+
+    def _verify_architecture(self, model_path: str) -> None:
+        """Determine from the loaded ONNX graph which architecture is ACTUALLY
+        running, and record it in ``self.status``.
+
+        This does not trust the cache filename or the manifest — it reads the
+        graph's own output shape, which is unforgeable:
+
+          * YOLO26 end-to-end one-to-one head -> ``(N, 300, 6)``
+          * YOLOv8 / one-to-many head         -> ``(N, 84, 8400)``
+
+        The result is surfaced to the backend heartbeat so the dashboard can
+        state plainly which model is live instead of assuming the upgrade
+        took effect.
+        """
+        try:
+            out = self._session.get_outputs()[0]
+            shape = [d if isinstance(d, int) else -1 for d in (out.shape or [])]
+            # Drop dynamic/batch dims (-1) so a dynamic batch axis cannot
+            # confuse the check. The trailing dim is what distinguishes the
+            # two heads: 6 (x1,y1,x2,y2,conf,cls) for YOLO26 end-to-end vs
+            # 8400 anchor predictions for the legacy YOLOv8 head.
+            dims = [d for d in shape if d and d > 0]
+            end2end = bool(dims) and dims[-1] == 6
+            self.status.update({
+                "onnx_output_shape": shape,
+                "architecture": "yolo26-end2end" if end2end else "yolov8-legacy-nms",
+                "is_preferred": bool(end2end),
+                "model_path": model_path,
+            })
+            if end2end:
+                log.info(
+                    "Detector architecture CONFIRMED: YOLO26 end-to-end "
+                    "(NMS-free), output shape=%s", shape,
+                )
+            else:
+                log.warning(
+                    "Detector architecture is YOLOv8 LEGACY (output shape=%s). "
+                    "YOLO26 is NOT active — counts go through the fallback NMS "
+                    "path. Reason for fallback: %s",
+                    shape, self.status.get("acquire_error") or "unknown",
+                )
+        except Exception as e:  # noqa: BLE001
+            log.warning(f"Could not verify detector architecture: {e}")
 
     def _acquire_model(self, model_path: str):
         """Obtain a detection ONNX model at ``model_path``.
@@ -118,18 +210,41 @@ class YoloInference:
         Preferred: YOLO26n (v1.5.0+, faster + NMS-free). Automatically falls
         back to YOLOv8n if the installed ``ultralytics`` version predates
         YOLO26 support, so older/offline environments keep working.
+
+        Every fallback reason is recorded in ``self.status`` and reported to
+        the backend, so a silent downgrade is impossible.
         """
+        manifest = Path(model_path).with_suffix(".json")
+
+        def _record(model_name: str) -> None:
+            try:
+                manifest.write_text(json.dumps({
+                    "model": model_name,
+                    "acquired_at": datetime.now(timezone.utc).isoformat(),
+                    "ultralytics": self._ultralytics_version(),
+                }), encoding="utf-8")
+            except Exception:  # noqa: BLE001 — manifest is advisory only
+                pass
+            self.status["model"] = model_name
+
         # 1) Preferred — YOLO26n via ultralytics (handles weight download too).
         try:
             from ultralytics import YOLO
             import shutil
             log.info("Preparing YOLO26n ONNX via ultralytics (first run only, ~30s)…")
-            m = YOLO("yolo26n.pt")
-            exported = m.export(format="onnx", imgsz=self._img_size, opset=12)
+            m = YOLO(self.PREFERRED_WEIGHTS)
+            # NOTE: opset is deliberately NOT pinned. The previous code passed
+            # opset=12, which cannot represent YOLO26's end-to-end one-to-one
+            # head — the export raised, and the agent silently fell back to
+            # YOLOv8n on every machine. Letting ultralytics pick the opset is
+            # what makes YOLO26 actually reachable.
+            exported = m.export(format="onnx", imgsz=self._img_size)
             shutil.copyfile(str(exported), model_path)
+            _record(self.PREFERRED_MODEL)
             log.info(f"YOLO26n model ready at {model_path}")
             return
         except Exception as e:  # noqa: BLE001
+            self.status["acquire_error"] = f"{type(e).__name__}: {e}"[:300]
             log.warning(f"YOLO26n unavailable ({e}); falling back to YOLOv8n…")
 
         # 2) Fallback — YOLOv8n via ultralytics (older ultralytics installs).
@@ -140,6 +255,7 @@ class YoloInference:
             m = YOLO("yolov8n.pt")
             exported = m.export(format="onnx", imgsz=self._img_size, opset=12)
             shutil.copyfile(str(exported), model_path)
+            _record("yolov8n")
             log.info(f"Fallback YOLOv8n model ready at {model_path}")
             return
         except Exception as e:  # noqa: BLE001
@@ -151,12 +267,21 @@ class YoloInference:
             try:
                 log.info(f"Downloading YOLOv8n model from {url}…")
                 urllib.request.urlretrieve(url, model_path)
+                _record("yolov8n-mirror")
                 log.info("Model downloaded successfully")
                 return
             except Exception as e:  # noqa: BLE001
                 log.warning(f"Download failed from {url}: {e}")
 
         raise RuntimeError("Could not obtain a detection model from ultralytics or mirrors")
+
+    @staticmethod
+    def _ultralytics_version() -> str:
+        try:
+            import ultralytics
+            return str(getattr(ultralytics, "__version__", "unknown"))
+        except Exception:  # noqa: BLE001
+            return "not-installed"
 
     def detect(self, frame_bgr: np.ndarray, conf_threshold: float = 0.5) -> List[BoundingBox]:
         """Run inference on a BGR OpenCV frame. Returns list of BoundingBox."""
@@ -227,10 +352,11 @@ class YoloInference:
     def _postprocess_legacy(self, output: np.ndarray, conf: float) -> List[BoundingBox]:
         """Parse a YOLOv8-style raw output tensor [84, 8400] → BoundingBox list.
 
-        No NMS is applied here (fallback-only path) — the current model is
-        YOLO26n, which needs none. If a YOLOv8n fallback is ever active this
-        can produce duplicate boxes for one object, a known limitation of
-        this fallback path only.
+        NMS **is** applied here. Previously it was not, on the reasoning that
+        the fallback "should never" be active — but when it silently was, one
+        person produced several overlapping boxes and every person-counting
+        and crowding figure derived from them was inflated. A fallback that
+        corrupts counts is worse than no fallback, so it now de-duplicates.
         """
         boxes = output[:4].T       # [8400, 4] — cx, cy, w, h (normalized)
         scores = output[4:].T      # [8400, 80]
@@ -238,24 +364,66 @@ class YoloInference:
         max_scores = scores.max(axis=1)
         class_ids = scores.argmax(axis=1)
 
-        results = []
-        for i, (score, cls_id) in enumerate(zip(max_scores, class_ids)):
-            if score < conf:
-                continue
-            cx, cy, bw, bh = boxes[i]
-            label = YOLO_CLASSES[cls_id] if cls_id < len(YOLO_CLASSES) else "unknown"
-            # Normalize to 0-1 relative to original frame
-            x = float(cx - bw / 2) / self._img_size
-            y = float(cy - bh / 2) / self._img_size
-            nw = float(bw) / self._img_size
-            nh = float(bh) / self._img_size
-            results.append(BoundingBox(
-                x=max(0.0, x), y=max(0.0, y),
-                w=min(1.0, nw), h=min(1.0, nh),
-                label=label, confidence=float(score)
-            ))
+        keep = max_scores >= conf
+        if not np.any(keep):
+            return []
 
-        return results[:50]  # cap at 50 boxes
+        idx = np.nonzero(keep)[0]
+        cand = []
+        for i in idx:
+            cx, cy, bw, bh = boxes[i]
+            x1 = float(cx - bw / 2)
+            y1 = float(cy - bh / 2)
+            cand.append((x1, y1, x1 + float(bw), y1 + float(bh),
+                         float(max_scores[i]), int(class_ids[i])))
+
+        kept = self._nms(cand, iou_threshold=0.45)
+
+        s = float(self._img_size)
+        results = []
+        for x1, y1, x2, y2, score, cls_id in kept[:50]:
+            label = YOLO_CLASSES[cls_id] if cls_id < len(YOLO_CLASSES) else "unknown"
+            results.append(BoundingBox(
+                x=max(0.0, x1 / s), y=max(0.0, y1 / s),
+                w=min(1.0, (x2 - x1) / s), h=min(1.0, (y2 - y1) / s),
+                label=label, confidence=score,
+            ))
+        return results
+
+    @staticmethod
+    def _nms(dets: list, iou_threshold: float = 0.45) -> list:
+        """Greedy per-class non-maximum suppression.
+
+        ``dets`` are ``(x1, y1, x2, y2, score, cls_id)`` tuples in model-input
+        pixel space. Suppression is per class so a person standing in front of
+        a bottle never suppresses the bottle.
+        """
+        out: list = []
+        by_cls: dict = {}
+        for d in dets:
+            by_cls.setdefault(d[5], []).append(d)
+
+        for cls_dets in by_cls.values():
+            cls_dets.sort(key=lambda d: d[4], reverse=True)
+            while cls_dets:
+                best = cls_dets.pop(0)
+                out.append(best)
+                bx1, by1, bx2, by2 = best[:4]
+                b_area = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
+                remaining = []
+                for d in cls_dets:
+                    ix1, iy1 = max(bx1, d[0]), max(by1, d[1])
+                    ix2, iy2 = min(bx2, d[2]), min(by2, d[3])
+                    iw, ih = max(0.0, ix2 - ix1), max(0.0, iy2 - iy1)
+                    inter = iw * ih
+                    d_area = max(0.0, d[2] - d[0]) * max(0.0, d[3] - d[1])
+                    union = b_area + d_area - inter
+                    if union <= 0 or (inter / union) <= iou_threshold:
+                        remaining.append(d)
+                cls_dets = remaining
+
+        out.sort(key=lambda d: d[4], reverse=True)
+        return out
 
 
 # ---------------------------------------------------------------------------

@@ -355,10 +355,15 @@ async def support_chat(req: ChatRequest) -> ChatResponse:
         return ChatResponse(reply=_fallback_reply(last_user), escalate_to_email=True)
 
     try:
-        # Lazy import so the backend doesn't require openai package unless used
-        from openai import OpenAI  # type: ignore
-
-        client = OpenAI(api_key=api_key)
+        # Call the OpenAI REST API directly with httpx rather than the
+        # `openai` SDK. The SDK was never listed in requirements.txt, so it
+        # was absent from the deployed container and every request raised
+        # ModuleNotFoundError — which the handler below swallowed into a
+        # friendly "limited mode" message, so the assistant appeared to
+        # "work" while being permanently dead and nobody was told.
+        # httpx is already a hard dependency and is the same transport
+        # services/vlm_verification_service.py uses successfully.
+        import httpx
 
         lang_hint = f"\n\nRespond in the user's language: {req.language}." if req.language != "en" else ""
 
@@ -368,13 +373,32 @@ async def support_chat(req: ChatRequest) -> ChatResponse:
         for m in req.messages[-10:]:  # keep last 10 turns
             openai_messages.append({"role": m.role, "content": m.content})
 
-        completion = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=openai_messages,
-            max_tokens=500,
-            temperature=0.3,
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": openai_messages,
+                    "max_tokens": 500,
+                    "temperature": 0.3,
+                },
+            )
+        if resp.status_code != 200:
+            raise RuntimeError(
+                f"OpenAI HTTP {resp.status_code}: {resp.text[:200]}"
+            )
+        reply = (
+            (resp.json().get("choices") or [{}])[0]
+            .get("message", {})
+            .get("content")
+            or ""
         )
-        reply = completion.choices[0].message.content or ""
+        if not reply.strip():
+            raise RuntimeError("OpenAI returned an empty completion")
 
         # Heuristic: if the reply suggests escalation, flag it
         escalate = any(
@@ -384,7 +408,20 @@ async def support_chat(req: ChatRequest) -> ChatResponse:
         return ChatResponse(reply=reply.strip(), escalate_to_email=escalate)
 
     except Exception as exc:
-        # OpenAI unreachable or errored — fall back gracefully
+        # Degrade gracefully for the user, but NEVER silently: log with a
+        # stack trace and raise a deduplicated admin alert, so a dead
+        # assistant is visible instead of hiding behind "limited mode".
+        logger.exception("AI assistant call failed: %s", exc)
+        try:
+            from ..services.system_health import report_fault
+
+            await report_fault(
+                component="ai_assistant",
+                summary=f"AI Assistant failing: {type(exc).__name__}",
+                detail=str(exc)[:1000],
+            )
+        except Exception:  # noqa: BLE001 — alerting must never break the reply
+            logger.exception("Failed to raise admin alert for AI assistant fault")
         return ChatResponse(
             reply=(
                 f"{_fallback_reply(last_user)}\n\n"

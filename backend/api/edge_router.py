@@ -462,6 +462,12 @@ class HeartbeatBody(BaseModel):
     fps_per_camera: dict[str, float] | None = None
     person_counts: dict[str, int] | None = None  # camera_id → live person count
     person_entries: dict[str, int] | None = None  # camera_id → cumulative visitors today (agent-side)
+    agent_version: str | None = None
+    # Detector status the agent verified from the loaded ONNX graph shape (NOT
+    # from the filename — a cached file named yolo26n.onnx can contain a
+    # YOLOv8 graph). Keys: architecture, model, expected_model, is_preferred,
+    # ultralytics_version, acquire_error.
+    model_status: dict | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -633,6 +639,48 @@ async def heartbeat(
             _pc_store.record_entries(str(agent.tenant_id), body.person_entries)
         except Exception:  # noqa: BLE001 — never fail a heartbeat over entry storage
             logger.exception("Failed to persist person entries for tenant %s", agent.tenant_id)
+    # Record which detector this agent actually verified from its ONNX graph,
+    # and alert the administrator if it silently fell back off YOLO26. Before
+    # this, a fallback was only a local log.warning on the customer's laptop —
+    # invisible to us and to them, so degraded accuracy went unnoticed.
+    if body.model_status:
+        try:
+            from ..db import system_health_store as _sh_store
+
+            _sh_store.record_agent_model_status(
+                str(agent.tenant_id),
+                str(agent.id),
+                body.agent_version or "",
+                body.model_status,
+            )
+            from ..services.system_health import clear_fault, report_fault
+
+            if body.model_status.get("is_preferred") is False:
+                arch = body.model_status.get("architecture") or "unknown"
+                expected = body.model_status.get("expected_model") or "yolo26n"
+                await report_fault(
+                    component="model_fallback",
+                    summary=(
+                        f"Edge Agent detector fell back to {arch} "
+                        f"(expected {expected})"
+                    ),
+                    detail=(
+                        f"agent_id={agent.id}\n"
+                        f"agent_version={body.agent_version}\n"
+                        f"verified_architecture={arch}\n"
+                        f"model_file={body.model_status.get('model')}\n"
+                        f"onnx_output_shape={body.model_status.get('onnx_output_shape')}\n"
+                        f"ultralytics={body.model_status.get('ultralytics')}\n"
+                        f"acquire_error={body.model_status.get('acquire_error')}"
+                    ),
+                    tenant_id=str(agent.tenant_id),
+                )
+            elif body.model_status.get("is_preferred") is True:
+                clear_fault("model_fallback")
+        except Exception:  # noqa: BLE001 — never fail a heartbeat over telemetry
+            logger.exception(
+                "Failed to record agent model status for agent %s", agent.id
+            )
     await session.commit()
     return {
         "ok": True,

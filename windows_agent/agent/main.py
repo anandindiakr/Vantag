@@ -395,6 +395,26 @@ def start_monitoring():
         entries = {w.config.name: person_entries.get(w.config.id, 0) for w in _workers}
         log.info(f"People counts (30s peak): {counted}")
         log.info(f"Visitors today (cumulative entries): {entries}")
+        # Report which detector architecture is ACTUALLY live (read from the
+        # loaded ONNX graph, not assumed from the upgrade having shipped), so
+        # the admin panel can show YOLO26 vs a silent YOLOv8 fallback and the
+        # reason for it. Never claim YOLO26 optimistically.
+        model_status = {}
+        try:
+            if _inference is not None:
+                model_status = dict(getattr(_inference, "status", {}) or {})
+        except Exception:  # noqa: BLE001 — telemetry must never break heartbeat
+            model_status = {}
+        if model_status:
+            arch = model_status.get("architecture")
+            if model_status.get("is_preferred"):
+                log.info(f"Detector: YOLO26 end-to-end ACTIVE ({arch})")
+            else:
+                log.warning(
+                    "Detector: YOLO26 NOT active — running %s. Reason: %s",
+                    arch, model_status.get("acquire_error") or "unknown",
+                )
+        from . import __version__ as _agent_ver
         resp = _api.heartbeat({
             "camera_statuses": camera_statuses,
             "fps_per_camera": fps_per_camera,
@@ -402,6 +422,8 @@ def start_monitoring():
             "person_entries": person_entries,
             "cpu_percent": psutil.cpu_percent(interval=None),
             "memory_percent": psutil.virtual_memory().percent,
+            "agent_version": _agent_ver,
+            "model_status": model_status,
         })
         # Backend may request an on-demand LAN camera scan
         if isinstance(resp, dict) and resp.get("scan_requested"):

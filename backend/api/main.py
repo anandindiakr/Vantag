@@ -76,6 +76,43 @@ from .seo_router import seo_router
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# File logging (so the Admin → Server Logs viewer has something real to read)
+# ---------------------------------------------------------------------------
+# uvicorn logs to stdout only, which Docker captures — meaning the only way to
+# read backend logs was `docker logs` over SSH. Attaching a rotating file
+# handler to the root logger makes the same output readable in-app, without
+# changing existing console behaviour. Best-effort: if the directory is not
+# writable we keep stdout-only rather than failing to boot.
+def _attach_file_logging() -> None:
+    import os as _os
+    from logging.handlers import RotatingFileHandler
+
+    target = _os.getenv("VANTAG_LOG_FILE", "").strip() or "/var/log/vantag/backend.log"
+    try:
+        Path(target).parent.mkdir(parents=True, exist_ok=True)
+        root = logging.getLogger()
+        # Guard against double-attachment when uvicorn reloads the module.
+        for h in root.handlers:
+            if getattr(h, "_vantag_file_handler", False):
+                return
+        handler = RotatingFileHandler(
+            target, maxBytes=10 * 1024 * 1024, backupCount=3, encoding="utf-8"
+        )
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s | %(levelname)-8s | %(name)s | %(message)s")
+        )
+        handler._vantag_file_handler = True  # type: ignore[attr-defined]
+        root.addHandler(handler)
+        if root.level > logging.INFO or root.level == logging.NOTSET:
+            root.setLevel(logging.INFO)
+        logger.info("Backend file logging enabled at %s", target)
+    except Exception as exc:  # noqa: BLE001 — never block startup over logging
+        logger.warning("Could not enable file logging at %s: %s", target, exc)
+
+
+_attach_file_logging()
+
+# ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 
@@ -222,6 +259,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         _pcstore.init_db()
     except Exception as exc:  # noqa: BLE001
         logger.warning("People-count store init failed (non-fatal) | error=%s", exc)
+
+    # Initialise the shared SQLite system-health store (multi-worker safe).
+    # Holds backend fault records + the detector architecture each Edge Agent
+    # actually verified, so Admin -> System Health reports real state.
+    try:
+        from ..db import system_health_store as _shstore
+        _shstore.init_db()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("System-health store init failed (non-fatal) | error=%s", exc)
 
     # ------------------------------------------------------------------
     # 5. Start pipeline (RTSP threads + async tasks).

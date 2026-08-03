@@ -12,6 +12,7 @@ import {
   RefreshCw, Download, Search, Ban, Play, Trash2,
   ChevronRight, Activity, Globe, Bell, Handshake,
 } from 'lucide-react';
+import SystemHealthTab from './SystemHealthTab';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -230,7 +231,7 @@ function ArchitectureTab() {
 
 // ── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'tenants' | 'payments' | 'incidents' | 'alerts' | 'architecture';
+type Tab = 'overview' | 'tenants' | 'payments' | 'incidents' | 'alerts' | 'architecture' | 'health';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -349,6 +350,7 @@ export default function AdminDashboard() {
     { key: 'incidents',     label: 'Incidents',     icon: <AlertTriangle size={16} /> },
     { key: 'alerts',        label: 'Alerts',        icon: <Bell size={16} />, badge: alerts.length },
     { key: 'architecture',  label: 'Architecture',  icon: <Network size={16} /> },
+    { key: 'health',        label: 'System Health', icon: <Activity size={16} /> },
   ] as any;
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -718,6 +720,8 @@ export default function AdminDashboard() {
 
           {/* ── ARCHITECTURE ── */}
           {tab === 'architecture' && <ArchitectureTab />}
+
+          {tab === 'health' && <SystemHealthTab />}
         </main>
       </div>
 

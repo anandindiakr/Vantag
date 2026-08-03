@@ -773,3 +773,136 @@ async def acknowledge_alert(
     await _audit(session, admin, "acknowledge_alert", "alert", alert_id, f"Acknowledged: {alert.title}")
     await session.commit()
     return {"message": "Alert acknowledged"}
+
+
+# ---------------------------------------------------------------------------
+# System health + genuine server logs (super-admin only)
+# ---------------------------------------------------------------------------
+# Two problems these endpoints exist to solve:
+#   1. The Edge Agent could silently fall back from YOLO26 to YOLOv8 and the
+#      only trace was a log.warning on the customer's own laptop. /system-health
+#      reports the architecture each agent VERIFIED from its loaded ONNX graph
+#      output shape, so "YOLO26 is active" is a measured fact, not a claim.
+#   2. There was no way to read real server logs without SSH, so a swallowed
+#      exception (e.g. the AI Assistant's missing `openai` package) was
+#      undetectable. /logs tails this container's own log file/stream.
+
+
+@admin_router.get("/system-health", summary="Live system health + detector status")
+async def system_health(
+    admin: dict = Depends(require_super_admin),
+) -> dict:
+    from ..services.system_health import snapshot
+
+    return snapshot()
+
+
+@admin_router.post("/system-health/test-alert", summary="Send a test admin alert email")
+async def system_health_test_alert(
+    admin: dict = Depends(require_super_admin),
+) -> dict:
+    """Prove the admin alert pipeline works end-to-end.
+
+    Uses a dedicated component name so it cannot mask or reset a real fault,
+    and bypasses the cooldown by clearing itself first — otherwise a second
+    test within the cooldown window would appear to do nothing.
+    """
+    from ..services.system_health import (
+        ADMIN_ALERT_EMAIL,
+        clear_fault,
+        report_fault,
+    )
+    from ..db import system_health_store as _sh
+
+    _sh.resolve_fault("admin_test_alert")
+    try:
+        # Reset the cooldown so repeated tests always actually send.
+        conn = _sh._get_conn()  # noqa: SLF001 — internal by design for tests
+        with _sh._lock, conn:  # noqa: SLF001
+            conn.execute(
+                "UPDATE system_faults SET last_alert_ts = NULL WHERE component = ?",
+                ("admin_test_alert",),
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
+    await report_fault(
+        component="admin_test_alert",
+        summary="Test alert requested from the admin panel",
+        detail=(
+            "This is a manual test of the administrator alert pipeline. "
+            "If you received this email, fault alerting is working."
+        ),
+    )
+    clear_fault("admin_test_alert")
+    return {
+        "message": f"Test alert dispatched to {ADMIN_ALERT_EMAIL}",
+        "email": ADMIN_ALERT_EMAIL,
+    }
+
+
+# Candidate log locations, in priority order. The container writes to
+# /var/log/vantag (created in docker/Dockerfile); when running outside Docker
+# a local logs/ dir is used instead.
+_LOG_CANDIDATES = [
+    "/var/log/vantag/backend.log",
+    "/var/log/vantag/api.log",
+    "/app/logs/backend.log",
+]
+
+
+@admin_router.get("/logs", summary="Tail real backend logs")
+async def tail_logs(
+    lines: int = Query(200, ge=10, le=2000),
+    contains: Optional[str] = Query(None, description="Case-insensitive filter"),
+    admin: dict = Depends(require_super_admin),
+) -> dict:
+    """Return the last N lines of this container's real log output.
+
+    Honesty note: if no log file is present (uvicorn logging to stdout only,
+    captured by Docker), this reports ``source: "unavailable"`` with the exact
+    reason and the ``docker logs`` command to run instead. It never fabricates
+    or simulates log content.
+    """
+    import os as _os
+    from collections import deque
+    from pathlib import Path as _Path
+
+    log_path: Optional[str] = _os.getenv("VANTAG_LOG_FILE", "").strip() or None
+    if log_path and not _Path(log_path).is_file():
+        log_path = None
+    if log_path is None:
+        for cand in _LOG_CANDIDATES:
+            if _Path(cand).is_file():
+                log_path = cand
+                break
+
+    if log_path is None:
+        return {
+            "source": "unavailable",
+            "reason": (
+                "No log file found on disk. This backend logs to stdout, which "
+                "Docker captures instead of writing a file. Set VANTAG_LOG_FILE "
+                "to a writable path to enable in-app log tailing."
+            ),
+            "checked_paths": _LOG_CANDIDATES,
+            "fallback_command": "docker logs --tail 200 vantag-backend",
+            "lines": [],
+        }
+
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
+            tail = deque(fh, maxlen=lines)
+        out = list(tail)
+        if contains:
+            needle = contains.lower()
+            out = [ln for ln in out if needle in ln.lower()]
+        return {
+            "source": log_path,
+            "line_count": len(out),
+            "filter": contains,
+            "lines": [ln.rstrip("\n") for ln in out],
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Could not read log file: {exc}")
+
