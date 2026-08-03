@@ -415,3 +415,81 @@ class YoloPoseInference(YoloInference):
             pts[:, 1] /= s
             results.append(PersonPose(box, pts))
         return results
+
+
+# ---------------------------------------------------------------------------
+# Tier 2 shelf/inventory-movement: open-vocabulary product-count detector
+# (YOLO-World via ultralytics). Loaded lazily and ONLY invoked when Tier 1's
+# per-frame CV histogram signal (see camera_worker.py) proposes a candidate
+# shelf-zone change — it never runs per-frame, so calling the ultralytics
+# Python API directly (rather than hand-parsing a custom ONNX export) is the
+# right trade-off here: correctness over raw speed, since call frequency is
+# at most a handful of times per hour per zone.
+# ---------------------------------------------------------------------------
+
+PRODUCT_PROMPT_CLASSES = [
+    "packaged product", "bottle", "box", "can", "jar", "carton", "package",
+]
+
+
+class ProductCountDetector:
+    """Open-vocabulary product/emptiness counter for a small shelf-zone crop.
+
+    Uses YOLO-World (``yolov8s-worldv2.pt``) with a fixed text-prompt
+    vocabulary — zero training data required, per the approved Tier 2 scope.
+    Lazily loaded on first actual use so agents with no shelf zones
+    configured never pay the extra weight download/load cost, and shared
+    as a single instance across all camera workers (main.py creates one and
+    passes it to every CameraWorker) so multiple shelf-monitored cameras
+    don't each load a separate copy of the model into memory.
+    """
+
+    def __init__(self):
+        self._model = None
+        self._load_failed = False
+
+    def _ensure_loaded(self):
+        if self._model is not None or self._load_failed:
+            return
+        try:
+            from ultralytics import YOLO
+            log.info(
+                "Loading YOLO-World (yolov8s-worldv2.pt) for shelf product "
+                "counting (first use only, ~30s)…"
+            )
+            m = YOLO("yolov8s-worldv2.pt")
+            m.set_classes(PRODUCT_PROMPT_CLASSES)
+            self._model = m
+            log.info("YOLO-World shelf product counter ready.")
+        except Exception as e:  # noqa: BLE001
+            log.warning(
+                f"YOLO-World unavailable ({e}) — Tier 2 product counting "
+                f"disabled for this session; shelf zones will fall back to "
+                f"the Tier 1 CV-only signal."
+            )
+            self._load_failed = True
+
+    def count_products(self, crop: np.ndarray, conf_threshold: float = 0.15) -> Optional[dict]:
+        """Run product detection on a shelf-zone crop.
+
+        Returns ``None`` if the model isn't available for any reason —
+        callers MUST treat that as "no Tier 2 signal" and fall back to
+        Tier 1 alone; this method never raises. On success returns
+        ``{"count": int, "mean_confidence": float}``.
+        """
+        self._ensure_loaded()
+        if self._model is None:
+            return None
+        try:
+            results = self._model.predict(crop, conf=conf_threshold, verbose=False)
+            if not results:
+                return {"count": 0, "mean_confidence": 0.0}
+            boxes = results[0].boxes
+            if boxes is None or len(boxes) == 0:
+                return {"count": 0, "mean_confidence": 0.0}
+            confs = boxes.conf.tolist() if boxes.conf is not None else []
+            mean_conf = float(sum(confs) / len(confs)) if confs else 0.0
+            return {"count": int(len(boxes)), "mean_confidence": round(mean_conf, 3)}
+        except Exception as e:  # noqa: BLE001
+            log.warning(f"Product count inference failed: {e}")
+            return None

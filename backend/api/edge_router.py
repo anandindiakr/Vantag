@@ -991,9 +991,15 @@ async def ingest_event(
             # before/after comparison is materially more accurate than
             # judging a single still frame, so prefer it when available.
             ref_b64 = cur_b64 = None
+            baseline_product_count = current_product_count = None
             if event_type == "inventory_movement" and isinstance(body.metadata, dict):
                 ref_b64 = body.metadata.get("reference_snapshot_b64")
                 cur_b64 = body.metadata.get("current_crop_b64")
+                # Tier 2 (optional): open-vocabulary product counts computed
+                # by the edge agent on both crops, when its detector is
+                # available — enriches the VLM prompt with concrete numbers.
+                baseline_product_count = body.metadata.get("baseline_product_count")
+                current_product_count = body.metadata.get("current_product_count")
 
             def _decode(b64: str) -> bytes:
                 if "," in b64 and b64.strip().lower().startswith("data:"):
@@ -1002,7 +1008,9 @@ async def ingest_event(
 
             if ref_b64 and cur_b64:
                 vlm_result = await vlm_verification_service.verify_inventory_change(
-                    _decode(ref_b64), _decode(cur_b64)
+                    _decode(ref_b64), _decode(cur_b64),
+                    baseline_product_count=baseline_product_count,
+                    current_product_count=current_product_count,
                 )
             else:
                 vlm_result = await vlm_verification_service.verify_incident(event_type, snapshot_bytes)

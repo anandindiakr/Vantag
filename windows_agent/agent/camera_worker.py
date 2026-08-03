@@ -37,6 +37,7 @@ from .inference import (
     YoloInference, RETAIL_CLASSES,
     YoloPoseInference, PersonPose,
     KP_L_SHOULDER, KP_R_SHOULDER, KP_L_WRIST, KP_R_WRIST, KP_L_HIP, KP_R_HIP,
+    ProductCountDetector,
 )
 from .tracker import ByteTracker
 
@@ -561,6 +562,7 @@ class DetectionAnalyzer:
         people_count_zones: Optional[list[dict]] = None,
         exclusion_zones: Optional[list[dict]] = None,
         inventory_zones: Optional[list[dict]] = None,
+        product_count_detector: Optional["ProductCountDetector"] = None,
     ):
         self.camera_id = camera_id
         self.cooldown_sec = cooldown_sec
@@ -633,6 +635,12 @@ class DetectionAnalyzer:
         self._inventory_baseline_crop: dict[str, np.ndarray] = {}
         self._inventory_change_since: dict[str, float] = {}
         self._inventory_change_last_seen: dict[str, float] = {}
+        # Tier 2: open-vocabulary product counter (YOLO-World), shared
+        # singleton passed in from main.py. Only invoked at the exact
+        # moment Tier 1's CV signal proposes a candidate change (see
+        # _analyze_inventory_zones below) — never per-frame. May be None
+        # (model unavailable) — Tier 1 must keep working unaffected.
+        self._product_count_detector = product_count_detector
 
     def _can_emit(self, event_type: str) -> bool:
         last = self._last_event.get(event_type, 0)
@@ -792,17 +800,37 @@ class DetectionAnalyzer:
                 ref_crop = self._inventory_baseline_crop.get(key, crop)
                 _, ref_buf = cv2.imencode(".jpg", ref_crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
                 _, cur_buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
+
+                # Tier 2: enrich the candidate change with a real
+                # open-vocabulary product count on both crops. This NEVER
+                # blocks or suppresses the Tier 1 event — if the detector is
+                # unavailable or errors, product_counts stays empty and the
+                # event still fires using only the Tier 1 CV signal.
+                extra_metadata = {
+                    "zone_id": key,
+                    "zone_label": zone.get("label") or "Shelf zone",
+                    "reference_snapshot_b64": base64.b64encode(ref_buf.tobytes()).decode(),
+                    "current_crop_b64": base64.b64encode(cur_buf.tobytes()).decode(),
+                }
+                if self._product_count_detector is not None:
+                    try:
+                        baseline_pc = self._product_count_detector.count_products(ref_crop)
+                        current_pc = self._product_count_detector.count_products(crop)
+                        if baseline_pc is not None and current_pc is not None:
+                            extra_metadata["baseline_product_count"] = baseline_pc["count"]
+                            extra_metadata["current_product_count"] = current_pc["count"]
+                            extra_metadata["product_count_delta"] = (
+                                current_pc["count"] - baseline_pc["count"]
+                            )
+                    except Exception as e:  # noqa: BLE001
+                        log.warning(f"Tier 2 product count enrichment failed (non-fatal): {e}")
+
                 evt = self._emit(
                     "inventory_movement",
                     min(0.95, 0.5 + change_score / 2),
                     [],
                     frame,
-                    extra_metadata={
-                        "zone_id": key,
-                        "zone_label": zone.get("label") or "Shelf zone",
-                        "reference_snapshot_b64": base64.b64encode(ref_buf.tobytes()).decode(),
-                        "current_crop_b64": base64.b64encode(cur_buf.tobytes()).decode(),
-                    },
+                    extra_metadata=extra_metadata,
                 )
                 if evt:
                     events.append(evt)
@@ -1138,6 +1166,7 @@ class CameraWorker:
         people_count_zones: Optional[list[dict]] = None,
         exclusion_zones: Optional[list[dict]] = None,
         inventory_zones: Optional[list[dict]] = None,
+        product_count_detector: Optional["ProductCountDetector"] = None,
     ):
         self.config = config
         self._inference = inference
@@ -1153,6 +1182,7 @@ class CameraWorker:
             exclusion_zones=exclusion_zones,
             people_count_zones=people_count_zones,
             inventory_zones=inventory_zones,
+            product_count_detector=product_count_detector,
         )
 
         self._stop_event = threading.Event()

@@ -22,7 +22,7 @@ from .config import AgentConfig
 from .api_client import VantagApiClient
 from .mqtt_client import VantagMqttClient
 from .camera_worker import CameraWorker, CameraConfig
-from .inference import YoloInference, YoloPoseInference
+from .inference import YoloInference, YoloPoseInference, ProductCountDetector
 from .tray_icon import VantagTrayIcon
 from . import discovery
 
@@ -58,6 +58,11 @@ _api: VantagApiClient = None
 _mqtt: VantagMqttClient = None
 _inference: YoloInference = None
 _pose_inference: YoloPoseInference = None
+# Tier 2 shelf/inventory-movement product counter — shared across every
+# camera worker so multiple shelf-monitored cameras don't each load a
+# separate copy of YOLO-World into memory. Cheap to construct (the model
+# itself is lazy-loaded on first actual shelf-zone event, see inference.py).
+_product_count_detector = ProductCountDetector()
 _workers: list[CameraWorker] = []
 _recent_events: list[dict] = []   # in-memory event log for tray tooltip
 _scan_lock = threading.Lock()     # guards against concurrent discovery scans
@@ -200,6 +205,7 @@ def _build_worker(cam):
         people_count_zones=getattr(cam, "people_count_zones", []),
         exclusion_zones=getattr(cam, "exclusion_zones", []),
         inventory_zones=getattr(cam, "inventory_zones", []),
+        product_count_detector=_product_count_detector,
     )
 
 
@@ -335,6 +341,7 @@ def start_monitoring():
             people_count_zones=getattr(cam, "people_count_zones", []),
             exclusion_zones=getattr(cam, "exclusion_zones", []),
             inventory_zones=getattr(cam, "inventory_zones", []),
+            product_count_detector=_product_count_detector,
         )
         worker.start()
         _workers.append(worker)

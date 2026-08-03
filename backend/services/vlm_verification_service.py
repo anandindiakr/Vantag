@@ -151,13 +151,24 @@ _INVENTORY_PROMPT = (
 )
 
 
-async def verify_inventory_change(reference_bytes: bytes, current_bytes: bytes) -> Optional[dict]:
+async def verify_inventory_change(
+    reference_bytes: bytes,
+    current_bytes: bytes,
+    baseline_product_count: Optional[int] = None,
+    current_product_count: Optional[int] = None,
+) -> Optional[dict]:
     """Two-image reference-vs-current VLM check for ``inventory_movement``.
 
     Same fail-open contract as ``verify_incident``: returns None whenever
     verification is disabled, misconfigured, unreachable, or the response
     can't be parsed — meaning "could not verify", so the caller must dispatch
     the alert exactly as it would without verification.
+
+    ``baseline_product_count``/``current_product_count`` (Tier 2, optional):
+    when the edge agent's open-vocabulary product counter produced a count
+    for both crops, it's passed here and appended as extra evidence text so
+    the VLM judges against concrete numbers instead of pixels alone. Safe
+    to omit — Tier 1 (CV-only) verification is unaffected either way.
     """
     if not is_enabled():
         return None
@@ -165,6 +176,15 @@ async def verify_inventory_change(reference_bytes: bytes, current_bytes: bytes) 
     api_key = os.getenv("OPENAI_API_KEY")
     ref_b64 = base64.b64encode(reference_bytes).decode()
     cur_b64 = base64.b64encode(current_bytes).decode()
+
+    prompt_text = _INVENTORY_PROMPT
+    if baseline_product_count is not None and current_product_count is not None:
+        prompt_text += (
+            f" An automated product counter (independent of you) found "
+            f"{baseline_product_count} item(s) in the baseline photo vs "
+            f"{current_product_count} now in the current photo — use this as "
+            f"additional evidence alongside what you see."
+        )
 
     payload = {
         "model": _MODEL,
@@ -178,7 +198,7 @@ async def verify_inventory_change(reference_bytes: bytes, current_bytes: bytes) 
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{ref_b64}"}},
                     {"type": "text", "text": "CURRENT photo (flagged as changed):"},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{cur_b64}"}},
-                    {"type": "text", "text": _INVENTORY_PROMPT},
+                    {"type": "text", "text": prompt_text},
                 ],
             },
         ],
