@@ -1,4 +1,15 @@
-ultralytics>=8.3.100  # YOLO26 support (agent v1.5.0); older installs auto-fallback to YOLOv8n
+# YOLO26 REQUIRES ultralytics >= 8.4.0. The previous floor of >=8.3.100 was
+# satisfied by 8.3.x, which contains no YOLO26 model definition at all, so
+# YOLO("yolo26n.pt") raised ImportError/FileNotFoundError and the agent fell
+# back to YOLOv8n on those machines. That was the real reason agents kept
+# reporting YOLOv8. Do NOT lower this floor.
+ultralytics>=8.4.0
+# Required by the YOLO26 ONNX export's simplify=True step. Without it,
+# ultralytics silently logs "simplifier failure: No module named 'onnxslim'",
+# skips simplification, and tries to pip-install it at runtime on the
+# customer's machine — which fails on any locked-down Python install. Pin it
+# here so the export is deterministic and needs no network install at runtime.
+onnxslim>=0.1.71
 onnxruntime>=1.18.0
 opencv-python-headless>=4.9.0
 numpy>=1.26.0

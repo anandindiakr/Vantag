@@ -15,6 +15,7 @@ affordable on a normal shop laptop.
 """
 import json
 import logging
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,30 @@ from typing import List, Tuple, Optional
 import numpy as np
 
 log = logging.getLogger("vantag.inference")
+
+
+def _parse_version(v: str) -> tuple:
+    """Parse a version string into a comparable integer tuple.
+
+    Tolerant by design: unknown / not-installed / dev suffixes degrade to
+    ``(0, 0, 0)`` so a version check can only ever be *conservative* (i.e.
+    treat the install as too old and fall back), never optimistic.
+    """
+    parts = []
+    for chunk in str(v).split(".")[:3]:
+        digits = ""
+        for ch in chunk:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        if not digits:
+            break
+        parts.append(int(digits))
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts)
+
 
 YOLO_CLASSES = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
@@ -201,8 +226,40 @@ class YoloInference:
                     "path. Reason for fallback: %s",
                     shape, self.status.get("acquire_error") or "unknown",
                 )
+                # Self-heal: if the manifest claims YOLO26 but the graph is
+                # legacy, the export silently produced the wrong head (a known
+                # ultralytics failure mode where the training branch is traced
+                # instead of the one-to-one inference branch). Left alone, the
+                # staleness check reads the manifest, sees "yolo26n", and never
+                # re-acquires — pinning the machine to the fallback forever.
+                # Rewriting the manifest with what actually loaded makes the
+                # next start re-export instead.
+                self._correct_manifest(model_path, "yolov8-legacy-nms")
         except Exception as e:  # noqa: BLE001
             log.warning(f"Could not verify detector architecture: {e}")
+
+    @staticmethod
+    def _correct_manifest(model_path: str, actual: str) -> None:
+        try:
+            manifest = Path(model_path).with_suffix(".json")
+            rec = {}
+            if manifest.exists():
+                try:
+                    rec = json.loads(manifest.read_text(encoding="utf-8"))
+                except Exception:  # noqa: BLE001
+                    rec = {}
+            if rec.get("model") == YoloInference.PREFERRED_MODEL:
+                rec["model"] = actual
+                rec["corrected_by_graph_inspection"] = True
+                manifest.write_text(json.dumps(rec), encoding="utf-8")
+                log.warning(
+                    "Manifest claimed %s but the ONNX graph is %s — manifest "
+                    "corrected so the next agent start re-exports.",
+                    YoloInference.PREFERRED_MODEL, actual,
+                )
+        except Exception:  # noqa: BLE001 — manifest is advisory only
+            pass
+
 
     def _acquire_model(self, model_path: str):
         """Obtain a detection ONNX model at ``model_path``.
@@ -229,16 +286,58 @@ class YoloInference:
 
         # 1) Preferred — YOLO26n via ultralytics (handles weight download too).
         try:
+            # MUST be set BEFORE `import ultralytics` — ultralytics reads
+            # YOLO_AUTOINSTALL once at module import time into a constant, so
+            # setting it afterwards is a no-op. This stops ultralytics from
+            # trying to pip-install onnxslim over the network mid-export on a
+            # customer machine (which fails on any locked-down Python install
+            # and silently degrades the export).
+            os.environ.setdefault("YOLO_AUTOINSTALL", "false")
             from ultralytics import YOLO
             import shutil
-            log.info("Preparing YOLO26n ONNX via ultralytics (first run only, ~30s)…")
+
+            # YOLO26 does not exist before ultralytics 8.4.0 — on 8.3.x the
+            # YOLO() call fails with an opaque error and we silently ran
+            # YOLOv8n instead. Check explicitly so the recorded reason names
+            # the actual problem (and tells the operator how to fix it).
+            _uv = self._ultralytics_version()
+            if _parse_version(_uv) < (8, 4, 0):
+                raise RuntimeError(
+                    f"ultralytics {_uv} is too old for YOLO26 (requires >=8.4.0). "
+                    f"Fix: pip install --upgrade 'ultralytics>=8.4.0'"
+                )
+
+            log.info(
+                "Preparing YOLO26n ONNX via ultralytics "
+                "(first run only, ~60s on a typical CPU)…"
+            )
+            # Never let ultralytics pip-install anything at runtime on a
+            # customer machine. Every dependency the export needs (onnxslim
+            # for simplify=True) is pinned in requirements.txt; a runtime
+            # AutoUpdate attempt just fails noisily on locked-down Python
+            # installs and silently degrades the export.
+            os.environ.setdefault("YOLO_AUTOINSTALL", "false")
             m = YOLO(self.PREFERRED_WEIGHTS)
-            # NOTE: opset is deliberately NOT pinned. The previous code passed
-            # opset=12, which cannot represent YOLO26's end-to-end one-to-one
-            # head — the export raised, and the agent silently fell back to
-            # YOLOv8n on every machine. Letting ultralytics pick the opset is
-            # what makes YOLO26 actually reachable.
-            exported = m.export(format="onnx", imgsz=self._img_size)
+
+            # opset: 12 was pinned here originally and CANNOT represent YOLO26's
+            # end-to-end one-to-one head, so the export raised on every machine
+            # and the agent fell back to YOLOv8n. 19 is the opset the ONNX
+            # Runtime CPU provider handles best for this head; leaving it
+            # unpinned made the export non-deterministic across ultralytics
+            # releases.
+            # nms is deliberately NOT passed: YOLO26 is already NMS-free
+            # end-to-end, and asking for NMS applies it twice, which drops
+            # overlapping people — exactly the doorway case people counting
+            # depends on.
+            # dynamic=False keeps a fixed input shape, which both avoids a
+            # known fragility in the e2e head export and lets ORT plan memory.
+            exported = m.export(
+                format="onnx",
+                imgsz=self._img_size,
+                opset=19,
+                dynamic=False,
+                simplify=True,
+            )
             shutil.copyfile(str(exported), model_path)
             _record(self.PREFERRED_MODEL)
             log.info(f"YOLO26n model ready at {model_path}")
@@ -246,6 +345,7 @@ class YoloInference:
         except Exception as e:  # noqa: BLE001
             self.status["acquire_error"] = f"{type(e).__name__}: {e}"[:300]
             log.warning(f"YOLO26n unavailable ({e}); falling back to YOLOv8n…")
+
 
         # 2) Fallback — YOLOv8n via ultralytics (older ultralytics installs).
         try:
