@@ -32,6 +32,12 @@ class CameraConfig:
     # center falls inside one of these zones is dropped before it can
     # trigger a shoplifting/restricted-zone/loitering event or be counted.
     exclusion_zones: list[dict] = field(default_factory=list)
+    # Shelf/inventory-movement zones (drawn in the Zone Editor's Shelf type).
+    # Fed into DetectionAnalyzer's InventoryMovementDetector so item removal/
+    # rearrangement inside these areas is actually evaluated by the edge
+    # agent — previously configured but never delivered here, so it had no
+    # effect at all.
+    inventory_zones: list[dict] = field(default_factory=list)
 
 
 @dataclass

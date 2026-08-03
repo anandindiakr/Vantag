@@ -541,6 +541,17 @@ class DetectionAnalyzer:
         "suspicious_behavior": "medium",
     }
 
+    # Inventory-zone occupancy-change tuning (Tier 1 fix). ``CHANGE_THRESHOLD``
+    # is a 0-1 dissimilarity score (1 - grayscale histogram correlation)
+    # between a zone's baseline crop and its current crop; empirically,
+    # ordinary lighting flicker/shadow movement stays well under 0.35 while a
+    # product genuinely removed/added produces a much larger jump.
+    # ``DEBOUNCE_SEC`` requires the change to persist (not just one noisy
+    # frame) before a candidate event is raised, mirroring the dwell-counter
+    # pattern used by restricted_zone/loitering above.
+    _INVENTORY_CHANGE_THRESHOLD = 0.35
+    _INVENTORY_DEBOUNCE_SEC = 5.0
+
     def __init__(
         self,
         camera_id: str,
@@ -549,6 +560,7 @@ class DetectionAnalyzer:
         pose_inference: Optional["YoloPoseInference"] = None,
         people_count_zones: Optional[list[dict]] = None,
         exclusion_zones: Optional[list[dict]] = None,
+        inventory_zones: Optional[list[dict]] = None,
     ):
         self.camera_id = camera_id
         self.cooldown_sec = cooldown_sec
@@ -612,11 +624,28 @@ class DetectionAnalyzer:
         # any alert/count logic runs (see _filter_exclusions below).
         self._exclusion_zones = exclusion_zones or []
 
+        # Shelf/inventory-movement zones (Zone Editor "Shelf" type), fed to
+        # the agent by main.py's _map_remote_camera/_build_worker. Each zone
+        # gets its own rolling baseline crop + debounce state so an edit to
+        # one shelf zone doesn't disturb another.
+        self._inventory_zones = inventory_zones or []
+        self._inventory_baseline_hist: dict[str, "np.ndarray"] = {}
+        self._inventory_baseline_crop: dict[str, np.ndarray] = {}
+        self._inventory_change_since: dict[str, float] = {}
+        self._inventory_change_last_seen: dict[str, float] = {}
+
     def _can_emit(self, event_type: str) -> bool:
         last = self._last_event.get(event_type, 0)
         return (time.time() - last) >= self.cooldown_sec
 
-    def _emit(self, event_type: str, confidence: float, boxes: list, frame: np.ndarray) -> Optional[dict]:
+    def _emit(
+        self,
+        event_type: str,
+        confidence: float,
+        boxes: list,
+        frame: np.ndarray,
+        extra_metadata: Optional[dict] = None,
+    ) -> Optional[dict]:
         if not self._can_emit(event_type):
             return None
         self._last_event[event_type] = time.time()
@@ -626,16 +655,19 @@ class DetectionAnalyzer:
         severity = self._SEVERITY_MAP.get(event_type, "medium")
         if confidence >= 0.85 and severity == "medium":
             severity = "high"
+        metadata = {
+            "timestamp": int(time.time() * 1000),
+            "bounding_boxes": [b.to_dict() for b in boxes],
+        }
+        if extra_metadata:
+            metadata.update(extra_metadata)
         return {
             "camera_id": self.camera_id,
             "event_type": event_type,
             "severity": severity,
             "confidence": round(confidence, 3),
             "snapshot_b64": snap,
-            "metadata": {
-                "timestamp": int(time.time() * 1000),
-                "bounding_boxes": [b.to_dict() for b in boxes],
-            },
+            "metadata": metadata,
         }
 
     def _in_exclusion_zone(self, box, frame_w: int, frame_h: int) -> bool:
@@ -662,6 +694,134 @@ class DetectionAnalyzer:
         if not self._exclusion_zones or not boxes:
             return boxes
         return [b for b in boxes if not self._in_exclusion_zone(b, frame_w, frame_h)]
+
+    @staticmethod
+    def _zone_pixel_bbox(zone: dict, frame_w: int, frame_h: int) -> Optional[tuple]:
+        """Convert a stored zone bbox (normalized 0-1 or raw pixels) to pixel
+        coordinates in the CURRENT frame's resolution. Mirrors the
+        normalized-vs-pixel handling used by ``_in_exclusion_zone``."""
+        bbox = zone.get("bbox", [])
+        if len(bbox) != 4:
+            return None
+        x1, y1, x2, y2 = (float(v) for v in bbox)
+        if zone.get("normalized") or max(x1, y1, x2, y2) <= 1.0:
+            x1, x2 = x1 * frame_w, x2 * frame_w
+            y1, y2 = y1 * frame_h, y2 * frame_h
+        x1, y1 = max(0, int(x1)), max(0, int(y1))
+        x2, y2 = min(frame_w, int(x2)), min(frame_h, int(y2))
+        if x2 - x1 < 20 or y2 - y1 < 20:
+            return None
+        return x1, y1, x2, y2
+
+    @staticmethod
+    def _zone_has_person(bbox_px: tuple, persons: list, frame_w: int, frame_h: int) -> bool:
+        """True if any person box overlaps this shelf zone right now. A
+        shopper merely standing in front of a shelf (browsing) produces the
+        exact same "occlusion" as someone removing an item in a single
+        frame — the only reliable way to tell them apart without a
+        multi-second track is to skip evaluation entirely while a person is
+        present and only judge the change once they've stepped away."""
+        zx1, zy1, zx2, zy2 = bbox_px
+        for p in persons:
+            px1, py1 = p.x * frame_w, p.y * frame_h
+            px2, py2 = (p.x + p.w) * frame_w, (p.y + p.h) * frame_h
+            ox1, oy1 = max(zx1, px1), max(zy1, py1)
+            ox2, oy2 = min(zx2, px2), min(zy2, py2)
+            if ox2 > ox1 and oy2 > oy1:
+                return True
+        return False
+
+    def _analyze_inventory_zones(self, persons: list, frame: np.ndarray, now: float) -> list[dict]:
+        """Real Tier-1 shelf/inventory-movement detection.
+
+        Replaces the previous no-op: for each configured shelf zone, keeps a
+        rolling baseline crop (captured whenever no person overlaps the
+        zone) and compares each new person-free frame's crop against it
+        using a cheap grayscale histogram correlation. A sustained
+        dissimilarity (not a single noisy frame) raises a candidate
+        ``inventory_movement`` event carrying BOTH the baseline and current
+        crops, so the backend's VLM verification step can confirm a genuine
+        change vs. normal restocking before any alert is dispatched.
+        """
+        if not self._inventory_zones:
+            return []
+        events: list[dict] = []
+        fh, fw = frame.shape[:2]
+        seen_keys: set[str] = set()
+
+        for idx, zone in enumerate(self._inventory_zones):
+            key = str(zone.get("id") or idx)
+            seen_keys.add(key)
+            bbox_px = self._zone_pixel_bbox(zone, fw, fh)
+            if bbox_px is None:
+                continue
+            if self._zone_has_person(bbox_px, persons, fw, fh):
+                continue
+
+            x1, y1, x2, y2 = bbox_px
+            crop = frame[y1:y2, x1:x2]
+            gray = cv2.cvtColor(cv2.resize(crop, (64, 64)), cv2.COLOR_BGR2GRAY)
+            hist = cv2.calcHist([gray], [0], None, [32], [0, 256])
+            cv2.normalize(hist, hist)
+
+            baseline_hist = self._inventory_baseline_hist.get(key)
+            if baseline_hist is None:
+                # First person-free look at this zone — establish baseline,
+                # nothing to compare against yet.
+                self._inventory_baseline_hist[key] = hist
+                self._inventory_baseline_crop[key] = crop.copy()
+                continue
+
+            similarity = cv2.compareHist(baseline_hist, hist, cv2.HISTCMP_CORREL)
+            change_score = 1.0 - max(-1.0, min(1.0, similarity))
+
+            if change_score < self._INVENTORY_CHANGE_THRESHOLD:
+                # Back to looking like baseline — any in-progress streak was
+                # noise (lighting flicker etc.), not a real change.
+                self._inventory_change_since.pop(key, None)
+                self._inventory_change_last_seen.pop(key, None)
+                continue
+
+            first_seen = self._inventory_change_since.get(key)
+            if first_seen is None:
+                first_seen = now
+                self._inventory_change_since[key] = first_seen
+            self._inventory_change_last_seen[key] = now
+
+            if now - first_seen >= self._INVENTORY_DEBOUNCE_SEC:
+                ref_crop = self._inventory_baseline_crop.get(key, crop)
+                _, ref_buf = cv2.imencode(".jpg", ref_crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                _, cur_buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                evt = self._emit(
+                    "inventory_movement",
+                    min(0.95, 0.5 + change_score / 2),
+                    [],
+                    frame,
+                    extra_metadata={
+                        "zone_id": key,
+                        "zone_label": zone.get("label") or "Shelf zone",
+                        "reference_snapshot_b64": base64.b64encode(ref_buf.tobytes()).decode(),
+                        "current_crop_b64": base64.b64encode(cur_buf.tobytes()).decode(),
+                    },
+                )
+                if evt:
+                    events.append(evt)
+                # Re-baseline to the new state so the same change doesn't
+                # keep re-firing every debounce window while it persists.
+                self._inventory_baseline_hist[key] = hist
+                self._inventory_baseline_crop[key] = crop.copy()
+                self._inventory_change_since.pop(key, None)
+                self._inventory_change_last_seen.pop(key, None)
+
+        # Drop state for zones removed/edited out of existence in the UI.
+        stale = [k for k in self._inventory_baseline_hist if k not in seen_keys]
+        for k in stale:
+            self._inventory_baseline_hist.pop(k, None)
+            self._inventory_baseline_crop.pop(k, None)
+            self._inventory_change_since.pop(k, None)
+            self._inventory_change_last_seen.pop(k, None)
+
+        return events
 
     def analyse(
         self,
@@ -785,9 +945,10 @@ class DetectionAnalyzer:
                 self._person_frame_counts.pop(k, None)
                 self._person_dwell_last_seen.pop(k, None)
 
-        # Inventory movement is configured and evaluated by the dedicated
-        # detector on the backend. Do not create a generic incident merely
-        # because this frame contains no shelf-item detections.
+        # 3. Inventory movement: per-zone occupancy-change detection (Tier 1
+        # fix — previously this was a no-op that relied on a dead backend
+        # detector which never received real per-tenant camera frames).
+        events.extend(self._analyze_inventory_zones(persons, frame, now))
 
         # 4. Fall Detection
         fall_evt = self._fall_detector.analyse(persons, frame)
@@ -976,6 +1137,7 @@ class CameraWorker:
         pose_inference: Optional[YoloPoseInference] = None,
         people_count_zones: Optional[list[dict]] = None,
         exclusion_zones: Optional[list[dict]] = None,
+        inventory_zones: Optional[list[dict]] = None,
     ):
         self.config = config
         self._inference = inference
@@ -990,6 +1152,7 @@ class CameraWorker:
             pose_inference=pose_inference,
             exclusion_zones=exclusion_zones,
             people_count_zones=people_count_zones,
+            inventory_zones=inventory_zones,
         )
 
         self._stop_event = threading.Event()

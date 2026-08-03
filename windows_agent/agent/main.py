@@ -174,6 +174,7 @@ def _map_remote_camera(c: dict) -> CameraConfig:
         confidence=conf,
         people_count_zones=c.get("people_count_zones") or [],
         exclusion_zones=c.get("exclusion_zones") or [],
+        inventory_zones=c.get("inventory_zones") or [],
     )
 
 
@@ -198,6 +199,7 @@ def _build_worker(cam):
         pose_inference=_pose_inference,
         people_count_zones=getattr(cam, "people_count_zones", []),
         exclusion_zones=getattr(cam, "exclusion_zones", []),
+        inventory_zones=getattr(cam, "inventory_zones", []),
     )
 
 
@@ -254,6 +256,9 @@ def reconcile_cameras():
             )
             or desired[cam_id].exclusion_zones != getattr(
                 w.config, "exclusion_zones", []
+            )
+            or desired[cam_id].inventory_zones != getattr(
+                w.config, "inventory_zones", []
             )
         )
         if changed:
@@ -329,6 +334,7 @@ def start_monitoring():
             pose_inference=_pose_inference,
             people_count_zones=getattr(cam, "people_count_zones", []),
             exclusion_zones=getattr(cam, "exclusion_zones", []),
+            inventory_zones=getattr(cam, "inventory_zones", []),
         )
         worker.start()
         _workers.append(worker)

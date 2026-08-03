@@ -31,10 +31,11 @@ Design principles (honesty first)
    verdict attached) — verification only decides whether to also fire an
    SMS/WhatsApp/email/webhook, so a shop owner reviewing incidents never
    loses visibility even when verification disagrees.
-4. Scoped to event types where a single still frame can plausibly confirm
+4. Scoped to event types where an image comparison can plausibly confirm
    or refute the claim (shoplifting, restricted_zone, loitering,
-   suspicious_behavior, fall_detected). Not used for count-based events
-   (people_count, queue_length, crowding) where a still frame can't
+   suspicious_behavior, fall_detected — single still frame; inventory_movement
+   — baseline-vs-current two-image comparison). Not used for count-based
+   events (people_count, queue_length, crowding) where a still frame can't
    meaningfully validate a threshold crossing.
 """
 from __future__ import annotations
@@ -59,6 +60,7 @@ VERIFIABLE_EVENT_TYPES = {
     "suspicious_behavior",
     "suspicious_behaviour",
     "fall_detected",
+    "inventory_movement",
 }
 
 _PROMPTS: dict[str, str] = {
@@ -104,8 +106,113 @@ _PROMPTS: dict[str, str] = {
         "fallen or is in the process of falling? A standing/sitting/normal posture "
         "or an unclear frame should be answered as NOT matching."
     ),
+    "inventory_movement": (
+        "This still image was flagged by an automated retail shelf-monitoring "
+        "system as possible INVENTORY MOVEMENT (a product removed, added, or "
+        "rearranged on this shelf/display area, without an obvious restocking "
+        "explanation). Judge only what is visible in this single frame: does it "
+        "plausibly show a shelf/display with a noticeable gap, missing product, "
+        "or disturbed arrangement? A fully and neatly stocked area, or an "
+        "unclear/low-quality frame, should be answered as NOT matching."
+    ),
 }
 _PROMPTS["suspicious_behaviour"] = _PROMPTS["suspicious_behavior"]
+
+# ---------------------------------------------------------------------------
+# Inventory movement: reference (baseline "stocked") vs current comparison.
+# ---------------------------------------------------------------------------
+# Unlike the other event types above, the edge agent's InventoryMovementDetector
+# attaches BOTH a baseline crop (captured when the shelf zone last looked
+# stable/unoccupied) and the current crop that triggered the candidate event.
+# A direct before/after comparison lets the VLM judge a genuine change instead
+# of guessing from a single frame what "normal" looks like for that shelf.
+
+_INVENTORY_SYSTEM_PROMPT = (
+    "You are a careful, honest visual auditor for a retail shelf-monitoring "
+    "system. You will be shown a BASELINE photo of a shelf/display area (what "
+    "it normally looked like) and a CURRENT photo of the same area, followed "
+    "by a claim that an automated detector flagged the area as changed (a "
+    "product possibly removed, added, or rearranged). Compare the two images "
+    "carefully. Judge ONLY what is visibly different between them — ignore "
+    "lighting, angle, or exposure differences that don't reflect an actual "
+    "change to the products. When genuinely unsure or an image is unclear/"
+    "dark/blurry, say so and answer 'matches: false' with a lower confidence "
+    "rather than guessing yes. Respond with ONLY a JSON object, no other "
+    'text: {"matches": true|false, "confidence": 0.0-1.0, "reasoning": "one short sentence"}'
+)
+
+_INVENTORY_PROMPT = (
+    "The CURRENT photo was flagged as possibly showing a product removed, "
+    "added, or rearranged compared to the BASELINE photo of the same shelf/"
+    "display area. Does the CURRENT photo plausibly show a real, meaningful "
+    "change versus the BASELINE (e.g. a gap where a product used to be, a "
+    "new item present, items visibly moved)? Minor lighting/angle differences "
+    "or no real change should be answered as NOT matching."
+)
+
+
+async def verify_inventory_change(reference_bytes: bytes, current_bytes: bytes) -> Optional[dict]:
+    """Two-image reference-vs-current VLM check for ``inventory_movement``.
+
+    Same fail-open contract as ``verify_incident``: returns None whenever
+    verification is disabled, misconfigured, unreachable, or the response
+    can't be parsed — meaning "could not verify", so the caller must dispatch
+    the alert exactly as it would without verification.
+    """
+    if not is_enabled():
+        return None
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    ref_b64 = base64.b64encode(reference_bytes).decode()
+    cur_b64 = base64.b64encode(current_bytes).decode()
+
+    payload = {
+        "model": _MODEL,
+        "max_tokens": 150,
+        "messages": [
+            {"role": "system", "content": _INVENTORY_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "BASELINE photo (normal/stocked):"},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{ref_b64}"}},
+                    {"type": "text", "text": "CURRENT photo (flagged as changed):"},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{cur_b64}"}},
+                    {"type": "text", "text": _INVENTORY_PROMPT},
+                ],
+            },
+        ],
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT_SEC) as client:
+            resp = await client.post(
+                _API_URL,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+        if resp.status_code != 200:
+            logger.warning(
+                "VLM inventory verification API returned %s — failing open",
+                resp.status_code,
+            )
+            return None
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"].strip()
+        if content.startswith("```"):
+            content = content.strip("`")
+            if content.lower().startswith("json"):
+                content = content[4:]
+        parsed = json.loads(content)
+        matches = bool(parsed.get("matches"))
+        confidence = float(parsed.get("confidence", 0.5))
+        reasoning = str(parsed.get("reasoning", ""))[:300]
+        return {"matches": matches, "confidence": confidence, "reasoning": reasoning}
+    except Exception:  # noqa: BLE001 — any failure here must fail open
+        logger.exception(
+            "VLM inventory verification failed — failing open (alert will still dispatch)"
+        )
+        return None
 
 _SYSTEM_PROMPT = (
     "You are a careful, honest visual auditor for a retail security system. "

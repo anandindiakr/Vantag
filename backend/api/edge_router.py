@@ -111,6 +111,42 @@ def _normalized_exclusion_zones(c) -> list[dict]:
         out.append({**z, "bbox": norm, "normalized": True})
     return out
 
+def _normalized_inventory_zones(c) -> list[dict]:
+    """Return the camera's shelf/inventory zones with bbox normalized to 0-1.
+
+    Same reference-resolution → fraction conversion as
+    ``_normalized_people_count_zones`` above, applied to zones stored under
+    ``analyzer_config.inventory_movement.zones`` (the Zone Editor's Shelf/
+    Inventory zone type). These zones were previously saved to the DB by the
+    Zone Editor UI but never sent to the edge agent at all, so a configured
+    shelf zone had zero effect on real detection — this is the fix.
+    """
+    zones = (
+        (getattr(c, "analyzer_config", None) or {})
+        .get("inventory_movement", {})
+        .get("zones", [])
+    )
+    ref_w = float(getattr(c, "resolution_width", None) or 1920)
+    ref_h = float(getattr(c, "resolution_height", None) or 1080)
+    out: list[dict] = []
+    for z in zones:
+        bbox = z.get("bbox") or []
+        if len(bbox) != 4:
+            continue
+        x1, y1, x2, y2 = (float(v) for v in bbox)
+        if max(x1, y1, x2, y2) <= 1.0:
+            norm = [x1, y1, x2, y2]
+        else:
+            norm = [
+                max(0.0, min(1.0, x1 / ref_w)),
+                max(0.0, min(1.0, y1 / ref_h)),
+                max(0.0, min(1.0, x2 / ref_w)),
+                max(0.0, min(1.0, y2 / ref_h)),
+            ]
+        out.append({**z, "bbox": norm, "normalized": True})
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Live pipeline wiring (populated by main.py via set_pipeline) + snapshot store
 # ---------------------------------------------------------------------------
@@ -516,6 +552,7 @@ async def register_agent(
                 "resolution_height": c.resolution_height,
                 "people_count_zones": _normalized_people_count_zones(c),
                 "exclusion_zones": _normalized_exclusion_zones(c),
+                "inventory_zones": _normalized_inventory_zones(c),
             }
             for c in cameras
         ],
@@ -947,7 +984,28 @@ async def ingest_event(
             if "," in raw_snapshot and raw_snapshot.strip().lower().startswith("data:"):
                 raw_snapshot = raw_snapshot.split(",", 1)[1]
             snapshot_bytes = base64.b64decode(raw_snapshot)
-            vlm_result = await vlm_verification_service.verify_incident(event_type, snapshot_bytes)
+
+            # inventory_movement candidates come with a baseline ("before
+            # the change") crop and the current ("after") crop attached by
+            # the edge agent's InventoryMovementDetector — a direct
+            # before/after comparison is materially more accurate than
+            # judging a single still frame, so prefer it when available.
+            ref_b64 = cur_b64 = None
+            if event_type == "inventory_movement" and isinstance(body.metadata, dict):
+                ref_b64 = body.metadata.get("reference_snapshot_b64")
+                cur_b64 = body.metadata.get("current_crop_b64")
+
+            def _decode(b64: str) -> bytes:
+                if "," in b64 and b64.strip().lower().startswith("data:"):
+                    b64 = b64.split(",", 1)[1]
+                return base64.b64decode(b64)
+
+            if ref_b64 and cur_b64:
+                vlm_result = await vlm_verification_service.verify_inventory_change(
+                    _decode(ref_b64), _decode(cur_b64)
+                )
+            else:
+                vlm_result = await vlm_verification_service.verify_incident(event_type, snapshot_bytes)
         except Exception:  # noqa: BLE001 — verification must never break ingestion
             logger.exception("VLM verification threw for event %s camera %s", event_type, body.camera_id)
             vlm_result = None
@@ -958,7 +1016,14 @@ async def ingest_event(
                 agent.tenant_id, body.camera_id, event_type,
                 vlm_result["confidence"], vlm_result["reasoning"],
             )
-        body.metadata = {**(body.metadata or {}), "vlm_verification": vlm_result}
+        # Drop the (large) raw comparison crops before persisting — they've
+        # already served their purpose for verification and would otherwise
+        # bloat every stored incident's metadata blob.
+        clean_metadata = {
+            k: v for k, v in (body.metadata or {}).items()
+            if k not in ("reference_snapshot_b64", "current_crop_b64")
+        }
+        body.metadata = {**clean_metadata, "vlm_verification": vlm_result}
 
     # 3) Persist the audit row in the per-tenant detection_events table.
     event = DetectionEvent(
@@ -1058,6 +1123,7 @@ async def get_config(
                 "confidence_threshold": (getattr(c, "analyzer_config", None) or {}).get("confidence_threshold"),
                 "people_count_zones": _normalized_people_count_zones(c),
                 "exclusion_zones": _normalized_exclusion_zones(c),
+                "inventory_zones": _normalized_inventory_zones(c),
             }
             for c in cameras
         ]
