@@ -88,58 +88,63 @@ def _zone_description(event_type: str, zone_name: str, zone_label: str, camera_i
     """
     cam   = camera_id
     coord = f"[{', '.join(str(v) for v in bbox)}]" if bbox else "N/A"
-    now_t = datetime.now().strftime("%H:%M:%S")
+    # NOTE: deliberately no embedded clock time here. The incident's
+    # Timestamp column already renders `created_at` converted to the
+    # viewer's local timezone in the browser (toLocaleString); a second,
+    # separately-formatted server-local (UTC) time baked into this text
+    # would silently disagree with that column for any viewer not in the
+    # UTC timezone — which is exactly what was reported.
 
     if event_type == "inventory_movement":
         return (
-            f"Item count change detected in {zone_label} zone \"{zone_name}\" on {cam} at {now_t}. "
+            f"Item count change detected in {zone_label} zone \"{zone_name}\" on {cam}. "
             f"No authorised staff detected in vicinity at time of event. "
             f"Zone coordinates: {coord}."
         )
     if event_type == "shoplifting":
         return (
             f"Rapid product removal activity detected near {zone_label} zone \"{zone_name}\" "
-            f"on {cam} at {now_t}. Suspect last seen at zone boundary. "
+            f"on {cam}. Suspect last seen at zone boundary. "
             f"Zone coordinates: {coord}."
         )
     if event_type == "restricted_zone":
         return (
-            f"Unauthorised entry into restricted area \"{zone_name}\" on {cam} at {now_t}. "
+            f"Unauthorised entry into restricted area \"{zone_name}\" on {cam}. "
             f"Person detected inside zone. No access permission on record for this time window. "
             f"Zone coordinates: {coord}."
         )
     if event_type == "queue_breach":
         return (
-            f"Queue length exceeded configured threshold in \"{zone_name}\" on {cam} at {now_t}. "
+            f"Queue length exceeded configured threshold in \"{zone_name}\" on {cam}. "
             f"Checkout assistance may be required. "
             f"Zone coordinates: {coord}."
         )
     if event_type == "loitering":
         return (
             f"Individual stationary beyond configured dwell threshold in "
-            f"\"{zone_name}\" ({zone_label}) on {cam} at {now_t}. "
+            f"\"{zone_name}\" ({zone_label}) on {cam}. "
             f"Zone coordinates: {coord}."
         )
     if event_type == "fall_detected":
         return (
-            f"Person-down event detected near \"{zone_name}\" zone on {cam} at {now_t}. "
+            f"Person-down event detected near \"{zone_name}\" zone on {cam}. "
             f"Pose analysis indicates possible fall. Immediate attention required. "
             f"Zone coordinates: {coord}."
         )
     if event_type == "face_match":
         return (
-            f"Positive watchlist match detected near \"{zone_name}\" zone on {cam} at {now_t}. "
+            f"Positive watchlist match detected near \"{zone_name}\" zone on {cam}. "
             f"Elevated alert level — review evidence immediately. "
             f"Zone coordinates: {coord}."
         )
     if event_type == "tamper":
         return (
-            f"Camera tamper detected on {cam} at {now_t} — zone \"{zone_name}\" may be unmonitored. "
+            f"Camera tamper detected on {cam} — zone \"{zone_name}\" may be unmonitored. "
             f"Sudden scene change or physical occlusion of lens. "
             f"Zone coordinates: {coord}."
         )
     return (
-        f"Event \"{event_type}\" detected in zone \"{zone_name}\" ({zone_label}) on {cam} at {now_t}. "
+        f"Event \"{event_type}\" detected in zone \"{zone_name}\" ({zone_label}) on {cam}. "
         f"Zone coordinates: {coord}."
     )
 

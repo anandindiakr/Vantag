@@ -140,10 +140,63 @@ def _resolve_snapshot_file(snapshot_url: str | None) -> Optional[Path]:
         return None
 
 
+async def _resolve_occurred_at_local(camera_id: str, raw_timestamp: str) -> str:
+    """
+    Convert a stored UTC incident timestamp into a human-readable string in
+    the camera's configured local time (falls back to UTC if the camera or
+    its schedule tz_offset can't be resolved).
+
+    The offset reused here (``analyzer_config.detection_schedule.tz_offset_minutes``)
+    is the same value the camera's own Schedule tab already saves when a user
+    configures active hours — so this uses a timezone that has actually been
+    confirmed for that camera, rather than guessing the server's own timezone
+    (which is UTC and was previously being shown to users unconverted).
+    """
+    if not raw_timestamp or raw_timestamp == "N/A":
+        return "N/A"
+    try:
+        dt = datetime.fromisoformat(str(raw_timestamp).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return str(raw_timestamp)
+
+    offset_minutes = 0
+    try:
+        from sqlalchemy import select
+
+        from ..db.database import get_session
+        from ..db.models.camera import CameraConfig
+
+        async for session in get_session():
+            row = (
+                await session.execute(
+                    select(CameraConfig).where(CameraConfig.camera_id == camera_id)
+                )
+            ).scalars().first()
+            if row is not None and row.analyzer_config:
+                schedule = row.analyzer_config.get("detection_schedule") or {}
+                offset_minutes = int(schedule.get("tz_offset_minutes") or 0)
+            break
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Could not resolve camera tz offset for report | camera_id=%s error=%s",
+            camera_id, exc,
+        )
+
+    from datetime import timedelta
+
+    local_dt = dt.astimezone(timezone.utc) + timedelta(minutes=offset_minutes)
+    sign = "+" if offset_minutes >= 0 else "-"
+    hh, mm = divmod(abs(offset_minutes), 60)
+    return f"{local_dt.strftime('%d %b %Y, %I:%M:%S %p')} (UTC{sign}{hh:02d}:{mm:02d})"
+
+
 def _generate_pdf_report(
     report_id: str,
     incident_id: str,
     incident_data: dict,
+    occurred_at_local: str = "",
 ) -> Path:
     """
     Generate a minimal PDF incident report.
@@ -176,7 +229,7 @@ def _generate_pdf_report(
             ["Camera", incident_data.get("camera_id", "N/A")],
             ["Event Type", incident_data.get("type", "N/A")],
             ["Severity", incident_data.get("severity", "N/A")],
-            ["Occurred At", str(incident_data.get("timestamp", "N/A"))],
+            ["Occurred At", occurred_at_local or str(incident_data.get("timestamp", "N/A"))],
             ["Generated At", datetime.now(tz=timezone.utc).isoformat()],
         ]
 
@@ -278,11 +331,14 @@ def _find_incident(incident_id: str) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 
 
-def _bg_generate_report(report_id: str, incident_id: str, incident_data: dict) -> None:
+async def _bg_generate_report(report_id: str, incident_id: str, incident_data: dict) -> None:
     """Background task that generates the PDF and updates the registry."""
     store_id = incident_data.get("store_id", "unknown")
     try:
-        file_path = _generate_pdf_report(report_id, incident_id, incident_data)
+        occurred_at_local = await _resolve_occurred_at_local(
+            incident_data.get("camera_id", ""), incident_data.get("timestamp", "")
+        )
+        file_path = _generate_pdf_report(report_id, incident_id, incident_data, occurred_at_local)
         file_size = file_path.stat().st_size
         _register_report(
             report_id=report_id,
@@ -338,7 +394,10 @@ async def download_incident_report(
         "timestamp": datetime.now(tz=timezone.utc).isoformat(),
     }
     report_id = str(uuid.uuid4())
-    file_path = _generate_pdf_report(report_id, incident_id, incident_data)
+    occurred_at_local = await _resolve_occurred_at_local(
+        incident_data.get("camera_id", ""), incident_data.get("timestamp", "")
+    )
+    file_path = _generate_pdf_report(report_id, incident_id, incident_data, occurred_at_local)
     _register_report(
         report_id=report_id,
         incident_id=incident_id,
