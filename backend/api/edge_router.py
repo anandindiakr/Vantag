@@ -874,10 +874,19 @@ async def ingest_event(
         schedule = analyzer_config.get("detection_schedule") or {}
         if schedule.get("enabled"):
             try:
-                from datetime import datetime, timedelta, timezone as _tz
+                # NOTE: do NOT locally import `datetime` here — `datetime`
+                # is already imported at module scope (see top of file) and
+                # a local `from datetime import datetime` makes `datetime`
+                # a local variable for this ENTIRE function (Python's
+                # scoping rules apply per-function, not per-branch), which
+                # raises UnboundLocalError for any call that skips this
+                # branch (e.g. shoplifting/theft events, which intentionally
+                # bypass the schedule check below) but still references the
+                # module-level `datetime` further down in the function.
+                from datetime import timedelta
 
                 offset_min = int(schedule.get("tz_offset_minutes") or 0)
-                local_now = datetime.now(_tz.utc) + timedelta(minutes=offset_min)
+                local_now = datetime.now(timezone.utc) + timedelta(minutes=offset_min)
                 now_hm = local_now.strftime("%H:%M")
                 start = str(schedule.get("start") or "00:00")
                 end = str(schedule.get("end") or "23:59")
