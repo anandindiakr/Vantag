@@ -32,6 +32,10 @@ class DetectionEvent(Base):
     risk_score: Mapped[float | None] = mapped_column(Float)
     snapshot_url: Mapped[str | None] = mapped_column(Text)
     location: Mapped[str | None] = mapped_column(String(200))
+    # Denormalised at ingest so per-store analytics stay correct even if the
+    # camera is later reassigned to a different site. Nullable: pre-existing
+    # rows have no site, and those fall back to the legacy derived store id.
+    site_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     event_meta: Mapped[dict | None] = mapped_column(JSONB)
     acknowledged: Mapped[bool] = mapped_column(default=False)
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

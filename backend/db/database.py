@@ -70,14 +70,24 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Create all tables (used in development; production uses Alembic)."""
+    """Create all tables and apply idempotent additive column migrations.
+
+    NOTE: this project has no Alembic. `create_all` plus the explicit
+    ADD COLUMN IF NOT EXISTS list below IS the migration mechanism, and it
+    runs on every backend boot. A new model is only created if it is imported
+    here — forgetting the import means the table silently never exists.
+    """
     # Import models so they register with Base.metadata before create_all
     from .models import tenant as _tenant  # noqa: F401
+    # `site` MUST be imported before `camera`: camera_configs.site_id has an FK
+    # to sites.id, so sites has to exist in the metadata sort order first.
+    from .models import site as _site  # noqa: F401
     from .models import camera as _camera  # noqa: F401
     from .models import event as _event  # noqa: F401
     from .models import billing as _billing  # noqa: F401
     from .models import admin as _admin  # noqa: F401
     from .models import partner as _partner  # noqa: F401
+
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -96,7 +106,21 @@ async def init_db() -> None:
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ",
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ",
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS login_count INTEGER DEFAULT 0",
+            # Multi-store. Added AFTER the sites table is created by
+            # create_all above, otherwise the FK target would not exist.
+            # Nullable + ON DELETE SET NULL so removing a site never deletes
+            # a customer's cameras, it just unassigns them.
+            "ALTER TABLE camera_configs ADD COLUMN IF NOT EXISTS site_id VARCHAR(36) "
+            "REFERENCES sites(id) ON DELETE SET NULL",
+            "CREATE INDEX IF NOT EXISTS ix_camera_configs_site_id ON camera_configs(site_id)",
+            "ALTER TABLE detection_events ADD COLUMN IF NOT EXISTS site_id VARCHAR(36)",
+            "CREATE INDEX IF NOT EXISTS ix_detection_events_site_id ON detection_events(site_id)",
+            # Pins an edge agent to one site. NULL = receive all tenant
+            # cameras (existing behaviour for every install today).
+            "ALTER TABLE edge_agents ADD COLUMN IF NOT EXISTS site_id VARCHAR(36)",
+            "CREATE INDEX IF NOT EXISTS ix_edge_agents_site_id ON edge_agents(site_id)",
         )
+
         for _sql in _stmts:
             try:
                 await conn.exec_driver_sql(_sql)

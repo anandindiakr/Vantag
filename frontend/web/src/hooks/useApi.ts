@@ -109,6 +109,8 @@ const normStore = (r: any): Store => ({
   openHours:   r.open_hours
                  ? { open: r.open_hours.split('-')[0] ?? '09:00', close: r.open_hours.split('-')[1] ?? '21:00' }
                  : (r.openHours ?? { open: '09:00', close: '21:00' }),
+  isManaged:   r.is_managed === true,
+  siteId:      r.site_id ?? null,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -444,6 +446,83 @@ export function useDeleteWatchlistEntry(): UseMutationResult<void, Error, string
   return useMutation({
     mutationFn: async (id: string) => { await api.delete(`/watchlist/${id}`); },
     onSuccess:  () => { void qc.invalidateQueries({ queryKey: queryKeys.watchlist }); },
+  });
+}
+
+// ─── Store (multi-site) management ────────────────────────────────────────────
+// These back the Stores page. A "store" is now a real `sites` row, so it can be
+// created/renamed/deleted. Tenants that never create one keep seeing the legacy
+// store id derived from each camera's location text.
+
+export interface StoreInput {
+  name: string;
+  address?: string;
+  city?: string;
+  timezone_name?: string;
+  open_time?: string;
+  close_time?: string;
+}
+
+export function useCreateStore(): UseMutationResult<unknown, Error, StoreInput> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: StoreInput) => (await api.post('/stores', body)).data,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: queryKeys.stores }); },
+  });
+}
+
+export function useUpdateStore(): UseMutationResult<
+  unknown, Error, { storeId: string; body: Partial<StoreInput> }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ storeId, body }) =>
+      (await api.patch(`/stores/${encodeURIComponent(storeId)}`, body)).data,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: queryKeys.stores }); },
+  });
+}
+
+export function useDeleteStore(): UseMutationResult<unknown, Error, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (storeId: string) =>
+      (await api.delete(`/stores/${encodeURIComponent(storeId)}`)).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.stores });
+      void qc.invalidateQueries({ queryKey: queryKeys.cameras });
+    },
+  });
+}
+
+export function useAssignCamerasToStore(): UseMutationResult<
+  unknown, Error, { storeId: string; cameraIds: string[] }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ storeId, cameraIds }) =>
+      (await api.post(`/stores/${encodeURIComponent(storeId)}/cameras`, {
+        camera_ids: cameraIds,
+      })).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.stores });
+      void qc.invalidateQueries({ queryKey: queryKeys.cameras });
+    },
+  });
+}
+
+export function useUnassignCamera(): UseMutationResult<
+  unknown, Error, { storeId: string; cameraId: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ storeId, cameraId }) =>
+      (await api.delete(
+        `/stores/${encodeURIComponent(storeId)}/cameras/${encodeURIComponent(cameraId)}`,
+      )).data,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.stores });
+      void qc.invalidateQueries({ queryKey: queryKeys.cameras });
+    },
   });
 }
 

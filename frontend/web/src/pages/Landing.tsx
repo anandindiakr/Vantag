@@ -36,7 +36,7 @@ const AI_FEATURES = [
     category: 'SECURITY',
     categoryColor: '#ff3c3c',
     title: 'Shoplifting Detection',
-    desc: 'Identifies concealment and product-sweep behaviour in real time. Triggers critical alerts before the shoplifter reaches the exit.',
+    desc: 'Flags concealment and product-sweep behaviour in real time and sends you the clip. Built as a triage layer — it surfaces the seconds worth watching so your team stops scrubbing hours of footage.',
     badge: 'CRITICAL',
   },
   {
@@ -141,10 +141,17 @@ const HOW_IT_WORKS = [
 ];
 
 const STATS = [
+  // "95%+" is deliberately a REVIEW-REDUCTION claim, not a detection-accuracy
+  // claim. Independent benchmarks on real (non-staged) in-store footage put
+  // shoplifting detection at roughly 69% AUC — no vendor, us included, can
+  // honestly claim 95% theft-detection accuracy. What the platform genuinely
+  // does is cut the volume of footage a human has to review by 95%+, which is
+  // the defensible and verifiable claim. Do not change this to an accuracy
+  // percentage.
+  { value: '95%+', label: 'Less footage to review' },
   { value: '11', label: 'AI Models' },
   { value: '< 30m', label: 'Setup time' },
   { value: '2–30', label: 'Cameras' },
-  { value: '3', label: 'Countries' },
 ];
 
 /* ─────────────────────────────────────────────────────────
@@ -314,7 +321,7 @@ export default function Landing() {
     >
       <Seo
         title="Retail Nazar — AI CCTV Theft Detection & Store Analytics"
-        description="Turn your existing CCTV cameras into an AI-powered security and analytics system. Real-time shoplifting alerts, footfall analytics and restricted zone monitoring for Indian retail stores."
+        description="Turn your existing CCTV cameras into an AI-powered security and analytics system. Reduces footage needing review by 95%+ — real-time shoplifting alerts, footfall analytics and restricted zone monitoring for retail stores."
         path="/"
         jsonLd={{
           '@context': 'https://schema.org',
@@ -451,8 +458,18 @@ export default function Landing() {
               <span className="text-white">Zero Blind Spots.</span>
             </h1>
 
-            <p className="text-[1.1rem] text-white/50 leading-relaxed mb-10 max-w-lg font-body-alt">
+            <p className="text-[1.1rem] text-white/50 leading-relaxed mb-6 max-w-lg font-body-alt">
               The DIY AI security platform for <strong className="text-white/80">shops, malls, hospitals, post offices, police stations, small offices and homes</strong>. Turn any existing IP camera into a 24/7 guardian — detects shoplifting, loitering, falls, empty shelves, intrusion and more. Plug &amp; play. 30-minute setup.
+            </p>
+
+            {/* The honest headline claim. See the note on STATS above: this is a
+                review-reduction claim, which is measurable and defensible, NOT a
+                theft-detection accuracy claim, which no vendor can substantiate. */}
+            <p className="text-[1.05rem] leading-relaxed mb-10 max-w-lg font-body-alt text-white/70">
+              <strong className="text-cyan-400">Reduces footage needing review by 95%+.</strong>{' '}
+              Instead of scrubbing hours of video, your team reviews only the
+              seconds the AI flagged — with the clip, the zone and the timestamp
+              already attached.
             </p>
 
             <div className="flex flex-wrap gap-4 items-center mb-14">

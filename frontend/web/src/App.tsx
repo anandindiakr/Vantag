@@ -41,6 +41,7 @@ const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
 const StaffFacesPage = lazy(() => import('./pages/StaffFacesPage'));
 const PeopleCountPage = lazy(() => import('./pages/PeopleCountPage'));
 const StoreDetail  = lazy(() => import('./pages/StoreDetail'));
+const StoresPage   = lazy(() => import('./pages/StoresPage'));
 const DownloadPage = lazy(() => import('./pages/DownloadPage'));
 const AgentStatusPage = lazy(() => import('./pages/AgentStatusPage'));
 const AccountPage    = lazy(() => import('./pages/AccountPage'));
@@ -160,6 +161,7 @@ export default function App() {
               <Route path="/watchlist"  element={<WatchlistPage />} />
               <Route path="/staff-faces" element={<StaffFacesPage />} />
               <Route path="/people-count" element={<PeopleCountPage />} />
+              <Route path="/stores"     element={<StoresPage />} />
               <Route path="/stores/:id" element={<StoreDetail />} />
               <Route path="/download"   element={<DownloadPage />} />
               <Route path="/agent-status" element={<AgentStatusPage />} />

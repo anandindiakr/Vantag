@@ -33,6 +33,7 @@ from ..db.database import get_session
 from ..db.models.tenant import EdgeAgent, Tenant
 from ..db.models.camera import CameraConfig
 from ..db.models.event import DetectionEvent
+from ..db.models.site import derive_legacy_store_id
 from ..middleware.tenant_middleware import get_current_user_id
 from ..services.tenant_alerts import dispatch_tenant_alert
 from ..services import staff_face_service
@@ -1006,16 +1007,29 @@ async def ingest_event(
             agent.tenant_id, body.camera_id, body.snapshot_b64
         )
 
-    # 2) Derive the store_id the dashboard keys incidents by (from the
-    #    camera's location, mirroring stores_router._camera_store_id).
+    # 2) Resolve the store the dashboard keys incidents by.
+    #    This used to slugify camera.location inline, splitting ONLY on the
+    #    en-dash while cameras_router/stores_router split on en-dash AND
+    #    hyphen — so the same camera produced two different store ids and its
+    #    incidents landed under a store the dashboard never showed. Now it
+    #    goes through CameraConfig.effective_store_id, the single definition.
     location = body.location
-    if location is None:
-        try:
-            if camera is not None:
+    site_id = None
+    if camera is not None:
+        if location is None:
+            try:
                 location = camera.location
+            except Exception:  # noqa: BLE001
+                location = None
+        site_id = getattr(camera, "site_id", None)
+
+    if camera is not None:
+        try:
+            store_id = camera.effective_store_id
         except Exception:  # noqa: BLE001
-            location = None
-    store_id = (location or "auto-detected").split("–")[0].strip().lower().replace(" ", "_")
+            store_id = derive_legacy_store_id(location)
+    else:
+        store_id = derive_legacy_store_id(location)
 
     # 2b) Staff face suppression: the edge agent attaches a native-resolution
     #     person crop to person-centric events. Match it against the enrolled
@@ -1149,6 +1163,7 @@ async def ingest_event(
         confidence=body.confidence,
         risk_score=body.risk_score,
         location=location,
+        site_id=site_id,
         snapshot_url=snapshot_url,
         event_meta=body.metadata,
     )
@@ -1219,11 +1234,21 @@ async def get_config(
     agent: EdgeAgent = Depends(_verify_agent),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Edge agent polls this to get latest camera configs."""
-    result = await session.execute(
+    """Edge agent polls this to get latest camera configs.
+
+    Multi-store scoping: if this agent is pinned to a site, it only receives
+    that site's cameras. An unpinned agent (``site_id`` NULL — every existing
+    install) still receives all tenant cameras, so this deploy changes nothing
+    for single-store customers.
+    """
+    stmt = (
         select(CameraConfig)
         .where(CameraConfig.tenant_id == agent.tenant_id, CameraConfig.enabled == True)
     )
+    agent_site = getattr(agent, "site_id", None)
+    if agent_site:
+        stmt = stmt.where(CameraConfig.site_id == agent_site)
+    result = await session.execute(stmt)
     cameras = result.scalars().all()
     return {
         "cameras": [

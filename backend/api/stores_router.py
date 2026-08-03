@@ -24,12 +24,15 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from pydantic import BaseModel, Field
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ..middleware.tenant_middleware import get_current_user_id
 from ..db.database import get_session
 from ..db.models.camera import CameraConfig
+from ..db.models.site import Site, slugify_site
 
 from .models import (
     HeatmapCell,
@@ -112,12 +115,16 @@ async def list_stores(
     user: dict = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ) -> List[StoreResponse]:
-    """Return a list of all stores for the current tenant, derived from the
-    tenant-scoped camera table (the same source the edge agent uses).
+    """Return all stores for the current tenant.
 
-    Stores are inferred by grouping cameras on their ``location`` prefix, so a
-    store appears as soon as the user adds (or the agent discovers) a camera —
-    no separate "create store" step required.
+    Two sources, merged:
+
+    1. Real ``sites`` rows the tenant created (multi-store). These are
+       authoritative — they exist even with zero cameras assigned, so a new
+       branch shows up immediately instead of only after a camera is added.
+    2. Cameras with no ``site_id``, grouped by the LEGACY location-prefix
+       slug. This is what every existing install has today, and keeping it
+       means nobody's dashboard changes on deploy.
     """
     tenant_id = user.get("tenant_id")
     if not tenant_id:
@@ -126,20 +133,30 @@ async def list_stores(
     try:
         rows = (
             await session.execute(
-                select(CameraConfig).where(CameraConfig.tenant_id == tenant_id)
+                select(CameraConfig)
+                .where(CameraConfig.tenant_id == tenant_id)
+                .options(selectinload(CameraConfig.site))
+            )
+        ).scalars().all()
+        sites = (
+            await session.execute(
+                select(Site).where(Site.tenant_id == tenant_id).order_by(Site.created_at)
             )
         ).scalars().all()
     except Exception as exc:  # noqa: BLE001
         logger.warning("Failed to load stores from DB | tenant=%s err=%s", tenant_id, exc)
         return []
 
-    # Group cameras by inferred store id.
-    store_camera_map: dict = {}
+    # Seed with real sites so a branch with no cameras yet is still visible.
+    store_camera_map: dict = {s.slug: [] for s in sites}
+    site_by_slug = {s.slug: s for s in sites}
+
     for cam in rows:
-        location = cam.location or ""
-        prefix = location.split("\u2013")[0].split("-")[0].strip() if location else ""
-        store_id = (prefix or "auto-detected").lower().replace(" ", "_")
-        store_camera_map.setdefault(store_id, []).append(cam)
+        # effective_store_id is the single source of truth for this mapping —
+        # do NOT re-derive the slug here, that duplication is what previously
+        # let the same camera land under two different store ids.
+        store_camera_map.setdefault(cam.effective_store_id, []).append(cam)
+
 
     # Pull live risk/events from the in-memory pipeline when it is available
     # (single-tenant / on-box deployments). Safe no-op for SaaS tenants.
@@ -169,20 +186,267 @@ async def list_stores(
             store_id.replace("_", " ").title(),
         )
 
+        # A real Site row wins: it carries the name/address the user actually
+        # typed, instead of a slug reverse-engineered back into Title Case.
+        site = site_by_slug.get(store_id)
+        display_name = site.name if site is not None else store_id.replace("_", " ").title()
+        if site is not None and (site.address or site.city):
+            location_label = ", ".join(p for p in (site.address, site.city) if p)
+
         stores.append(
             StoreResponse(
                 store_id=store_id,
-                name=store_id.replace("_", " ").title(),
+                name=display_name,
                 location=location_label,
                 camera_count=len(cams),
                 active_cameras=active,
                 risk_score=round(score, 2),
                 risk_severity=_score_to_severity(score),
                 last_event_at=last_event_at,
+                is_managed=site is not None,
+                site_id=site.id if site is not None else None,
             )
         )
 
     return stores
+
+
+# ---------------------------------------------------------------------------
+# Store (Site) management — real CRUD.
+#
+# Before this, /api/stores was read-only and a "store" was a slug derived from
+# camera_configs.location, so stores could not be created, renamed or deleted
+# and renaming a camera silently moved it to another store. These endpoints
+# back the store list with a real, tenant-scoped `sites` row.
+#
+# Route ordering note: these use POST/PATCH/DELETE, so they never shadow the
+# existing GET /{store_id} route below.
+# ---------------------------------------------------------------------------
+
+
+class SiteCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    address: Optional[str] = Field(None, max_length=2000)
+    city: Optional[str] = Field(None, max_length=120)
+    timezone_name: str = Field("Asia/Kolkata", max_length=64)
+    open_time: str = Field("09:00", max_length=5)
+    close_time: str = Field("21:00", max_length=5)
+
+
+class SiteUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    address: Optional[str] = Field(None, max_length=2000)
+    city: Optional[str] = Field(None, max_length=120)
+    timezone_name: Optional[str] = Field(None, max_length=64)
+    open_time: Optional[str] = Field(None, max_length=5)
+    close_time: Optional[str] = Field(None, max_length=5)
+    is_active: Optional[bool] = None
+
+
+class SiteCameraAssign(BaseModel):
+    camera_ids: List[str] = Field(default_factory=list)
+
+
+def _site_payload(site: Site, camera_count: int = 0) -> dict:
+    return {
+        "id": site.id,
+        "store_id": site.slug,
+        "slug": site.slug,
+        "name": site.name,
+        "address": site.address,
+        "city": site.city,
+        "timezone_name": site.timezone_name,
+        "open_time": site.open_time,
+        "close_time": site.close_time,
+        "is_active": site.is_active,
+        "camera_count": camera_count,
+        "created_at": site.created_at.isoformat() if site.created_at else None,
+    }
+
+
+async def _unique_slug(session: AsyncSession, tenant_id: str, name: str,
+                       exclude_id: str | None = None) -> str:
+    """Slug that is unique within the tenant, suffixing _2, _3 … on collision."""
+    base = slugify_site(name)
+    candidate = base
+    n = 1
+    while True:
+        q = select(Site.id).where(Site.tenant_id == tenant_id, Site.slug == candidate)
+        if exclude_id:
+            q = q.where(Site.id != exclude_id)
+        clash = (await session.execute(q)).first()
+        if not clash:
+            return candidate
+        n += 1
+        candidate = f"{base}_{n}"
+
+
+@router.post("", status_code=status.HTTP_201_CREATED, summary="Create a store / branch")
+async def create_store(
+    body: SiteCreate,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
+
+    slug = await _unique_slug(session, str(tenant_id), body.name)
+    site = Site(
+        tenant_id=str(tenant_id),
+        name=body.name.strip(),
+        slug=slug,
+        address=body.address,
+        city=body.city,
+        timezone_name=body.timezone_name,
+        open_time=body.open_time,
+        close_time=body.close_time,
+    )
+    session.add(site)
+    await session.commit()
+    await session.refresh(site)
+    logger.info("Store created | tenant=%s slug=%s", tenant_id, slug)
+    return _site_payload(site)
+
+
+async def _load_site(session: AsyncSession, tenant_id: str, store_id: str) -> Site:
+    """Resolve a store_id (slug OR uuid) to a Site owned by this tenant."""
+    site = (
+        await session.execute(
+            select(Site).where(
+                Site.tenant_id == tenant_id,
+                (Site.slug == store_id) | (Site.id == store_id),
+            )
+        )
+    ).scalars().first()
+    if site is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No such store. Stores that were auto-derived from a camera's "
+                "location text are not editable — create a real store, then "
+                "assign its cameras to it."
+            ),
+        )
+    return site
+
+
+@router.patch("/{store_id}", summary="Rename / update a store")
+async def update_store(
+    store_id: str,
+    body: SiteUpdate,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
+
+    site = await _load_site(session, str(tenant_id), store_id)
+    data = body.model_dump(exclude_unset=True)
+
+    if "name" in data and data["name"] and data["name"].strip() != site.name:
+        site.name = data["name"].strip()
+        # Keep the slug stable on rename. Changing it would orphan every
+        # incident already recorded against the old slug.
+    for field in ("address", "city", "timezone_name", "open_time", "close_time", "is_active"):
+        if field in data and data[field] is not None:
+            setattr(site, field, data[field])
+
+    await session.commit()
+    await session.refresh(site)
+    return _site_payload(site)
+
+
+@router.delete("/{store_id}", summary="Delete a store")
+async def delete_store(
+    store_id: str,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
+
+    site = await _load_site(session, str(tenant_id), store_id)
+    # Cameras are UNASSIGNED, never deleted — site_id is ON DELETE SET NULL.
+    # They fall back to their legacy location-derived store id so nothing
+    # disappears from the customer's dashboard.
+    freed = (
+        await session.execute(
+            select(func.count()).select_from(CameraConfig).where(CameraConfig.site_id == site.id)
+        )
+    ).scalar() or 0
+    await session.delete(site)
+    await session.commit()
+    logger.info("Store deleted | tenant=%s slug=%s cameras_unassigned=%s",
+                tenant_id, site.slug, freed)
+    return {"deleted": True, "store_id": site.slug, "cameras_unassigned": int(freed)}
+
+
+@router.post("/{store_id}/cameras", summary="Assign cameras to a store")
+async def assign_cameras(
+    store_id: str,
+    body: SiteCameraAssign,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
+
+    site = await _load_site(session, str(tenant_id), store_id)
+
+    # Tenant scoping is enforced on the WHERE clause, not trusted from the
+    # body — a caller cannot move another tenant's camera into their store.
+    rows = (
+        await session.execute(
+            select(CameraConfig).where(
+                CameraConfig.tenant_id == str(tenant_id),
+                CameraConfig.camera_id.in_(body.camera_ids or []),
+            )
+        )
+    ).scalars().all()
+
+    for cam in rows:
+        cam.site_id = site.id
+    await session.commit()
+
+    matched = {c.camera_id for c in rows}
+    unknown = [c for c in (body.camera_ids or []) if c not in matched]
+    return {
+        "store_id": site.slug,
+        "assigned": sorted(matched),
+        "unknown_camera_ids": unknown,
+    }
+
+
+@router.delete("/{store_id}/cameras/{camera_id}", summary="Unassign a camera from a store")
+async def unassign_camera(
+    store_id: str,
+    camera_id: str,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
+
+    site = await _load_site(session, str(tenant_id), store_id)
+    cam = (
+        await session.execute(
+            select(CameraConfig).where(
+                CameraConfig.tenant_id == str(tenant_id),
+                CameraConfig.camera_id == camera_id,
+                CameraConfig.site_id == site.id,
+            )
+        )
+    ).scalars().first()
+    if cam is None:
+        raise HTTPException(status_code=404, detail="Camera not assigned to this store")
+    cam.site_id = None
+    await session.commit()
+    return {"store_id": site.slug, "unassigned": camera_id}
 
 
 # ---------------------------------------------------------------------------

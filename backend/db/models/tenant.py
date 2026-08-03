@@ -93,6 +93,13 @@ class EdgeAgent(Base):
     status: Mapped[str] = mapped_column(String(20), default="offline")  # online/offline
     capabilities: Mapped[dict | None] = mapped_column(JSONB)
     camera_count: Mapped[int] = mapped_column(Integer, default=0)
+    # Multi-store: pins this agent to one physical site. NULL keeps the
+    # historical behaviour (agent receives every camera in the tenant), so
+    # single-store installs are completely unaffected. When set,
+    # /api/edge/config returns only that site's cameras — a two-branch tenant
+    # previously had each branch's agent trying to reach the other branch's
+    # LAN IPs, which never resolve.
+    site_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     tenant: Mapped[Tenant] = relationship("Tenant", back_populates="edge_agents")

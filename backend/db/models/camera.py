@@ -55,6 +55,12 @@ class CameraConfig(Base):
     brand: Mapped[str | None] = mapped_column(String(100))
     model: Mapped[str | None] = mapped_column(String(100))
     location: Mapped[str | None] = mapped_column(String(200))
+    # Real store/branch this camera belongs to. NULLABLE on purpose: existing
+    # installs have no sites, and those cameras keep falling back to the legacy
+    # store_id derived from `location`. Nothing breaks until a tenant opts in.
+    site_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("sites.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     resolution_width: Mapped[int] = mapped_column(Integer, default=1920)
     resolution_height: Mapped[int] = mapped_column(Integer, default=1080)
     fps_target: Mapped[int] = mapped_column(Integer, default=15)
@@ -70,6 +76,36 @@ class CameraConfig(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="cameras")
+    # lazy="selectin" is deliberate: effective_store_id below is read from many
+    # request handlers, and under async SQLAlchemy a lazy relationship access
+    # raises MissingGreenlet. Eager-loading it here means every caller gets a
+    # correct store id without having to remember .options(selectinload(...)),
+    # which is exactly the kind of easy-to-forget detail that produced the
+    # original inconsistent-store_id bug. Cost is one small extra SELECT.
+    site = relationship("Site", back_populates="cameras", lazy="selectin")
+
+    @property
+    def effective_store_id(self) -> str:
+        """The store id to report for this camera.
+
+        Prefers the real Site slug. Falls back to the legacy location-prefix
+        slug so tenants who have not created sites see exactly what they saw
+        before. This is the ONLY place the choice is made — callers must not
+        re-derive it, which is what caused the two-competing-slug bug.
+        """
+        from .site import derive_legacy_store_id
+
+        # Fast path: no site assigned -> never touch the relationship at all,
+        # so this stays safe even on a detached/expired instance.
+        if not self.site_id:
+            return derive_legacy_store_id(self.location)
+        try:
+            site = self.site
+        except Exception:  # noqa: BLE001  (not loaded / detached)
+            site = None
+        if site is not None and getattr(site, "slug", None):
+            return site.slug
+        return derive_legacy_store_id(self.location)
 
     # ------------------------------------------------------------------
     # RTSP URL encryption helpers

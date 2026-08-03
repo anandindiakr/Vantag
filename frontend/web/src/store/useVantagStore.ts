@@ -14,6 +14,14 @@ export interface Store {
   active: boolean;
   timezone: string;
   openHours: { open: string; close: string };
+  /**
+   * True when this store is a real `sites` record the user created, and can
+   * therefore be renamed / deleted / have cameras assigned. False for legacy
+   * groups the backend derives from camera location text — there is no row
+   * behind those to edit.
+   */
+  isManaged?: boolean;
+  siteId?: string | null;
 }
 
 export interface Camera {

@@ -96,6 +96,16 @@ class StoreResponse(BaseModel):
     risk_score: float = Field(..., ge=0.0, le=100.0, description="Current composite risk score (0–100).")
     risk_severity: SeverityLevel = Field(..., description="Severity band derived from risk_score.")
     last_event_at: Optional[datetime] = Field(None, description="Timestamp of the most recent behavioral event.")
+    is_managed: bool = Field(
+        False,
+        description=(
+            "True when this store is a real `sites` row the tenant created, and "
+            "can therefore be renamed, deleted and have cameras assigned to it. "
+            "False for legacy groups auto-derived from camera location text, "
+            "which have no record behind them to edit."
+        ),
+    )
+    site_id: Optional[str] = Field(None, description="UUID of the backing site row, when managed.")
 
 
 class RiskScoreResponse(BaseModel):

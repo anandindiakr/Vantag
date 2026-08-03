@@ -19,6 +19,7 @@ import {
   MonitorCheck,
   UserCircle,
   UserCheck,
+  Store as StoreIcon,
   Wand2,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -39,6 +40,7 @@ const navItems: NavItem[] = [
   { label: 'Setup Wizard', to: '/setup',        icon: <Wand2 size={20} /> },
   { label: 'Cameras',      to: '/cameras',      icon: <Camera size={20} /> },
   { label: 'Manage Cameras', to: '/cameras/manage', icon: <Settings2 size={20} /> },
+  { label: 'Stores',       to: '/stores',       icon: <StoreIcon size={20} /> },
   { label: 'Incidents',    to: '/incidents',    icon: <AlertTriangle size={20} /> },
   { label: 'Watchlist',    to: '/watchlist',    icon: <Users size={20} /> },
   { label: 'Staff Faces',  to: '/staff-faces',  icon: <UserCheck size={20} /> },

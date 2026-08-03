@@ -32,12 +32,13 @@ from urllib.parse import quote, unquote
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from .models import CameraResponse, CameraStatus, ZonePolygon, ZoneUpdateRequest, SensitivityUpdateRequest
 from ..middleware.tenant_middleware import get_current_user_id, get_current_user_id_img
@@ -175,6 +176,11 @@ def _encode_jpeg(frame: np.ndarray, quality: int = 85) -> bytes:
     summary="List all cameras with health status",
 )
 async def list_cameras(
+    store_id: Optional[str] = Query(
+        None,
+        description="Filter to one store. Accepts a real site slug/uuid or a "
+                    "legacy location-derived store id.",
+    ),
     user: dict = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ) -> List[CameraResponse]:
@@ -184,6 +190,11 @@ async def list_cameras(
     user adds manually or that the edge agent auto-discovers both land in the
     tenant-scoped ``CameraConfig`` table, so the dashboard and the agent always
     agree on the camera list.
+
+    ``store_id`` used to be accepted by the frontend and silently ignored here,
+    so a multi-store tenant saw every branch's cameras on every store page. It
+    is now actually applied, matched against ``effective_store_id`` (real site
+    slug when assigned, legacy derived id otherwise).
     """
     tenant_id = user.get("tenant_id")
     if not tenant_id:
@@ -194,6 +205,7 @@ async def list_cameras(
             await session.execute(
                 select(CameraConfig)
                 .where(CameraConfig.tenant_id == tenant_id)
+                .options(selectinload(CameraConfig.site))
                 .order_by(CameraConfig.created_at)
             )
         ).scalars().all()
@@ -201,7 +213,15 @@ async def list_cameras(
         logger.warning("Failed to load cameras from DB | tenant=%s err=%s", tenant_id, exc)
         return []
 
+    if store_id:
+        wanted = store_id.strip()
+        rows = [
+            r for r in rows
+            if r.effective_store_id == wanted or (r.site_id and r.site_id == wanted)
+        ]
+
     return [_db_camera_to_response(row) for row in rows]
+
 
 
 def _db_camera_to_response(row) -> CameraResponse:  # noqa: ANN001
@@ -214,8 +234,15 @@ def _db_camera_to_response(row) -> CameraResponse:  # noqa: ANN001
         cam_status = CameraStatus.OFFLINE
 
     location = row.location or ""
-    prefix = location.split("\u2013")[0].split("-")[0].strip() if location else ""
-    store_id = (prefix or "auto-detected").lower().replace(" ", "_")
+    # Canonical: real site slug when the camera is assigned to a store,
+    # legacy location-derived id otherwise. Do NOT re-derive it here — the
+    # duplicated derivation is what previously let one camera resolve to two
+    # different store ids depending on which endpoint answered.
+    try:
+        store_id = row.effective_store_id
+    except Exception:  # noqa: BLE001  (site relationship not loaded)
+        prefix = location.split("\u2013")[0].split("-")[0].strip() if location else ""
+        store_id = (prefix or "auto-detected").lower().replace(" ", "_")
 
     try:
         rtsp = row.get_rtsp_url() if hasattr(row, "get_rtsp_url") else None
