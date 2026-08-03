@@ -552,6 +552,13 @@ class DetectionAnalyzer:
     # pattern used by restricted_zone/loitering above.
     _INVENTORY_CHANGE_THRESHOLD = 0.35
     _INVENTORY_DEBOUNCE_SEC = 5.0
+    # Shelf zones drawn in the UI are usually much wider than a single
+    # product slot. Comparing one histogram over the WHOLE zone dilutes a
+    # single item's removal into noise. Subdividing into a grid of cells and
+    # tracking a baseline PER CELL makes a single-slot removal a much larger
+    # (reliably detectable) fraction of that cell's own histogram.
+    _INVENTORY_GRID_ROWS = 2
+    _INVENTORY_GRID_COLS = 3
 
     def __init__(
         self,
@@ -742,14 +749,23 @@ class DetectionAnalyzer:
     def _analyze_inventory_zones(self, persons: list, frame: np.ndarray, now: float) -> list[dict]:
         """Real Tier-1 shelf/inventory-movement detection.
 
-        Replaces the previous no-op: for each configured shelf zone, keeps a
-        rolling baseline crop (captured whenever no person overlaps the
-        zone) and compares each new person-free frame's crop against it
-        using a cheap grayscale histogram correlation. A sustained
-        dissimilarity (not a single noisy frame) raises a candidate
-        ``inventory_movement`` event carrying BOTH the baseline and current
-        crops, so the backend's VLM verification step can confirm a genuine
-        change vs. normal restocking before any alert is dispatched.
+        For each configured shelf zone, subdivides it into a grid of cells
+        (``_INVENTORY_GRID_ROWS`` x ``_INVENTORY_GRID_COLS``) and tracks a
+        rolling baseline histogram PER CELL, not per whole zone. A shelf
+        zone is usually much wider than a single product slot, so comparing
+        the whole zone's histogram diluted a single item's removal into
+        noise — the grid keeps each comparison scoped to roughly one
+        product-slot's worth of pixels, making a single-item removal a much
+        bigger (and reliably detectable) fraction of that cell's histogram.
+
+        Each cell keeps a rolling baseline crop (captured whenever no person
+        overlaps that cell) and compares each new person-free frame's crop
+        against it using a cheap grayscale histogram correlation. A
+        sustained dissimilarity (not a single noisy frame) raises a
+        candidate ``inventory_movement`` event carrying BOTH the baseline
+        and current crops, so the backend's VLM verification step can
+        confirm a genuine change vs. normal restocking before any alert is
+        dispatched.
         """
         if not self._inventory_zones:
             return []
@@ -758,91 +774,130 @@ class DetectionAnalyzer:
         seen_keys: set[str] = set()
 
         for idx, zone in enumerate(self._inventory_zones):
-            key = str(zone.get("id") or idx)
-            seen_keys.add(key)
+            zone_key = str(zone.get("id") or idx)
+            seen_keys.add(zone_key)
             bbox_px = self._zone_pixel_bbox(zone, fw, fh)
             if bbox_px is None:
                 continue
-            if self._zone_has_person(bbox_px, persons, fw, fh):
-                continue
 
-            x1, y1, x2, y2 = bbox_px
-            crop = frame[y1:y2, x1:x2]
-            gray = cv2.cvtColor(cv2.resize(crop, (64, 64)), cv2.COLOR_BGR2GRAY)
-            hist = cv2.calcHist([gray], [0], None, [32], [0, 256])
-            cv2.normalize(hist, hist)
+            zx1, zy1, zx2, zy2 = bbox_px
+            zone_w, zone_h = zx2 - zx1, zy2 - zy1
+            rows, cols = self._INVENTORY_GRID_ROWS, self._INVENTORY_GRID_COLS
+            if zone_w < 60 or zone_h < 60:
+                # Too small to subdivide meaningfully — treat as one cell.
+                rows, cols = 1, 1
 
-            baseline_hist = self._inventory_baseline_hist.get(key)
-            if baseline_hist is None:
-                # First person-free look at this zone — establish baseline,
-                # nothing to compare against yet.
-                self._inventory_baseline_hist[key] = hist
-                self._inventory_baseline_crop[key] = crop.copy()
-                continue
+            for r in range(rows):
+                for c in range(cols):
+                    cx1 = zx1 + int(zone_w * c / cols)
+                    cx2 = zx1 + int(zone_w * (c + 1) / cols)
+                    cy1 = zy1 + int(zone_h * r / rows)
+                    cy2 = zy1 + int(zone_h * (r + 1) / rows)
+                    if cx2 - cx1 < 10 or cy2 - cy1 < 10:
+                        continue
+                    key = f"{zone_key}:{r}_{c}"
 
-            similarity = cv2.compareHist(baseline_hist, hist, cv2.HISTCMP_CORREL)
-            change_score = 1.0 - max(-1.0, min(1.0, similarity))
+                    if self._zone_has_person((cx1, cy1, cx2, cy2), persons, fw, fh):
+                        continue
 
-            if change_score < self._INVENTORY_CHANGE_THRESHOLD:
-                # Back to looking like baseline — any in-progress streak was
-                # noise (lighting flicker etc.), not a real change.
-                self._inventory_change_since.pop(key, None)
-                self._inventory_change_last_seen.pop(key, None)
-                continue
+                    crop = frame[cy1:cy2, cx1:cx2]
+                    gray = cv2.cvtColor(cv2.resize(crop, (64, 64)), cv2.COLOR_BGR2GRAY)
+                    hist = cv2.calcHist([gray], [0], None, [32], [0, 256])
+                    cv2.normalize(hist, hist)
 
-            first_seen = self._inventory_change_since.get(key)
-            if first_seen is None:
-                first_seen = now
-                self._inventory_change_since[key] = first_seen
-            self._inventory_change_last_seen[key] = now
+                    baseline_hist = self._inventory_baseline_hist.get(key)
+                    if baseline_hist is None:
+                        # First person-free look at this cell — establish
+                        # baseline, nothing to compare against yet.
+                        self._inventory_baseline_hist[key] = hist
+                        self._inventory_baseline_crop[key] = crop.copy()
+                        continue
 
-            if now - first_seen >= self._INVENTORY_DEBOUNCE_SEC:
-                ref_crop = self._inventory_baseline_crop.get(key, crop)
-                _, ref_buf = cv2.imencode(".jpg", ref_crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
-                _, cur_buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                    similarity = cv2.compareHist(baseline_hist, hist, cv2.HISTCMP_CORREL)
+                    change_score = 1.0 - max(-1.0, min(1.0, similarity))
 
-                # Tier 2: enrich the candidate change with a real
-                # open-vocabulary product count on both crops. This NEVER
-                # blocks or suppresses the Tier 1 event — if the detector is
-                # unavailable or errors, product_counts stays empty and the
-                # event still fires using only the Tier 1 CV signal.
-                extra_metadata = {
-                    "zone_id": key,
-                    "zone_label": zone.get("label") or "Shelf zone",
-                    "reference_snapshot_b64": base64.b64encode(ref_buf.tobytes()).decode(),
-                    "current_crop_b64": base64.b64encode(cur_buf.tobytes()).decode(),
-                }
-                if self._product_count_detector is not None:
-                    try:
-                        baseline_pc = self._product_count_detector.count_products(ref_crop)
-                        current_pc = self._product_count_detector.count_products(crop)
-                        if baseline_pc is not None and current_pc is not None:
-                            extra_metadata["baseline_product_count"] = baseline_pc["count"]
-                            extra_metadata["current_product_count"] = current_pc["count"]
-                            extra_metadata["product_count_delta"] = (
-                                current_pc["count"] - baseline_pc["count"]
-                            )
-                    except Exception as e:  # noqa: BLE001
-                        log.warning(f"Tier 2 product count enrichment failed (non-fatal): {e}")
+                    if change_score < self._INVENTORY_CHANGE_THRESHOLD:
+                        # Back to looking like baseline — any in-progress
+                        # streak was noise (lighting flicker etc.), not a
+                        # real change.
+                        self._inventory_change_since.pop(key, None)
+                        self._inventory_change_last_seen.pop(key, None)
+                        continue
 
-                evt = self._emit(
-                    "inventory_movement",
-                    min(0.95, 0.5 + change_score / 2),
-                    [],
-                    frame,
-                    extra_metadata=extra_metadata,
-                )
-                if evt:
-                    events.append(evt)
-                # Re-baseline to the new state so the same change doesn't
-                # keep re-firing every debounce window while it persists.
-                self._inventory_baseline_hist[key] = hist
-                self._inventory_baseline_crop[key] = crop.copy()
-                self._inventory_change_since.pop(key, None)
-                self._inventory_change_last_seen.pop(key, None)
+                    first_seen = self._inventory_change_since.get(key)
+                    if first_seen is None:
+                        first_seen = now
+                        self._inventory_change_since[key] = first_seen
+                    self._inventory_change_last_seen[key] = now
 
-        # Drop state for zones removed/edited out of existence in the UI.
-        stale = [k for k in self._inventory_baseline_hist if k not in seen_keys]
+                    if now - first_seen >= self._INVENTORY_DEBOUNCE_SEC:
+                        ref_crop = self._inventory_baseline_crop.get(key, crop)
+                        _, ref_buf = cv2.imencode(".jpg", ref_crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                        _, cur_buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 75])
+
+                        # Tier 2: enrich the candidate change with a real
+                        # open-vocabulary product count on both crops. This
+                        # NEVER blocks or suppresses the Tier 1 event — if
+                        # the detector is unavailable or errors, product
+                        # counts stay empty and the event still fires using
+                        # only the Tier 1 CV signal.
+                        extra_metadata = {
+                            "zone_id": zone_key,
+                            "zone_label": zone.get("label") or "Shelf zone",
+                            "cell": [r, c],
+                            "cell_bbox_px": [cx1, cy1, cx2, cy2],
+                            "reference_snapshot_b64": base64.b64encode(ref_buf.tobytes()).decode(),
+                            "current_crop_b64": base64.b64encode(cur_buf.tobytes()).decode(),
+                        }
+                        if self._product_count_detector is not None:
+                            try:
+                                baseline_pc = self._product_count_detector.count_products(ref_crop)
+                                current_pc = self._product_count_detector.count_products(crop)
+                                if baseline_pc is not None and current_pc is not None:
+                                    extra_metadata["baseline_product_count"] = baseline_pc["count"]
+                                    extra_metadata["current_product_count"] = current_pc["count"]
+                                    extra_metadata["product_count_delta"] = (
+                                        current_pc["count"] - baseline_pc["count"]
+                                    )
+                            except Exception as e:  # noqa: BLE001
+                                log.warning(f"Tier 2 product count enrichment failed (non-fatal): {e}")
+
+                        # Draw the changed cell (yellow box + zone label) on
+                        # the alert snapshot so the Incident evidence image
+                        # actually shows the zone that triggered the alert —
+                        # mirrors the annotated-snapshot pattern already used
+                        # for people-count evidence.
+                        annotated = frame.copy()
+                        cv2.rectangle(annotated, (cx1, cy1), (cx2, cy2), (0, 200, 255), 3)
+                        cv2.putText(
+                            annotated, zone.get("label") or "Shelf zone",
+                            (cx1 + 4, max(14, cy1 - 8)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 200, 255), 2, cv2.LINE_AA,
+                        )
+
+                        evt = self._emit(
+                            "inventory_movement",
+                            min(0.95, 0.5 + change_score / 2),
+                            [],
+                            annotated,
+                            extra_metadata=extra_metadata,
+                        )
+                        if evt:
+                            events.append(evt)
+                        # Re-baseline to the new state so the same change
+                        # doesn't keep re-firing every debounce window while
+                        # it persists.
+                        self._inventory_baseline_hist[key] = hist
+                        self._inventory_baseline_crop[key] = crop.copy()
+                        self._inventory_change_since.pop(key, None)
+                        self._inventory_change_last_seen.pop(key, None)
+
+        # Drop state for cells whose parent zone was removed/edited out of
+        # existence in the UI. Keys are "{zone_key}:{r}_{c}".
+        stale = [
+            k for k in self._inventory_baseline_hist
+            if k.split(":", 1)[0] not in seen_keys
+        ]
         for k in stale:
             self._inventory_baseline_hist.pop(k, None)
             self._inventory_baseline_crop.pop(k, None)
