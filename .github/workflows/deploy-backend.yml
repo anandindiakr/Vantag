@@ -22,6 +22,15 @@ name: Deploy Backend (Vantag FastAPI)
 # not become healthy in time, the workflow automatically rolls back: git
 # checkout the previous commit, rebuild, and restart — leaving the VPS on
 # the last known-good version — then fails the job so it's visible in CI.
+#
+# Retry: the deploy is attempted TWICE. A GitHub-hosted runner's SSH
+# connection to the VPS is occasionally dropped upstream before it ever
+# reaches sshd — observed as "dial tcp ...:22: i/o timeout" with NO matching
+# entry in the VPS sshd journal, while a different runner IP connected
+# successfully 47 seconds earlier for the frontend deploy. That is a network
+# flake, not a bad commit, and without a retry it silently left production
+# running older code than main. The actual deploy logic lives in
+# docker/deploy_backend.sh so both attempts run identical steps.
 
 on:
   push:
@@ -53,7 +62,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy backend to VPS (serves all region domains)
+      # Attempt 1. Allowed to fail without failing the job so that a dropped
+      # SSH connection (see the retry note above) does not leave the VPS on an
+      # older backend than main.
+      - name: Deploy backend to VPS (attempt 1)
+        id: attempt1
+        continue-on-error: true
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_IN_HOST }}
@@ -65,48 +79,47 @@ jobs:
             set -e
             cd ${{ secrets.VPS_IN_REPO_PATH }}
             PREV_SHA=$(git rev-parse HEAD)
-            echo "Previous known-good commit: $PREV_SHA"
             git fetch origin main
             git reset --hard origin/main
+            cp -f docker/deploy_backend.sh /tmp/vantag_deploy_backend.sh
+            bash /tmp/vantag_deploy_backend.sh "${{ secrets.VPS_IN_REPO_PATH }}" "$PREV_SHA"
 
-            deploy_and_check() {
-              docker compose -f docker/docker-compose.prod.yml build vantag-backend
-              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
+      - name: Wait before retry
+        if: steps.attempt1.outcome == 'failure'
+        run: sleep 60
 
-              echo "Waiting for container health..."
-              STATUS="starting"
-              for i in $(seq 1 60); do
-                STATUS=$(docker inspect --format='{{.State.Health.Status}}' vantag-backend 2>/dev/null || echo "starting")
-                if [ "$STATUS" = "healthy" ]; then
-                  break
-                fi
-                sleep 6
-              done
+      # Attempt 2 runs the exact same one-liner against the same script file in
+      # the repo, so the two attempts can never drift apart. Re-running after a
+      # successful-but-unhealthy attempt 1 is safe: attempt 1 already rolled the
+      # repo back to the previous commit, so PREV_SHA is still a known-good
+      # target and the whole sequence is idempotent.
+      - name: Deploy backend to VPS (attempt 2)
+        id: attempt2
+        if: steps.attempt1.outcome == 'failure'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_IN_HOST }}
+          username: ${{ secrets.VPS_IN_USER }}
+          key: ${{ secrets.VPS_IN_SSH_KEY }}
+          command_timeout: 30m
+          request_pty: true
+          script: |
+            set -e
+            cd ${{ secrets.VPS_IN_REPO_PATH }}
+            PREV_SHA=$(git rev-parse HEAD)
+            git fetch origin main
+            git reset --hard origin/main
+            cp -f docker/deploy_backend.sh /tmp/vantag_deploy_backend.sh
+            bash /tmp/vantag_deploy_backend.sh "${{ secrets.VPS_IN_REPO_PATH }}" "$PREV_SHA"
 
-              HTTP_CODE="000"
-              for i in $(seq 1 15); do
-                HTTP_CODE=$(docker exec vantag-backend curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health || echo "000")
-                if [ "$HTTP_CODE" = "200" ]; then
-                  break
-                fi
-                sleep 6
-              done
-              if [ "$STATUS" = "healthy" ] && [ "$HTTP_CODE" = "200" ]; then
-                return 0
-              else
-                echo "Backend unhealthy (container status=$STATUS, /health HTTP=$HTTP_CODE)"
-                return 1
-              fi
-            }
-
-            if deploy_and_check; then
-              echo "Backend deploy successful and healthy."
-              docker image prune -f
-            else
-              echo "Deploy failed health check — rolling back to $PREV_SHA"
-              git reset --hard "$PREV_SHA"
-              docker compose -f docker/docker-compose.prod.yml build vantag-backend
-              docker compose -f docker/docker-compose.prod.yml up -d vantag-backend
-              echo "Rolled back to previous version. Failing job for visibility."
-              exit 1
-            fi
+      - name: Report deploy outcome
+        if: always()
+        run: |
+          if [ "${{ steps.attempt1.outcome }}" = "success" ]; then
+            echo "Backend deployed on attempt 1."
+          elif [ "${{ steps.attempt2.outcome }}" = "success" ]; then
+            echo "Backend deployed on attempt 2 (attempt 1 failed)."
+          else
+            echo "Backend deploy FAILED on both attempts."
+            exit 1
+          fi
