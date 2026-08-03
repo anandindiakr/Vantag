@@ -1513,6 +1513,13 @@ def _build_agent_zip(config: dict, platform: str) -> bytes:
     return buf.getvalue()
 
 
+@agent_download_router.get("/version")
+async def agent_version_info():
+    """Public (no-auth) endpoint so the Download page can display the
+    current Edge Agent version before the user clicks download."""
+    return {"version": _agent_version()}
+
+
 @agent_download_router.get("/download")
 async def download_agent(
     request: Request,

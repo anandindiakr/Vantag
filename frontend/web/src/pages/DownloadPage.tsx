@@ -28,6 +28,14 @@ export default function DownloadPage() {
   const apiUrl = window.location.origin;
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [version, setVersion] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetch('/api/agent/version')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data?.version && setVersion(data.version))
+      .catch(() => {});
+  }, []);
 
   const downloadAgent = async (platform: 'windows' | 'linux' | 'mac') => {
     setError(null);
@@ -68,15 +76,24 @@ export default function DownloadPage() {
         </Link>
       </div>
 
-      <h1 className="text-4xl font-bold mb-2">Install Vantag Edge Agent</h1>
+      <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
+        Install Vantag Edge Agent
+        {version && (
+          <span className="text-sm font-semibold px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+            Latest: v{version}
+          </span>
+        )}
+      </h1>
       <p className="text-white/60 mb-8">
         The Edge Agent runs on your local PC/tablet/Raspberry Pi and connects
         your LAN cameras to Vantag cloud. Choose your platform below.
         <br />
         <span className="text-white/40 text-sm">
-          The downloaded filename includes the agent version (e.g.
-          vantag-edge-agent-windows-v1.2.0.zip) — if you already installed an
-          older version, re-download and re-extract to update.
+          Every platform below downloads the same current version
+          {version ? ` (v${version})` : ''}. The downloaded filename includes
+          the version number (e.g. vantag-edge-agent-windows-v{version || '1.2.0'}.zip)
+          — if you already installed an older version, re-download and
+          re-extract to update.
         </span>
       </p>
 
@@ -95,6 +112,7 @@ export default function DownloadPage() {
           <div className="text-5xl mb-3">🪟</div>
           <div className="font-bold text-lg">Windows</div>
           <div className="text-sm text-white/70 mt-1">Windows 10/11 · 64-bit</div>
+          {version && <div className="text-xs text-white/50 mt-1">v{version}</div>}
           <div className="text-xs mt-3 px-3 py-1 bg-white/10 rounded-full inline-block">
             {busy === 'windows' ? 'Preparing…' : 'Download .zip'}
           </div>
@@ -108,6 +126,7 @@ export default function DownloadPage() {
           <div className="text-5xl mb-3">🐧</div>
           <div className="font-bold text-lg">Linux / Raspberry Pi</div>
           <div className="text-sm text-white/70 mt-1">Ubuntu, Debian, Raspbian</div>
+          {version && <div className="text-xs text-white/50 mt-1">v{version}</div>}
           <div className="text-xs mt-3 px-3 py-1 bg-white/10 rounded-full inline-block">
             {busy === 'linux' ? 'Preparing…' : 'Download .zip'}
           </div>
@@ -121,6 +140,7 @@ export default function DownloadPage() {
           <div className="text-5xl mb-3">🍎</div>
           <div className="font-bold text-lg">macOS</div>
           <div className="text-sm text-white/70 mt-1">Intel + Apple Silicon</div>
+          {version && <div className="text-xs text-white/50 mt-1">v{version}</div>}
           <div className="text-xs mt-3 px-3 py-1 bg-white/10 rounded-full inline-block">
             {busy === 'mac' ? 'Preparing…' : 'Download .zip'}
           </div>
