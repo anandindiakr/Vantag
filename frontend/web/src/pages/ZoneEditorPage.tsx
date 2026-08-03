@@ -80,6 +80,24 @@ const ZONE_META: Record<ZoneType, {
   },
 };
 
+// Default name given to a freshly drawn zone, per zone type.
+//
+// Declared as a Record<ZoneType, string> ON PURPOSE: TypeScript now refuses
+// to compile if a new ZoneType is added without a name here. The previous
+// implementation was an if/else chain that ended in an *unguarded* fallback
+// (`: `People Count ${n}``), so drawing an "Excluded Area" produced a zone
+// labelled "People Count 1". It was still correctly SAVED as an exclusion
+// zone, but both the zone list and the stored config then claimed the user
+// had set up people counting — when in reality that area was excluded from
+// ALL detection (including people counting), i.e. the exact opposite.
+const ZONE_LABEL_PREFIX: Record<ZoneType, string> = {
+  shelf:        'Shelf',
+  restricted:   'Restricted',
+  queue:        'Queue Lane',
+  people_count: 'People Count',
+  exclusion:    'Excluded Area',
+};
+
 function uid() { return Math.random().toString(36).slice(2, 8); }
 
 function toImageCoords(
@@ -418,11 +436,7 @@ export default function ZoneEditorPage() {
     const popupX = x + w / 2;
     const popupY = y + h / 2;
     const zoneCount = zones.filter((z) => z.type === mode).length + 1;
-    const defaultLabel =
-      mode === 'shelf'      ? `Shelf ${zoneCount}` :
-      mode === 'restricted' ? `Restricted ${zoneCount}` :
-      mode === 'queue'      ? `Queue Lane ${zoneCount}` :
-                              `People Count ${zoneCount}`;
+    const defaultLabel = `${ZONE_LABEL_PREFIX[mode]} ${zoneCount}`;
 
     setNamePopup({ canvasX: popupX, canvasY: popupY, rect: currentRect, defaultLabel });
     void e;
