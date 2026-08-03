@@ -1026,12 +1026,18 @@ async def ingest_event(
             )
         # Drop the (large) raw comparison crops before persisting — they've
         # already served their purpose for verification and would otherwise
-        # bloat every stored incident's metadata blob.
+        # bloat every stored incident's metadata blob. The person snapshot
+        # (if any) is saved as a file below and replaced with a URL instead.
+        raw_person_b64 = (body.metadata or {}).get("person_snapshot_b64")
         clean_metadata = {
             k: v for k, v in (body.metadata or {}).items()
-            if k not in ("reference_snapshot_b64", "current_crop_b64")
+            if k not in ("reference_snapshot_b64", "current_crop_b64", "person_snapshot_b64")
         }
         body.metadata = {**clean_metadata, "vlm_verification": vlm_result}
+        if raw_person_b64:
+            person_url = _save_edge_snapshot(agent.tenant_id, body.camera_id, raw_person_b64)
+            if person_url:
+                body.metadata["person_snapshot_url"] = person_url
 
     # 3) Persist the audit row in the per-tenant detection_events table.
     event = DetectionEvent(

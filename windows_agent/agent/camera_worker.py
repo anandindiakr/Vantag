@@ -559,6 +559,11 @@ class DetectionAnalyzer:
     # (reliably detectable) fraction of that cell's own histogram.
     _INVENTORY_GRID_ROWS = 2
     _INVENTORY_GRID_COLS = 3
+    # Max age (seconds) of a "last person seen at this cell" photo that's
+    # still considered plausibly relevant evidence for a later-confirmed
+    # change. Longer than this and the photo is dropped rather than shown,
+    # since it could no longer represent who actually made the change.
+    _INVENTORY_PERSON_EVIDENCE_MAX_AGE_SEC = 120.0
 
     def __init__(
         self,
@@ -642,6 +647,13 @@ class DetectionAnalyzer:
         self._inventory_baseline_crop: dict[str, np.ndarray] = {}
         self._inventory_change_since: dict[str, float] = {}
         self._inventory_change_last_seen: dict[str, float] = {}
+        # Last moment a person was seen overlapping each cell + a JPEG of
+        # the full frame at that moment, so an inventory_movement event
+        # (which by design only fires once the zone is person-free) can
+        # still attach a photo of whoever was last there, instead of
+        # showing no one at all in the evidence.
+        self._inventory_last_person_seen: dict[str, float] = {}
+        self._inventory_last_person_jpeg: dict[str, bytes] = {}
         # Tier 2: open-vocabulary product counter (YOLO-World), shared
         # singleton passed in from main.py. Only invoked at the exact
         # moment Tier 1's CV signal proposes a candidate change (see
@@ -660,10 +672,19 @@ class DetectionAnalyzer:
         boxes: list,
         frame: np.ndarray,
         extra_metadata: Optional[dict] = None,
+        cooldown_key: Optional[str] = None,
     ) -> Optional[dict]:
-        if not self._can_emit(event_type):
+        # By default the cooldown gate is keyed by event_type alone (one
+        # slot per camera). Callers that manage several independent
+        # sub-regions for the SAME event_type (e.g. one inventory zone per
+        # shelf grid cell) can pass a more specific ``cooldown_key`` so an
+        # unrelated cell's noise can't block/delay a genuine change in a
+        # different cell — this is what caused Tier-1 shelf events to
+        # appear at the wrong grid cell and/or minutes late.
+        gate_key = cooldown_key or event_type
+        if not self._can_emit(gate_key):
             return None
-        self._last_event[event_type] = time.time()
+        self._last_event[gate_key] = time.time()
         small = cv2.resize(frame, (320, 180))
         _, buf = cv2.imencode(".jpg", small, [cv2.IMWRITE_JPEG_QUALITY, 60])
         snap = base64.b64encode(buf.tobytes()).decode()
@@ -798,6 +819,19 @@ class DetectionAnalyzer:
                     key = f"{zone_key}:{r}_{c}"
 
                     if self._zone_has_person((cx1, cy1, cx2, cy2), persons, fw, fh):
+                        # Remember who was last standing here (full frame,
+                        # not just the tight crop) so a later confirmed
+                        # change can still show a person, even though this
+                        # detector only judges the shelf once they've left.
+                        # Throttled to once every ~2s to avoid re-encoding a
+                        # full JPEG on every frame while someone browses.
+                        last_capture = self._inventory_last_person_seen.get(key, 0)
+                        if now - last_capture >= 2.0:
+                            _, person_buf = cv2.imencode(
+                                ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70]
+                            )
+                            self._inventory_last_person_jpeg[key] = person_buf.tobytes()
+                        self._inventory_last_person_seen[key] = now
                         continue
 
                     crop = frame[cy1:cy2, cx1:cx2]
@@ -849,6 +883,20 @@ class DetectionAnalyzer:
                             "reference_snapshot_b64": base64.b64encode(ref_buf.tobytes()).decode(),
                             "current_crop_b64": base64.b64encode(cur_buf.tobytes()).decode(),
                         }
+                        # Attach a photo of whoever was last seen at this
+                        # cell (if recent enough to plausibly be the person
+                        # who made the change) so the incident isn't
+                        # evidence-less just because the detector only
+                        # judges the shelf once the zone is person-free.
+                        person_seen_at = self._inventory_last_person_seen.get(key)
+                        person_jpeg = self._inventory_last_person_jpeg.get(key)
+                        if person_seen_at is not None and person_jpeg is not None:
+                            age_sec = now - person_seen_at
+                            if age_sec <= self._INVENTORY_PERSON_EVIDENCE_MAX_AGE_SEC:
+                                extra_metadata["person_snapshot_b64"] = base64.b64encode(
+                                    person_jpeg
+                                ).decode()
+                                extra_metadata["person_seen_seconds_ago"] = round(age_sec, 1)
                         if self._product_count_detector is not None:
                             try:
                                 baseline_pc = self._product_count_detector.count_products(ref_crop)
@@ -881,28 +929,38 @@ class DetectionAnalyzer:
                             [],
                             annotated,
                             extra_metadata=extra_metadata,
+                            cooldown_key=f"inventory_movement:{key}",
                         )
                         if evt:
                             events.append(evt)
-                        # Re-baseline to the new state so the same change
-                        # doesn't keep re-firing every debounce window while
-                        # it persists.
-                        self._inventory_baseline_hist[key] = hist
-                        self._inventory_baseline_crop[key] = crop.copy()
-                        self._inventory_change_since.pop(key, None)
-                        self._inventory_change_last_seen.pop(key, None)
+                            # Re-baseline to the new state so the same
+                            # change doesn't keep re-firing every debounce
+                            # window while it persists.
+                            self._inventory_baseline_hist[key] = hist
+                            self._inventory_baseline_crop[key] = crop.copy()
+                            self._inventory_change_since.pop(key, None)
+                            self._inventory_change_last_seen.pop(key, None)
+                        # If evt is None (this cell's own cooldown hasn't
+                        # elapsed yet), deliberately do NOT re-baseline or
+                        # clear the streak — otherwise a confirmed change
+                        # would be silently discarded and never emitted at
+                        # all instead of firing as soon as cooldown clears.
 
         # Drop state for cells whose parent zone was removed/edited out of
         # existence in the UI. Keys are "{zone_key}:{r}_{c}".
-        stale = [
-            k for k in self._inventory_baseline_hist
-            if k.split(":", 1)[0] not in seen_keys
-        ]
+        all_keys = (
+            set(self._inventory_baseline_hist)
+            | set(self._inventory_last_person_seen)
+            | set(self._inventory_last_person_jpeg)
+        )
+        stale = [k for k in all_keys if k.split(":", 1)[0] not in seen_keys]
         for k in stale:
             self._inventory_baseline_hist.pop(k, None)
             self._inventory_baseline_crop.pop(k, None)
             self._inventory_change_since.pop(k, None)
             self._inventory_change_last_seen.pop(k, None)
+            self._inventory_last_person_seen.pop(k, None)
+            self._inventory_last_person_jpeg.pop(k, None)
 
         return events
 

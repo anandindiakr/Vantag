@@ -19,7 +19,7 @@ import { useIncidents, useGenerateReport, useStores, api } from '../hooks/useApi
 import { Severity, EventType, Incident } from '../store/useVantagStore';
 
 // ── Lightbox ──────────────────────────────────────────────────────────────────
-function EvidenceLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+function LightboxImage({ url, caption }: { url: string; caption: string }) {
   const [imgError, setImgError] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
@@ -40,12 +40,48 @@ function EvidenceLightbox({ url, onClose }: { url: string; onClose: () => void }
   }, [url]);
 
   return (
+    <div>
+      {imgError ? (
+        <div className="w-full rounded-xl border border-slate-600 bg-slate-800 flex flex-col items-center justify-center py-20 gap-3">
+          <Camera size={36} className="text-slate-500" />
+          <p className="text-slate-400 text-sm">Snapshot not available</p>
+          <p className="text-slate-600 text-xs">The evidence image was captured before the camera frame loaded.</p>
+        </div>
+      ) : imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={caption}
+          className="w-full rounded-xl border border-slate-600 shadow-2xl"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <div className="w-full rounded-xl border border-slate-600 bg-slate-800 flex items-center justify-center py-20">
+          <Loader2 size={28} className="animate-spin text-slate-500" />
+        </div>
+      )}
+      <p className="text-center text-xs text-slate-400 mt-3">{caption}</p>
+    </div>
+  );
+}
+
+function EvidenceLightbox({
+  url,
+  personUrl,
+  personSecondsAgo,
+  onClose,
+}: {
+  url: string;
+  personUrl?: string;
+  personSecondsAgo?: number;
+  onClose: () => void;
+}) {
+  return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm overflow-y-auto py-8"
       onClick={onClose}
     >
       <div
-        className="relative max-w-4xl w-full mx-4"
+        className={clsx('relative w-full mx-4', personUrl ? 'max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-4' : 'max-w-4xl')}
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -54,27 +90,20 @@ function EvidenceLightbox({ url, onClose }: { url: string; onClose: () => void }
         >
           <X size={16} /> Close
         </button>
-        {imgError ? (
-          <div className="w-full rounded-xl border border-slate-600 bg-slate-800 flex flex-col items-center justify-center py-20 gap-3">
-            <Camera size={36} className="text-slate-500" />
-            <p className="text-slate-400 text-sm">Snapshot not available</p>
-            <p className="text-slate-600 text-xs">The evidence image was captured before the camera frame loaded.</p>
-          </div>
-        ) : imageUrl ? (
-          <img
-            src={imageUrl}
-            alt="Evidence snapshot"
-            className="w-full rounded-xl border border-slate-600 shadow-2xl"
-            onError={() => setImgError(true)}
+        <LightboxImage
+          url={url}
+          caption="Camera snapshot captured at the moment of detection — zone highlighted in colour"
+        />
+        {personUrl && (
+          <LightboxImage
+            url={personUrl}
+            caption={
+              typeof personSecondsAgo === 'number'
+                ? `Last person seen at this zone ~${Math.round(personSecondsAgo)}s before the change was confirmed`
+                : 'Last person seen at this zone before the change was confirmed'
+            }
           />
-        ) : (
-          <div className="w-full rounded-xl border border-slate-600 bg-slate-800 flex items-center justify-center py-20">
-            <Loader2 size={28} className="animate-spin text-slate-500" />
-          </div>
         )}
-        <p className="text-center text-xs text-slate-400 mt-3">
-          Camera snapshot captured at the moment of detection — zone highlighted in colour
-        </p>
       </div>
     </div>
   );
@@ -126,7 +155,7 @@ export default function IncidentsPage() {
   const [severityFilter, setSeverityFilter] = useState<Severity | 'ALL'>('ALL');
   const [typeFilter, setTypeFilter]   = useState<EventType | 'all'>('all');
   const [downloadingId, setDownloadingId]   = useState<string | null>(null);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; personUrl?: string; personSecondsAgo?: number } | null>(null);
   const [purging, setPurging]         = useState(false);
   const qc = useQueryClient();
 
@@ -219,8 +248,13 @@ export default function IncidentsPage() {
   return (
     <div className="min-h-screen bg-vantag-dark pb-10">
       {/* Evidence lightbox */}
-      {lightboxUrl && (
-        <EvidenceLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+      {lightbox && (
+        <EvidenceLightbox
+          url={lightbox.url}
+          personUrl={lightbox.personUrl}
+          personSecondsAgo={lightbox.personSecondsAgo}
+          onClose={() => setLightbox(null)}
+        />
       )}
       <header className="sticky top-0 z-10 bg-vantag-dark/95 backdrop-blur border-b border-slate-700/60 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -439,7 +473,13 @@ export default function IncidentsPage() {
                     </p>
                     {inc.snapshotUrl && (
                       <button
-                        onClick={() => setLightboxUrl(inc.snapshotUrl!)}
+                        onClick={() =>
+                          setLightbox({
+                            url: inc.snapshotUrl!,
+                            personUrl: inc.metadata?.person_snapshot_url as string | undefined,
+                            personSecondsAgo: inc.metadata?.person_seen_seconds_ago as number | undefined,
+                          })
+                        }
                         className="flex items-center gap-1.5 group mt-1"
                         title="View evidence snapshot"
                       >
