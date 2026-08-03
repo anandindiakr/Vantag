@@ -38,6 +38,14 @@ class CameraConfig:
     # agent — previously configured but never delivered here, so it had no
     # effect at all.
     inventory_zones: list[dict] = field(default_factory=list)
+    # Per-camera opt-in analytic toggles, delivered by the backend's
+    # /api/edge/config response as "detections". Keys: shoplifting,
+    # loitering, suspicious_behavior, crowding, fall_detected,
+    # people_count. The backend applies the same gate authoritatively on
+    # ingest, so honouring it here does not change WHICH events reach the
+    # dashboard — it just stops us burning CPU on every camera running
+    # heuristics whose results would only be discarded server-side.
+    detections: dict = field(default_factory=dict)
 
 
 @dataclass

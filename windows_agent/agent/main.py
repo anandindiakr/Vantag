@@ -180,6 +180,7 @@ def _map_remote_camera(c: dict) -> CameraConfig:
         people_count_zones=c.get("people_count_zones") or [],
         exclusion_zones=c.get("exclusion_zones") or [],
         inventory_zones=c.get("inventory_zones") or [],
+        detections=c.get("detections") or analyzer.get("detections") or {},
     )
 
 
@@ -205,6 +206,7 @@ def _build_worker(cam):
         people_count_zones=getattr(cam, "people_count_zones", []),
         exclusion_zones=getattr(cam, "exclusion_zones", []),
         inventory_zones=getattr(cam, "inventory_zones", []),
+        detections=getattr(cam, "detections", {}) or {},
         product_count_detector=_product_count_detector,
     )
 
@@ -341,6 +343,7 @@ def start_monitoring():
             people_count_zones=getattr(cam, "people_count_zones", []),
             exclusion_zones=getattr(cam, "exclusion_zones", []),
             inventory_zones=getattr(cam, "inventory_zones", []),
+            detections=getattr(cam, "detections", {}) or {},
             product_count_detector=_product_count_detector,
         )
         worker.start()

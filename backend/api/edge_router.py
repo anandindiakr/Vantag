@@ -147,6 +147,39 @@ def _normalized_inventory_zones(c) -> list[dict]:
     return out
 
 
+def _detection_toggles(c) -> dict:
+    """Return the camera's per-analytic enable flags for the edge agent.
+
+    Mirrors EXACTLY the resolution order used by ``ingest_event()``'s
+    OPT_IN_EVENT_TYPES gate, so the agent's local decision and the
+    backend's authoritative decision can never disagree:
+
+      1. ``analyzer_config.detections.<key>`` — the dashboard toggle. If
+         present it always wins (an owner switching a detection OFF must
+         never be overridden by a stale feature block).
+      2. ``analyzer_config.<key>.enabled`` — legacy per-feature flag.
+      3. Otherwise OFF. These are opt-in behaviour heuristics; defaulting
+         them ON is what used to flood the incident feed.
+    """
+    cfg = getattr(c, "analyzer_config", None) or {}
+    detections_cfg = cfg.get("detections") or {}
+    out: dict[str, bool] = {}
+    for key in (
+        "shoplifting",
+        "loitering",
+        "suspicious_behavior",
+        "crowding",
+        "fall_detected",
+        "people_count",
+    ):
+        toggle = detections_cfg.get(key)
+        if toggle is not None:
+            out[key] = bool(toggle)
+        else:
+            out[key] = bool((cfg.get(key) or {}).get("enabled"))
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Live pipeline wiring (populated by main.py via set_pipeline) + snapshot store
 # ---------------------------------------------------------------------------
@@ -553,6 +586,15 @@ async def register_agent(
                 "people_count_zones": _normalized_people_count_zones(c),
                 "exclusion_zones": _normalized_exclusion_zones(c),
                 "inventory_zones": _normalized_inventory_zones(c),
+                # Per-camera opt-in analytic toggles. Previously NOT sent at
+                # all, so the agent ran every behaviour heuristic (pose
+                # shoplifting, loitering, crowding, suspicious, fall) on every
+                # camera and relied entirely on ingest_event()'s
+                # OPT_IN_EVENT_TYPES gate to throw the results away. That
+                # burned CPU on all cameras and, worse, made a test in front
+                # of a camera where the analytic is OFF look identical to a
+                # broken detector (event sent, silently dropped server-side).
+                "detections": _detection_toggles(c),
             }
             for c in cameras
         ],
@@ -1147,6 +1189,15 @@ async def get_config(
                 "people_count_zones": _normalized_people_count_zones(c),
                 "exclusion_zones": _normalized_exclusion_zones(c),
                 "inventory_zones": _normalized_inventory_zones(c),
+                # Per-camera opt-in analytic toggles. Previously NOT sent at
+                # all, so the agent ran every behaviour heuristic (pose
+                # shoplifting, loitering, crowding, suspicious, fall) on every
+                # camera and relied entirely on ingest_event()'s
+                # OPT_IN_EVENT_TYPES gate to throw the results away. That
+                # burned CPU on all cameras and, worse, made a test in front
+                # of a camera where the analytic is OFF look identical to a
+                # broken detector (event sent, silently dropped server-side).
+                "detections": _detection_toggles(c),
             }
             for c in cameras
         ]

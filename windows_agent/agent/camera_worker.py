@@ -574,11 +574,22 @@ class DetectionAnalyzer:
         people_count_zones: Optional[list[dict]] = None,
         exclusion_zones: Optional[list[dict]] = None,
         inventory_zones: Optional[list[dict]] = None,
+        detections: Optional[dict] = None,
         product_count_detector: Optional["ProductCountDetector"] = None,
     ):
         self.camera_id = camera_id
         self.cooldown_sec = cooldown_sec
         self.fps = fps
+        # Per-camera opt-in analytic toggles from the backend config.
+        # These heuristics (pose shoplifting, loitering, crowding,
+        # suspicious behaviour, fall) are OFF unless explicitly enabled for
+        # this camera in the dashboard — exactly matching the backend's
+        # OPT_IN_EVENT_TYPES gate on ingest. Running them regardless (the
+        # previous behaviour) meant every camera paid for pose inference and
+        # then had its events silently discarded server-side, which made a
+        # test in front of a camera with the analytic switched OFF look
+        # identical to a broken detector.
+        self._detections: dict = dict(detections or {})
         self._last_event: dict[str, float] = {}
         # {key: [first_seen, last_seen]} — last_seen enables the continuous-
         # presence (temporal smoothing) check in analyse() below (v1.5.1):
@@ -776,6 +787,23 @@ class DetectionAnalyzer:
             if ox2 > ox1 and oy2 > oy1:
                 return True
         return False
+
+    def _is_enabled(self, key: str) -> bool:
+        """Is this opt-in behaviour analytic switched on for this camera?
+
+        Mirrors the backend's OPT_IN_EVENT_TYPES gate. Absent key => OFF,
+        which is deliberate: these heuristics are opt-in, and defaulting
+        them on is what previously flooded the incident feed.
+
+        If the backend sent no ``detections`` block at all (older backend,
+        or the camera has never been configured) we fall back to running
+        everything, exactly as before, and let the backend be the single
+        authority — a config-delivery gap must never silently disable
+        detection that the dashboard shows as enabled.
+        """
+        if not self._detections:
+            return True
+        return bool(self._detections.get(key))
 
     def _analyze_inventory_zones(self, persons: list, frame: np.ndarray, now: float) -> list[dict]:
         """Real Tier-1 shelf/inventory-movement detection.
@@ -1112,7 +1140,7 @@ class DetectionAnalyzer:
         # Key on the ITEM's position (items are stationary — backpack/bag on shelf).
         # Keying on the person would reset the timer whenever they walk a grid cell
         # width (~64px at 640p) before the 2s window closes.
-        if persons and items:
+        if persons and items and self._is_enabled("shoplifting"):
             overlapping_keys: set[str] = set()
             for p in persons:
                 for item in items:
@@ -1189,27 +1217,34 @@ class DetectionAnalyzer:
         events.extend(self._analyze_inventory_zones(persons, frame, now))
 
         # 4. Fall Detection
-        fall_evt = self._fall_detector.analyse(persons, frame)
-        if fall_evt:
-            events.append(fall_evt)
+        if self._is_enabled("fall_detected"):
+            fall_evt = self._fall_detector.analyse(persons, frame)
+            if fall_evt:
+                events.append(fall_evt)
 
         # 5. Loitering
-        loiter_evt = self._loiter_detector.analyse(persons, frame)
-        if loiter_evt:
-            events.append(loiter_evt)
+        if self._is_enabled("loitering"):
+            loiter_evt = self._loiter_detector.analyse(persons, frame)
+            if loiter_evt:
+                events.append(loiter_evt)
 
         # 6. Crowding
-        crowd_evt = self._crowd_detector.analyse(persons, frame)
-        if crowd_evt:
-            events.append(crowd_evt)
+        if self._is_enabled("crowding"):
+            crowd_evt = self._crowd_detector.analyse(persons, frame)
+            if crowd_evt:
+                events.append(crowd_evt)
 
         # 7. Suspicious behavior (pacing / direction reversals)
-        suspicious_evt = self._suspicious_detector.analyse(persons, frame)
-        if suspicious_evt:
-            events.append(suspicious_evt)
+        if self._is_enabled("suspicious_behavior"):
+            suspicious_evt = self._suspicious_detector.analyse(persons, frame)
+            if suspicious_evt:
+                events.append(suspicious_evt)
 
-        # 8. Pose-based concealment shoplifting (rate-limited internally)
-        if self._pose_detector is not None:
+        # 8. Pose-based concealment shoplifting (rate-limited internally).
+        # Pose inference is the single most expensive pass in the pipeline —
+        # skipping it entirely on cameras where shoplifting is switched off
+        # is also the biggest available latency win on multi-camera sites.
+        if self._pose_detector is not None and self._is_enabled("shoplifting"):
             pose_evt = self._pose_detector.analyse(frame)
             if pose_evt:
                 events.append(pose_evt)
@@ -1376,6 +1411,7 @@ class CameraWorker:
         people_count_zones: Optional[list[dict]] = None,
         exclusion_zones: Optional[list[dict]] = None,
         inventory_zones: Optional[list[dict]] = None,
+        detections: Optional[dict] = None,
         product_count_detector: Optional["ProductCountDetector"] = None,
     ):
         self.config = config
@@ -1392,6 +1428,7 @@ class CameraWorker:
             exclusion_zones=exclusion_zones,
             people_count_zones=people_count_zones,
             inventory_zones=inventory_zones,
+            detections=detections,
             product_count_detector=product_count_detector,
         )
 
@@ -1439,6 +1476,32 @@ class CameraWorker:
         )
         self._thread.start()
         log.info(f"[{self.config.name}] Worker started → {self.config.rtsp_url}")
+        # Make the per-camera analytic configuration VISIBLE in the console.
+        # Without this, testing an analytic in front of a camera where it is
+        # switched off produced total silence — indistinguishable from a
+        # broken detector, and the only record was a server-side log line.
+        det = self._analyzer._detections
+        if det:
+            on = sorted(k for k, v in det.items() if v)
+            off = sorted(k for k, v in det.items() if not v)
+            log.info(
+                f"[{self.config.name}] Analytics ENABLED: "
+                f"{', '.join(on) if on else '(none)'}"
+            )
+            if off:
+                log.info(f"[{self.config.name}] Analytics off: {', '.join(off)}")
+        else:
+            log.warning(
+                f"[{self.config.name}] No per-camera analytic config received "
+                f"— running all detectors; backend will filter."
+            )
+        zone_bits = []
+        if getattr(self._analyzer, "_inventory_zones", None):
+            zone_bits.append(f"shelf/inventory zones={len(self._analyzer._inventory_zones)}")
+        if getattr(self._analyzer, "_people_count_zones", None):
+            zone_bits.append(f"people-count zones={len(self._analyzer._people_count_zones)}")
+        if zone_bits:
+            log.info(f"[{self.config.name}] Zones: {'; '.join(zone_bits)}")
 
     def stop(self):
         self._stop_event.set()
