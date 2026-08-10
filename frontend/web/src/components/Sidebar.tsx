@@ -21,6 +21,7 @@ import {
   UserCheck,
   Store as StoreIcon,
   Wand2,
+  MonitorPlay,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useVantagStore } from '../store/useVantagStore';
@@ -41,6 +42,7 @@ const navItems: NavItem[] = [
   { label: 'Cameras',      to: '/cameras',      icon: <Camera size={20} /> },
   { label: 'Manage Cameras', to: '/cameras/manage', icon: <Settings2 size={20} /> },
   { label: 'Stores',       to: '/stores',       icon: <StoreIcon size={20} /> },
+  { label: 'Live Wall',    to: '/wall',         icon: <MonitorPlay size={20} /> },
   { label: 'Incidents',    to: '/incidents',    icon: <AlertTriangle size={20} /> },
   { label: 'Watchlist',    to: '/watchlist',    icon: <Users size={20} /> },
   { label: 'Staff Faces',  to: '/staff-faces',  icon: <UserCheck size={20} /> },
