@@ -577,6 +577,7 @@ class HeartbeatBody(BaseModel):
     # YOLOv8 graph). Keys: architecture, model, expected_model, is_preferred,
     # ultralytics_version, acquire_error.
     model_status: dict | None = None
+    pending_incidents: int | None = None  # durable agent outbox depth
 
 
 # ---------------------------------------------------------------------------
@@ -803,6 +804,7 @@ async def heartbeat(
         "server_time": now.isoformat(),
         "scan_requested": consume_camera_scan(agent.tenant_id),
         "rtsp_probe_jobs": consume_rtsp_probes(agent.tenant_id),
+        "pending_incidents": body.pending_incidents,
     }
 
 

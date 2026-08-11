@@ -123,7 +123,12 @@ services:
       VANTAG_JWT_SECRET:    ${VANTAG_JWT_SECRET}
       VANTAG_FACE_KEY:      ${VANTAG_FACE_KEY}
       MQTT_BROKER:          mosquitto
-      MQTT_PORT:            1883
+      MQTT_PORT:            ${MQTT_PORT:-1883}
+      MQTT_TLS:             ${MQTT_TLS:-false}
+      MQTT_TLS_CA:          ${MQTT_TLS_CA:-}
+      MQTT_USERNAME:        ${MQTT_USERNAME:-}
+      MQTT_PASSWORD:        ${MQTT_PASSWORD:-}
+      MQTT_REQUIRED:        ${MQTT_REQUIRED:-false}
       REDIS_URL:            redis://redis:6379/0
       VANTAG_SMTP_HOST:     ${VANTAG_SMTP_HOST:-smtp.gmail.com}
       VANTAG_SMTP_PORT:     ${VANTAG_SMTP_PORT:-587}

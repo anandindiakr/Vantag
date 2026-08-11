@@ -194,10 +194,15 @@ class VantagPipeline:
             # any MQTT status (door locks, camera health, etc.) from ever
             # being reliably received. Make the client_id unique per
             # process so each worker keeps its own stable connection.
+            mqtt_tls = os.getenv("MQTT_TLS", "false").lower() in {"1", "true", "yes"}
             self._mqtt = MQTTClient(
-                broker=global_cfg.get("mqtt_broker", "localhost"),
-                port=int(global_cfg.get("mqtt_port", 1883)),
+                broker=os.getenv("MQTT_BROKER", global_cfg.get("mqtt_broker", "localhost")),
+                port=int(os.getenv("MQTT_PORT", global_cfg.get("mqtt_port", 1883))),
                 client_id=f"vantag-backend-{os.getpid()}",
+                username=os.getenv("MQTT_USERNAME") or None,
+                password=os.getenv("MQTT_PASSWORD") or None,
+                tls=mqtt_tls,
+                tls_ca_cert=os.getenv("MQTT_TLS_CA") or None,
             )
         self._mqtt_owned = mqtt_client is None  # we own it if we created it
 

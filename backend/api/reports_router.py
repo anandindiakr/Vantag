@@ -19,10 +19,17 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Iterator, List, Optional
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows development fallback
+    fcntl = None
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import FileResponse
@@ -47,35 +54,63 @@ _META_FILE: Path = _REPORTS_DIR / "reports_meta.json"
 # ---------------------------------------------------------------------------
 
 _report_registry: Dict[str, dict] = {}
+_registry_lock = threading.RLock()
+_LOCK_FILE = _REPORTS_DIR / ".reports.lock"
+
+
+@contextmanager
+def _registry_file_lock() -> Iterator[None]:
+    """Serialize report metadata reads/writes across Uvicorn worker processes."""
+    _ensure_dir()
+    with _LOCK_FILE.open("a+", encoding="utf-8") as lock_file:
+        if fcntl is not None:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if fcntl is not None:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def _ensure_dir() -> None:
     _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _read_registry() -> Dict[str, dict]:
+    if not _META_FILE.exists():
+        return {}
+    try:
+        with _META_FILE.open("r", encoding="utf-8") as fh:
+            value = json.load(fh)
+        return value if isinstance(value, dict) else {}
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Failed to load report registry | error=%s", exc)
+        return {}
+
+
 def _load_registry() -> None:
-    """Populate ``_report_registry`` from the JSON sidecar on disk."""
+    """Reload metadata on every request so workers see each other's reports."""
     global _report_registry  # noqa: PLW0603
-    _ensure_dir()
-    if _META_FILE.exists():
-        try:
-            with _META_FILE.open("r", encoding="utf-8") as fh:
-                _report_registry = json.load(fh)
-        except (json.JSONDecodeError, OSError) as exc:
-            logger.warning("Failed to load report registry | error=%s", exc)
-            _report_registry = {}
-    else:
-        _report_registry = {}
+    with _registry_lock, _registry_file_lock():
+        _report_registry = _read_registry()
 
 
 def _flush_registry() -> None:
-    """Persist the in-memory registry to the JSON sidecar."""
+    """Atomically persist the registry; caller must hold the file lock."""
     _ensure_dir()
+    tmp = _META_FILE.with_suffix(".tmp")
     try:
-        with _META_FILE.open("w", encoding="utf-8") as fh:
+        with tmp.open("w", encoding="utf-8") as fh:
             json.dump(_report_registry, fh, indent=2, default=str)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, _META_FILE)
     except OSError as exc:
         logger.error("Failed to flush report registry | error=%s", exc)
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _register_report(
@@ -96,8 +131,13 @@ def _register_report(
         "file_name": file_name,
         "file_size_bytes": file_size,
     }
-    _report_registry[report_id] = entry
-    _flush_registry()
+    with _registry_lock, _registry_file_lock():
+        # Reload while holding the process + file lock so concurrent workers
+        # merge their entries instead of overwriting one another.
+        _report_registry.clear()
+        _report_registry.update(_read_registry())
+        _report_registry[report_id] = entry
+        _flush_registry()
     return _entry_to_model(entry)
 
 
@@ -376,6 +416,7 @@ async def list_reports(
     user: dict = Depends(get_current_user_id),
 ) -> ReportListResponse:
     """Return only reports generated for the authenticated tenant."""
+    _load_registry()
     tenant_id = str(user.get("tenant_id"))
     reports = [
         _entry_to_model(e)
@@ -444,6 +485,7 @@ async def download_report(
     user: dict = Depends(get_current_user_id),
 ) -> FileResponse:
     """Download a PDF report belonging to the authenticated tenant."""
+    _load_registry()
     entry = _report_registry.get(report_id)
     if not entry or entry.get("tenant_id") != str(user.get("tenant_id")):
         raise HTTPException(

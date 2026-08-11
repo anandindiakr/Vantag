@@ -32,12 +32,47 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Multiple queries commonly fail with 401 at the same time when a token
+// expires. Share one rotation request so only one request consumes the
+// single-use refresh token; all failed queries then retry with its result.
+let refreshPromise: Promise<string> | null = null;
+
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
-    // 401 Unauthorized → token expired / invalid → force re-login
+  async (err) => {
+    // 401 Unauthorized → rotate the refresh token once before forcing login.
+    // The refresh endpoint itself is excluded to prevent an interceptor loop.
     if (err.response?.status === 401) {
+      const original = (err.config ?? {}) as typeof err.config & { _retry?: boolean };
+      const refreshToken = localStorage.getItem('vantag_refresh_token');
+      const isRefreshRequest = String(original.url ?? '').includes('/auth/refresh');
+      if (refreshToken && !original._retry && !isRefreshRequest) {
+        original._retry = true;
+        try {
+          if (!refreshPromise) {
+            refreshPromise = api.post<{
+              access_token: string;
+              refresh_token: string;
+            }>('/auth/refresh', { refresh_token: refreshToken })
+              .then(({ data }) => {
+                localStorage.setItem('vantag_token', data.access_token);
+                localStorage.setItem('vantag_refresh_token', data.refresh_token);
+                return data.access_token;
+              })
+              .finally(() => {
+                refreshPromise = null;
+              });
+          }
+          const accessToken = await refreshPromise;
+          original.headers = original.headers ?? {};
+          original.headers.Authorization = `Bearer ${accessToken}`;
+          return api(original);
+        } catch {
+          // Fall through to the normal signed-out path below.
+        }
+      }
       localStorage.removeItem('vantag_token');
+      localStorage.removeItem('vantag_refresh_token');
       localStorage.removeItem('vantag_tenant');
       // Avoid infinite loop if already on login page
       if (!window.location.pathname.startsWith('/login')) {

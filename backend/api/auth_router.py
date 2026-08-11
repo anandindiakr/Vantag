@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -127,6 +127,43 @@ def make_token(payload: dict, expires_delta: timedelta) -> str:
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 REFRESH_EXPIRE_DAYS = 30
 
+
+def _issue_refresh_token(user: TenantUser) -> str:
+    """Create and bind a single-use refresh token to the user row.
+
+    Only a keyed digest of the random token identifier is persisted. Rotating
+    the binding on every refresh means a stolen/ replayed refresh token is
+    rejected after its first successful use.
+    """
+    jti = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_EXPIRE_DAYS)
+    user.refresh_token_hash = _hash_otp(f"refresh:{jti}")
+    user.refresh_token_expires_at = expires_at
+    return make_token(
+        {
+            "sub": user.id,
+            "tenant_id": user.tenant_id,
+            "type": "refresh",
+            "jti": jti,
+            "ver": user.token_version or 0,
+        },
+        timedelta(days=REFRESH_EXPIRE_DAYS),
+    )
+
+
+def _issue_access_token(user: TenantUser, tenant: Tenant) -> str:
+    return make_token(
+        {
+            "sub": user.id,
+            "tenant_id": tenant.id,
+            "email": user.email,
+            "role": user.role,
+            "is_super_admin": user.is_super_admin,
+            "ver": user.token_version or 0,
+        },
+        timedelta(hours=JWT_EXPIRE_HOURS),
+    )
+
 auth_router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
@@ -155,6 +192,10 @@ class TokenResponse(BaseModel):
     tenant_id: str
     onboarding_step: int
     plan_id: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(..., min_length=20)
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
@@ -216,15 +257,9 @@ async def register(
     from ..utils.background_tasks import fire_and_forget
     fire_and_forget(_fire_signup_notifications(tenant.name, tenant.country), name="signup_notify")
 
-    access = make_token(
-        {"sub": user.id, "tenant_id": tenant.id, "email": user.email,
-         "role": user.role, "is_super_admin": False, "ver": user.token_version or 0},
-        timedelta(hours=JWT_EXPIRE_HOURS),
-    )
-    refresh = make_token(
-        {"sub": user.id, "tenant_id": tenant.id, "type": "refresh"},
-        timedelta(days=REFRESH_EXPIRE_DAYS),
-    )
+    access = _issue_access_token(user, tenant)
+    refresh = _issue_refresh_token(user)
+    await session.commit()
 
     return {
         "access_token": access,
@@ -262,16 +297,8 @@ async def login(
             if not tenant:
                 raise HTTPException(status_code=404, detail="Tenant not found")
 
-            access = make_token(
-                {"sub": user.id, "tenant_id": tenant.id, "email": user.email,
-                 "role": user.role, "is_super_admin": user.is_super_admin,
-                 "ver": user.token_version or 0},
-                timedelta(hours=JWT_EXPIRE_HOURS),
-            )
-            refresh = make_token(
-                {"sub": user.id, "tenant_id": tenant.id, "type": "refresh"},
-                timedelta(days=REFRESH_EXPIRE_DAYS),
-            )
+            access = _issue_access_token(user, tenant)
+            refresh = _issue_refresh_token(user)
 
             # Usage tracking: record this login so the admin dashboard can show
             # real last-login / login-count / active-session stats per tenant.
@@ -302,6 +329,70 @@ async def login(
 
     # Demo / guest accounts have been removed. All access requires a registered, verified user.
     raise HTTPException(status_code=401, detail="Invalid email or password")
+
+
+@auth_router.post("/refresh", response_model=TokenResponse)
+async def refresh_access_token(
+    body: RefreshRequest,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Rotate a refresh token and issue a fresh access token.
+
+    Refresh tokens are signed, short-lived, bound to one database row, and
+    rotated on every successful call. Reusing an old token fails closed.
+    """
+    try:
+        payload = jwt.decode(body.refresh_token, _jwt_secret(), algorithms=["HS256"])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    if payload.get("type") != "refresh" or not payload.get("sub") or not payload.get("jti"):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    # Serialize refresh requests for this user. Without a row lock, two tabs
+    # refreshing the same token at the same moment could both validate the old
+    # binding before either transaction commits, defeating single-use rotation.
+    result = await session.execute(
+        select(TenantUser)
+        .where(TenantUser.id == str(payload["sub"]))
+        .with_for_update()
+    )
+    user = result.scalar_one_or_none()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    expected = user.refresh_token_hash or ""
+    supplied = _hash_otp(f"refresh:{payload['jti']}")
+    if not expected or not secrets.compare_digest(expected, supplied):
+        raise HTTPException(status_code=401, detail="Refresh token has been revoked or already used")
+
+    expiry = user.refresh_token_expires_at
+    if expiry is None:
+        raise HTTPException(status_code=401, detail="Refresh token has expired")
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) >= expiry:
+        user.refresh_token_hash = None
+        user.refresh_token_expires_at = None
+        await session.commit()
+        raise HTTPException(status_code=401, detail="Refresh token has expired")
+
+    tenant_result = await session.execute(select(Tenant).where(Tenant.id == user.tenant_id))
+    tenant = tenant_result.scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    access = _issue_access_token(user, tenant)
+    rotated = _issue_refresh_token(user)
+    await session.commit()
+    return {
+        "access_token": access,
+        "refresh_token": rotated,
+        "token_type": "bearer",
+        "tenant_id": tenant.id,
+        "onboarding_step": tenant.onboarding_step,
+        "plan_id": tenant.plan_id,
+    }
 
 
 # ── OTP (DB-backed, hashed, TTL 10 min, attempt-limited) ─────────────────────
@@ -533,6 +624,8 @@ async def reset_password(
     user.pw_reset_jti = None
     user.pw_reset_expires_at = None
     user.token_version = (user.token_version or 0) + 1
+    user.refresh_token_hash = None
+    user.refresh_token_expires_at = None
     await session.commit()
 
     return {"message": "Password has been reset successfully. Please sign in with your new password."}

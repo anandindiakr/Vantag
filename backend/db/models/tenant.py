@@ -67,11 +67,14 @@ class TenantUser(Base):
     otp_code_hash: Mapped[str | None] = mapped_column(String(128))
     otp_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     otp_attempts: Mapped[int] = mapped_column(Integer, default=0)
-    # ── Password reset — one-time-use token binding ───────────────────────
+    # ── Password reset — one-time-use token binding ────────────────────────
     pw_reset_jti: Mapped[str | None] = mapped_column(String(64))
     pw_reset_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # ── Session epoch — bumped on password change to invalidate old JWTs ──
+    # ── Session epoch — bumped on password change to invalidate old JWTs ───
     token_version: Mapped[int] = mapped_column(Integer, default=0)
+    # ── Rotating refresh-token binding — only the latest refresh token is valid
+    refresh_token_hash: Mapped[str | None] = mapped_column(String(128))
+    refresh_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # ── Usage tracking — real login/activity stats for the admin dashboard ──
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

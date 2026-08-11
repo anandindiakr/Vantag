@@ -4,7 +4,7 @@
   "agent_id": "",
   "backend_url": "https://retail-vantag.com",
   "mqtt_host": "retail-vantag.com",
-  "mqtt_port": 1883,
+  "mqtt_port": 8883,
   "tenant_id": "",
   "cameras": [],
   "inference_device": "cpu",

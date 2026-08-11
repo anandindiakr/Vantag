@@ -28,6 +28,7 @@ export default function Login() {
     try {
       const { data } = await axios.post('/api/auth/login', form);
       localStorage.setItem('vantag_token', data.access_token);
+      localStorage.setItem('vantag_refresh_token', data.refresh_token);
       localStorage.setItem('vantag_tenant', JSON.stringify({ id: data.tenant_id, name: data.name, plan: data.plan_id, step: data.onboarding_step }));
       // Persist super-admin flag
       if (data.is_super_admin) {

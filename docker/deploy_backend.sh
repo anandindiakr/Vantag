@@ -41,7 +41,7 @@ build_and_start() {
 
 # Health is checked two independent ways:
 #  1. the compose healthcheck status reported by docker
-#  2. a real HTTP call to /health from INSIDE the container
+#  2. a real dependency-aware HTTP call to /health/ready from INSIDE the container
 # It is deliberately NOT checked through the host's nginx: this VPS hosts
 # multiple apps, so https://localhost hits a different vhost and returns 404,
 # which previously caused false rollbacks of a perfectly healthy backend.
@@ -56,12 +56,12 @@ check_health() {
   done
 
   for i in $(seq 1 15); do
-    http_code=$(docker exec "$CONTAINER" curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health || echo "000")
+    http_code=$(docker exec "$CONTAINER" curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health/ready || echo "000")
     [ "$http_code" = "200" ] && break
     sleep 6
   done
 
-  echo "Health result: container status=$status /health HTTP=$http_code"
+  echo "Health result: container status=$status /health/ready HTTP=$http_code"
   [ "$status" = "healthy" ] && [ "$http_code" = "200" ]
 }
 

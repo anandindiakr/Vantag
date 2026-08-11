@@ -116,11 +116,15 @@ def _run_rtsp_probe_job(job: dict):
     tried: list[str] = []
     result: dict | None = None
     try:
-        creds = [(username, password)] if (username or password) else None
+        # Never guess vendor/default passwords. Auto-recovery may try an
+        # explicitly supplied credential, or anonymous access when the user
+        # intentionally left credentials blank; authenticated cameras must be
+        # probed with credentials supplied from the dashboard.
+        creds = [(username or "", password or "")]
         paths = discovery._candidate_paths(brand)
         for path in paths:
             tried.append(path)
-            for u, p in (creds or discovery._DEFAULT_CREDS):
+            for u, p in creds:
                 res = discovery._try_rtsp(ip, port, path, u, p)
                 if res:
                     result = res
@@ -415,6 +419,9 @@ def start_monitoring():
                     arch, model_status.get("acquire_error") or "unknown",
                 )
         from . import __version__ as _agent_ver
+        flushed = _api.flush_outbox(limit=20)
+        if flushed:
+            log.info("Delivered %d queued incident(s); %d remain", flushed, _api.pending_incidents)
         resp = _api.heartbeat({
             "camera_statuses": camera_statuses,
             "fps_per_camera": fps_per_camera,
@@ -424,6 +431,7 @@ def start_monitoring():
             "memory_percent": psutil.virtual_memory().percent,
             "agent_version": _agent_ver,
             "model_status": model_status,
+            "pending_incidents": _api.pending_incidents,
         })
         # Backend may request an on-demand LAN camera scan
         if isinstance(resp, dict) and resp.get("scan_requested"):
