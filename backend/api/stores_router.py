@@ -32,7 +32,7 @@ from sqlalchemy.orm import selectinload
 from ..middleware.tenant_middleware import get_current_user_id
 from ..db.database import get_session
 from ..db.models.camera import CameraConfig
-from ..db.models.site import Site, slugify_site
+from ..db.models.site import Site, derive_legacy_store_id, slugify_site
 
 from .models import (
     HeatmapCell,
@@ -72,6 +72,39 @@ def _get_pipeline():  # noqa: ANN202
             detail="Inference pipeline is not yet initialised.",
         )
     return _pipeline
+
+
+async def _assert_store_access(
+    session: AsyncSession,
+    tenant_id: str | None,
+    store_id: str,
+) -> None:
+    """Ensure a store belongs to the authenticated tenant before reading it."""
+    if not tenant_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    site = (
+        await session.execute(
+            select(Site.id).where(
+                Site.tenant_id == tenant_id,
+                (Site.slug == store_id) | (Site.id == store_id),
+            )
+        )
+    ).first()
+    if site:
+        return
+
+    # Legacy stores are derived from camera location text until a real Site is
+    # assigned. Resolve that fallback against this tenant's cameras only.
+    locations = (
+        await session.execute(
+            select(CameraConfig.location).where(CameraConfig.tenant_id == tenant_id)
+        )
+    ).scalars().all()
+    if any(derive_legacy_store_id(location) == store_id for location in locations):
+        return
+
+    raise HTTPException(status_code=404, detail=f"Store '{store_id}' not found.")
 
 
 # ---------------------------------------------------------------------------
@@ -535,8 +568,13 @@ async def get_store(
     response_model=RiskScoreResponse,
     summary="Get current risk score snapshot",
 )
-async def get_risk(store_id: str) -> RiskScoreResponse:
-    """Return the current risk score and event counts for a store."""
+async def get_risk(
+    store_id: str,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> RiskScoreResponse:
+    """Return the current risk score and event counts for an owned store."""
+    await _assert_store_access(session, user.get("tenant_id"), store_id)
     # Analytics (risk scoring) only exist when an on-box pipeline is running.
     # On the multi-tenant SaaS backend there is no pipeline, so return a clean
     # zero score rather than a 503.
@@ -601,8 +639,11 @@ async def get_risk(store_id: str) -> RiskScoreResponse:
 async def get_heatmap(
     store_id: str,
     window: str = Query("hourly", description="Aggregation window: 'hourly' or 'daily'."),
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
 ) -> HeatmapResponse:
-    """Return normalised heatmap grid data for a store."""
+    """Return normalised heatmap grid data for an owned store."""
+    await _assert_store_access(session, user.get("tenant_id"), store_id)
     # Heatmaps are produced by the on-box pipeline. Return an empty grid on the
     # SaaS backend instead of raising 503.
     if _pipeline is None:
@@ -666,8 +707,11 @@ async def list_incidents(
     page: int = Query(1, ge=1, description="Page number (1-based)."),
     limit: int = Query(20, ge=1, le=200, description="Items per page."),
     event_type: Optional[str] = Query(None, description="Filter by event type (e.g. inventory_movement)."),
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
 ) -> IncidentListResponse:
-    """Return a paginated list of incidents for a store, newest first."""
+    """Return a paginated incident list for an owned store, newest first."""
+    await _assert_store_access(session, user.get("tenant_id"), store_id)
     # Incident history is held in the on-box pipeline's in-memory buffer. On the
     # SaaS backend there is none yet — return an empty page rather than 503.
     if _pipeline is None:

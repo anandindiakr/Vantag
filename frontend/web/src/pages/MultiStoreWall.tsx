@@ -76,8 +76,31 @@ interface PickerModalProps {
 
 function PickerModal({ stores, cameras, existing, onAdd, onClose }: PickerModalProps) {
   const [picked, setPicked] = useState<Set<string>>(new Set(existing));
+  const [selectedStoreId, setSelectedStoreId] = useState(stores[0]?.id ?? '');
 
   const storeById = useMemo(() => new Map(stores.map((s) => [s.id, s.name])), [stores]);
+
+  useEffect(() => {
+    if (selectedStoreId && stores.some((store) => store.id === selectedStoreId)) return;
+    setSelectedStoreId(stores[0]?.id ?? '');
+  }, [selectedStoreId, stores]);
+
+  const selectedStoreCameras = useMemo(
+    () => cameras.filter((camera) => camera.storeId === selectedStoreId),
+    [cameras, selectedStoreId]
+  );
+
+  const selectStoreCameras = () => {
+    if (selectedStoreCameras.length === 0) return;
+    setPicked((current) => {
+      const next = new Set(current);
+      selectedStoreCameras.forEach((camera) => next.add(camera.id));
+      return next;
+    });
+  };
+
+  const selectedStoreName = storeById.get(selectedStoreId) ?? 'this store';
+  const selectedStoreUnpickedCount = selectedStoreCameras.filter((camera) => !picked.has(camera.id)).length;
 
   // Group cameras by their store id for a store → camera tree in the picker.
   const grouped = useMemo(() => {
@@ -123,6 +146,46 @@ function PickerModal({ stores, cameras, existing, onAdd, onClose }: PickerModalP
         </div>
 
         <div className="px-6 py-4 overflow-y-auto space-y-4 scrollbar-thin">
+          {stores.length > 0 && (
+            <div className="rounded-xl border border-vantag-green/30 bg-vantag-green/5 p-3 space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                  <StoreIcon size={13} className="text-vantag-green" /> Add an entire store
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Select a store to add all of its cameras at once.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedStoreId}
+                  onChange={(event) => setSelectedStoreId(event.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-vantag-green/60"
+                  aria-label="Select a store"
+                >
+                  {stores.map((store) => (
+                    <option key={store.id} value={store.id}>{store.name}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={selectStoreCameras}
+                  disabled={selectedStoreCameras.length === 0 || selectedStoreUnpickedCount === 0}
+                  className="shrink-0 rounded-lg bg-vantag-green px-3 py-2 text-xs font-semibold text-slate-900 transition-colors hover:bg-vantag-green/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Select all ({selectedStoreCameras.length})
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                {selectedStoreCameras.length === 0
+                  ? `${selectedStoreName} has no cameras assigned.`
+                  : selectedStoreUnpickedCount > 0
+                    ? `${selectedStoreUnpickedCount} camera${selectedStoreUnpickedCount === 1 ? '' : 's'} still need to be selected.`
+                    : 'All cameras from this store are already on the wall.'}
+              </p>
+            </div>
+          )}
+
           {cameras.length === 0 ? (
             <p className="text-sm text-slate-400">
               No cameras yet. Add cameras first, then build your wall.
