@@ -24,10 +24,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 
 from .models import ReportListResponse, ReportResponse
+from ..middleware.tenant_middleware import get_current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -83,12 +84,14 @@ def _register_report(
     store_id: str,
     file_name: str,
     file_size: int,
+    tenant_id: str | None = None,
 ) -> ReportResponse:
     now = datetime.now(tz=timezone.utc)
     entry = {
         "report_id": report_id,
         "incident_id": incident_id,
         "store_id": store_id,
+        "tenant_id": tenant_id,
         "generated_at": now.isoformat(),
         "file_name": file_name,
         "file_size_bytes": file_size,
@@ -133,14 +136,18 @@ def _resolve_snapshot_file(snapshot_url: str | None) -> Optional[Path]:
     snapshots_root = (_BASE_DIR / "snapshots").resolve()
     try:
         candidate = (snapshots_root / rel).resolve()
-        if not str(candidate).startswith(str(snapshots_root)):
+        if candidate != snapshots_root and snapshots_root not in candidate.parents:
             return None
         return candidate if candidate.is_file() else None
     except OSError:
         return None
 
 
-async def _resolve_occurred_at_local(camera_id: str, raw_timestamp: str) -> str:
+async def _resolve_occurred_at_local(
+    camera_id: str,
+    raw_timestamp: str,
+    tenant_id: str | None = None,
+) -> str:
     """
     Convert a stored UTC incident timestamp into a human-readable string in
     the camera's configured local time (falls back to UTC if the camera or
@@ -169,11 +176,10 @@ async def _resolve_occurred_at_local(camera_id: str, raw_timestamp: str) -> str:
         from ..db.models.camera import CameraConfig
 
         async for session in get_session():
-            row = (
-                await session.execute(
-                    select(CameraConfig).where(CameraConfig.camera_id == camera_id)
-                )
-            ).scalars().first()
+            stmt = select(CameraConfig).where(CameraConfig.camera_id == camera_id)
+            if tenant_id:
+                stmt = stmt.where(CameraConfig.tenant_id == tenant_id)
+            row = (await session.execute(stmt)).scalars().first()
             if row is not None and row.analyzer_config:
                 schedule = row.analyzer_config.get("detection_schedule") or {}
                 offset_minutes = int(schedule.get("tz_offset_minutes") or 0)
@@ -309,18 +315,18 @@ def set_pipeline(pipeline: object) -> None:  # noqa: ANN001
     _pipeline = pipeline
 
 
-def _find_incident(incident_id: str) -> Optional[dict]:
-    """Search recent_events (in-memory), then the SQLite incident store."""
+def _find_incident(incident_id: str, tenant_id: str) -> Optional[dict]:
+    """Search only the authenticated tenant's incidents."""
     if _pipeline is not None:
         for events in _pipeline.recent_events.values():
             for ev in events:
-                if ev.get("incident_id") == incident_id:
+                if ev.get("incident_id") == incident_id and ev.get("tenant_id") == tenant_id:
                     return ev
     # Fallback: persisted incidents survive backend restarts.
     try:
         from ..db import incident_store as _istore  # lazy import
 
-        return _istore.get_incident(incident_id)
+        return _istore.get_incident(incident_id, tenant_id=tenant_id)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Incident DB lookup failed | id=%s error=%s", incident_id, exc)
         return None
@@ -336,7 +342,9 @@ async def _bg_generate_report(report_id: str, incident_id: str, incident_data: d
     store_id = incident_data.get("store_id", "unknown")
     try:
         occurred_at_local = await _resolve_occurred_at_local(
-            incident_data.get("camera_id", ""), incident_data.get("timestamp", "")
+            incident_data.get("camera_id", ""),
+            incident_data.get("timestamp", ""),
+            incident_data.get("tenant_id"),
         )
         file_path = _generate_pdf_report(report_id, incident_id, incident_data, occurred_at_local)
         file_size = file_path.stat().st_size
@@ -346,6 +354,7 @@ async def _bg_generate_report(report_id: str, incident_id: str, incident_data: d
             store_id=store_id,
             file_name=file_path.name,
             file_size=file_size,
+            tenant_id=incident_data.get("tenant_id"),
         )
     except Exception as exc:  # noqa: BLE001
         logger.error(
@@ -363,9 +372,16 @@ async def _bg_generate_report(report_id: str, incident_id: str, incident_data: d
     response_model=ReportListResponse,
     summary="List all generated reports",
 )
-async def list_reports() -> ReportListResponse:
-    """Return metadata for all reports that have been generated."""
-    reports = [_entry_to_model(e) for e in _report_registry.values()]
+async def list_reports(
+    user: dict = Depends(get_current_user_id),
+) -> ReportListResponse:
+    """Return only reports generated for the authenticated tenant."""
+    tenant_id = str(user.get("tenant_id"))
+    reports = [
+        _entry_to_model(e)
+        for e in _report_registry.values()
+        if e.get("tenant_id") == tenant_id
+    ]
     reports.sort(key=lambda r: r.generated_at, reverse=True)
     return ReportListResponse(reports=reports)
 
@@ -382,11 +398,14 @@ async def list_reports() -> ReportListResponse:
 )
 async def download_incident_report(
     incident_id: str,
+    user: dict = Depends(get_current_user_id),
 ) -> FileResponse:
-    """Generate a report synchronously for the incident download action."""
-    incident_data = _find_incident(incident_id) or {
+    """Generate a report synchronously for the authenticated tenant's incident."""
+    tenant_id = str(user.get("tenant_id"))
+    incident_data = _find_incident(incident_id, tenant_id) or {
         "incident_id": incident_id,
         "store_id": "unknown",
+        "tenant_id": tenant_id,
         "camera_id": "unknown",
         "type": "manual",
         "severity": "medium",
@@ -395,7 +414,9 @@ async def download_incident_report(
     }
     report_id = str(uuid.uuid4())
     occurred_at_local = await _resolve_occurred_at_local(
-        incident_data.get("camera_id", ""), incident_data.get("timestamp", "")
+        incident_data.get("camera_id", ""),
+        incident_data.get("timestamp", ""),
+        incident_data.get("tenant_id"),
     )
     file_path = _generate_pdf_report(report_id, incident_id, incident_data, occurred_at_local)
     _register_report(
@@ -404,6 +425,7 @@ async def download_incident_report(
         store_id=incident_data.get("store_id", "unknown"),
         file_name=file_path.name,
         file_size=file_path.stat().st_size,
+        tenant_id=tenant_id,
     )
     return FileResponse(
         path=str(file_path),
@@ -417,10 +439,13 @@ async def download_incident_report(
     summary="Download a PDF report",
     responses={200: {"content": {"application/pdf": {}}}},
 )
-async def download_report(report_id: str) -> FileResponse:
-    """Download the PDF file for a specific report."""
+async def download_report(
+    report_id: str,
+    user: dict = Depends(get_current_user_id),
+) -> FileResponse:
+    """Download a PDF report belonging to the authenticated tenant."""
     entry = _report_registry.get(report_id)
-    if not entry:
+    if not entry or entry.get("tenant_id") != str(user.get("tenant_id")):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Report '{report_id}' not found.",
@@ -454,6 +479,7 @@ async def download_report(report_id: str) -> FileResponse:
 async def generate_report(
     incident_id: str,
     background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user_id),
 ) -> ReportResponse:
     """
     Initiate PDF report generation for an incident.
@@ -462,13 +488,15 @@ async def generate_report(
     immediately with a ``202 Accepted`` status.  Poll ``GET /api/reports``
     to confirm when the file is ready.
     """
-    incident_data = _find_incident(incident_id)
+    tenant_id = str(user.get("tenant_id"))
+    incident_data = _find_incident(incident_id, tenant_id)
     if incident_data is None:
         # Allow generating a stub report even if the incident is not found
         # (e.g. for incidents from a previous session).
         incident_data = {
             "incident_id": incident_id,
             "store_id": "unknown",
+            "tenant_id": tenant_id,
             "camera_id": "unknown",
             "type": "manual",
             "severity": "medium",
@@ -488,6 +516,7 @@ async def generate_report(
         store_id=incident_data.get("store_id", "unknown"),
         file_name=f"report_{report_id}.pdf",
         file_size=0,
+        tenant_id=tenant_id,
     )
 
     background_tasks.add_task(_bg_generate_report, report_id, incident_id, incident_data)

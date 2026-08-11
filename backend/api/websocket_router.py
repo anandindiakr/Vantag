@@ -134,6 +134,13 @@ class ConnectionManager:
         """
         raw = json.dumps(message, default=str)
         event_tenant_id: Optional[str] = message.get("tenant_id")
+        # Incident messages contain tenant data and must never use the legacy
+        # broadcast-all fallback. The edge agent supplies this value from its
+        # authenticated credential; rejecting missing values prevents a
+        # cross-tenant live-feed leak.
+        if message.get("type") == "incident" and not event_tenant_id:
+            logger.error("Dropped incident WebSocket message without tenant_id")
+            return
         store_id: Optional[str] = message.get("store_id")
 
         await self._send_to_tenant_map(raw, self._global_connections, event_tenant_id)
@@ -163,9 +170,11 @@ class ConnectionManager:
         Stale / closed connections are silently removed.
         """
         dead: list[WebSocket] = []
+        if not event_tenant_id:
+            return
         for ws, ws_tenant in list(connections.items()):
             # Tenant filtering: skip if event belongs to a different tenant
-            if event_tenant_id and ws_tenant != event_tenant_id:
+            if ws_tenant != event_tenant_id:
                 continue
             try:
                 if ws.client_state == WebSocketState.CONNECTED:

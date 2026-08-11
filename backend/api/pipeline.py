@@ -161,6 +161,15 @@ class VantagPipeline:
         self.registry.load()
 
         global_cfg = self.registry.get_global()
+        # Native pipeline events must carry tenant identity before they reach
+        # shared WebSocket/in-memory stores. SaaS deployments provide this via
+        # config or VANTAG_TENANT_ID; edge-ingested events always use the
+        # authenticated EdgeAgent tenant directly.
+        self._tenant_id: str | None = (
+            str(global_cfg.get("tenant_id") or os.getenv("VANTAG_TENANT_ID"))
+            if (global_cfg.get("tenant_id") or os.getenv("VANTAG_TENANT_ID"))
+            else None
+        )
         self._window_seconds: int = int(global_cfg.get("risk_score_window_seconds", 60))
 
         # ---- Ingestion layer ----
@@ -323,7 +332,12 @@ class VantagPipeline:
         try:
             from ..db import incident_store as _istore  # lazy import
             for sid in _istore.get_all_store_ids():
-                items, _, _ = _istore.query_incidents(sid, page=1, limit=500)
+                items, _, _ = _istore.query_incidents(
+                    sid,
+                    page=1,
+                    limit=500,
+                    tenant_id=self._tenant_id,
+                )
                 dq = self.recent_events[sid]
                 for item in items:   # already newest first
                     dq.append(item)
@@ -434,6 +448,8 @@ class VantagPipeline:
                 results = analyzer.analyze(enhanced, detections, timestamp)
                 for result in results:
                     ev = self._normalise_event(result, camera_id, store_id)
+                    if self._tenant_id:
+                        ev["tenant_id"] = self._tenant_id
                     events.append(ev)
             except Exception as exc:  # noqa: BLE001
                 logger.error(
@@ -522,6 +538,11 @@ class VantagPipeline:
 
     async def _emit_event(self, ev: dict, store_id: str) -> None:
         """Push an event to the in-memory log, WebSocket, MQTT, and SQLite."""
+        # Native events are tenant-tagged in the camera loop. Keep this
+        # defensive fallback for tests or future emitters so a configured
+        # single-tenant pipeline cannot accidentally drop its own identity.
+        if self._tenant_id and not ev.get("tenant_id"):
+            ev["tenant_id"] = self._tenant_id
         # Append to recent events. Newest-first convention (index 0 = most
         # recent) — matches _emit_edge_event()/demo_router._inject().
         self.recent_events[store_id].appendleft(ev)
@@ -534,7 +555,7 @@ class VantagPipeline:
             pass
 
         # WebSocket broadcast.
-        if self._ws_broadcast:
+        if self._ws_broadcast and ev.get("tenant_id"):
             try:
                 await self._ws_broadcast(ev)
             except Exception as exc:  # noqa: BLE001

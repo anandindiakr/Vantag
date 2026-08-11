@@ -29,7 +29,7 @@ from ..middleware.tenant_middleware import get_current_user_id as get_current_us
 _pipeline = None   # type: ignore[assignment]
 
 # Snapshot storage (same root that main.py already mounts as /snapshots/*)
-_SNAPSHOTS_DIR = Path(__file__).resolve().parent.parent / "snapshots"
+_SNAPSHOTS_DIR = Path(__file__).resolve().parent.parent.parent / "snapshots"
 _DEMO_SNAPS_DIR = _SNAPSHOTS_DIR / "demo"
 
 
@@ -170,22 +170,34 @@ class TriggerResponse(BaseModel):
     snapshot_url: Optional[str] = None
 
 
-def _save_snapshot(incident_id: str, snapshot_b64: str) -> Optional[str]:
-    """Decode base64 canvas image and save to disk. Returns static URL or None."""
-    if not snapshot_b64:
+def _save_snapshot(
+    incident_id: str,
+    snapshot_b64: str,
+    tenant_id: str,
+) -> Optional[str]:
+    """Save a bounded demo snapshot inside the authenticated tenant's folder."""
+    if not snapshot_b64 or not tenant_id:
         return None
     try:
-        _DEMO_SNAPS_DIR.mkdir(parents=True, exist_ok=True)
-        raw       = snapshot_b64.split(",", 1)[-1]
-        img_bytes = base64.b64decode(raw)
-        img_path  = _DEMO_SNAPS_DIR / f"{incident_id}.jpg"
+        raw = snapshot_b64.split(",", 1)[-1]
+        img_bytes = base64.b64decode(raw, validate=True)
+        if len(img_bytes) > 2_000_000 or not img_bytes.startswith(b"\xff\xd8\xff"):
+            return None
+        tenant_dir = _DEMO_SNAPS_DIR / tenant_id
+        tenant_dir.mkdir(parents=True, exist_ok=True)
+        img_path = tenant_dir / f"{incident_id}.jpg"
         img_path.write_bytes(img_bytes)
-        return f"/api/snapshots/demo/{incident_id}.jpg"
+        return f"/api/snapshots/demo/{tenant_id}__{incident_id}.jpg"
     except Exception:  # noqa: BLE001
         return None
 
 
-def _build_event(req: TriggerRequest, incident_id: str, snapshot_url: Optional[str] = None) -> dict:
+def _build_event(
+    req: TriggerRequest,
+    incident_id: str,
+    snapshot_url: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+) -> dict:
     """
     Build a canonical event dict.
 
@@ -214,6 +226,7 @@ def _build_event(req: TriggerRequest, incident_id: str, snapshot_url: Optional[s
     return {
         # ── canonical keys (match real pipeline) ──
         "incident_id":  incident_id,
+        "tenant_id":    tenant_id,
         "type":         event_type,         # ← was "event_type"
         "timestamp":    now_iso,            # ← was "occurred_at"
         # ── additional fields ──
@@ -265,6 +278,7 @@ async def _inject(event: dict) -> None:
         try:
             await _pipeline._ws_broadcast({
                 "type":         "incident",
+                "tenant_id":    event.get("tenant_id"),
                 "incident_id":  event["incident_id"],
                 "store_id":     store_id,
                 "camera_id":    event["camera_id"],
@@ -288,7 +302,7 @@ async def _inject(event: dict) -> None:
 )
 async def trigger_event(
     req: TriggerRequest,
-    _: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ) -> TriggerResponse:
     if req.event_type not in _EVENT_WEIGHTS:
         raise HTTPException(
@@ -298,8 +312,12 @@ async def trigger_event(
         )
 
     incident_id  = f"demo-{uuid.uuid4().hex[:8]}"
-    snapshot_url = _save_snapshot(incident_id, req.snapshot_b64)
-    event        = _build_event(req, incident_id, snapshot_url)
+    snapshot_url = _save_snapshot(
+        incident_id,
+        req.snapshot_b64,
+        str(user.get("tenant_id")),
+    )
+    event        = _build_event(req, incident_id, snapshot_url, str(user.get("tenant_id")))
 
     await _inject(event)
     return TriggerResponse(
@@ -318,7 +336,7 @@ async def trigger_event(
     summary="Fire ALL demo incidents in sequence",
 )
 async def trigger_sequence(
-    _: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ) -> dict:
     sequence = [
         TriggerRequest(event_type="shoplifting",        camera_id="cam-03", severity="high"),
@@ -334,7 +352,7 @@ async def trigger_sequence(
     fired = []
     for req in sequence:
         incident_id = f"demo-{uuid.uuid4().hex[:8]}"
-        event       = _build_event(req, incident_id)
+        event       = _build_event(req, incident_id, tenant_id=str(user.get("tenant_id")))
         await _inject(event)
         fired.append({
             "event_type":  event["type"],
@@ -360,14 +378,18 @@ def _is_demo_event(e: dict) -> bool:
     summary="Clear all demo incidents",
 )
 async def clear_demo_events(
-    _: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ) -> dict:
     # 1. Remove from in-memory deques (live Incidents page reads these).
     mem_cleared = 0
     if _pipeline is not None:
         for store_id, dq in _pipeline.recent_events.items():
             before  = len(dq)
-            to_keep = [e for e in dq if not _is_demo_event(e)]
+            tenant_id = str(user.get("tenant_id"))
+            to_keep = [
+                e for e in dq
+                if not (_is_demo_event(e) and e.get("tenant_id") == tenant_id)
+            ]
             dq.clear()
             for e in to_keep:
                 dq.append(e)
@@ -377,17 +399,25 @@ async def clear_demo_events(
     db_cleared = 0
     try:
         from ..db import incident_store as _istore  # type: ignore[import]
-        db_cleared = await asyncio.to_thread(_istore.delete_demo)
+        db_cleared = await asyncio.to_thread(
+            _istore.delete_demo, str(user.get("tenant_id"))
+        )
     except Exception:  # noqa: BLE001
         pass
 
     # 3. Remove demo snapshot images from disk.
     snaps_cleared = 0
     try:
-        if _DEMO_SNAPS_DIR.exists():
-            for f in _DEMO_SNAPS_DIR.glob("*.jpg"):
+        tenant_id = str(user.get("tenant_id"))
+        tenant_dir = _DEMO_SNAPS_DIR / tenant_id
+        if tenant_dir.exists():
+            for f in tenant_dir.glob("*.jpg"):
                 f.unlink(missing_ok=True)
                 snaps_cleared += 1
+            try:
+                tenant_dir.rmdir()
+            except OSError:
+                pass
     except Exception:  # noqa: BLE001
         pass
 
