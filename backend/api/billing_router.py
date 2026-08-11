@@ -5,6 +5,7 @@ Billing endpoints: create order, webhook handler, invoice listing.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import uuid
@@ -30,6 +31,14 @@ billing_router = APIRouter(prefix="/api/billing", tags=["billing"])
 logger = logging.getLogger("vantag.billing")
 
 
+def _provider_event_id(provider: str, payload: bytes, external_id: object) -> str:
+    """Return a stable, non-null idempotency key for a provider delivery."""
+    value = str(external_id or "").strip()
+    if not value:
+        value = hashlib.sha256(payload).hexdigest()
+    return f"{provider}:{value}"[:200]
+
+
 class CreateOrderRequest(BaseModel):
     plan_id: str
 
@@ -51,6 +60,10 @@ async def create_payment_order(
     tenant = tenant_result.scalar_one_or_none()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
+
+    plan = get_plan(body.plan_id)
+    if not plan or not get_plan_price(body.plan_id, get_region(tenant.country)["currency"]):
+        raise HTTPException(status_code=400, detail=f"Plan '{body.plan_id}' is not available")
 
     order = create_order(tenant.country, body.plan_id, tenant.id)
 
@@ -81,6 +94,18 @@ async def verify_payment(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
+    inv_result = await session.execute(
+        select(Invoice).where(
+            Invoice.razorpay_order_id == body.razorpay_order_id,
+            Invoice.tenant_id == tenant.id,
+        )
+    )
+    inv = inv_result.scalar_one_or_none()
+    if inv is None:
+        raise HTTPException(status_code=404, detail="Payment order not found")
+    if inv.status == "paid":
+        return {"success": True, "status": "active", "duplicate": True}
+
     valid = verify_payment_signature(
         body.razorpay_order_id,
         body.razorpay_payment_id,
@@ -90,25 +115,15 @@ async def verify_payment(
     if not valid:
         raise HTTPException(status_code=400, detail="Payment verification failed")
 
+    inv.status = "paid"
+    inv.razorpay_payment_id = body.razorpay_payment_id
     await session.execute(
         update(Tenant).where(Tenant.id == tenant.id).values(status="active")
     )
-    await session.execute(
-        update(Invoice)
-        .where(Invoice.razorpay_order_id == body.razorpay_order_id)
-        .values(status="paid", razorpay_payment_id=body.razorpay_payment_id)
-    )
-
-    inv_result = await session.execute(
-        select(Invoice).where(Invoice.razorpay_order_id == body.razorpay_order_id)
-    )
-    inv = inv_result.scalar_one_or_none()
-    if inv:
-        try:
-            inv.status = "paid"
-            await compute_commission_for_invoice(inv, session)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Commission computation failed for invoice=%s: %s", inv.id, exc)
+    try:
+        await compute_commission_for_invoice(inv, session)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Commission computation failed for invoice=%s: %s", inv.id, exc)
 
     await session.commit()
 
@@ -120,7 +135,7 @@ async def _process_webhook_event(
     payload: dict,
     pe_id: str,
     session: AsyncSession,
-) -> None:
+) -> bool:
     """Process a Razorpay webhook event and update tenant/invoice state."""
     data = payload.get("payload", {})
 
@@ -163,7 +178,9 @@ async def _process_webhook_event(
             sub_id = sub_data.get("id")
             if sub_id:
                 sub_result = await session.execute(
-                    select(Subscription).where(Subscription.id == sub_id)
+                    select(Subscription).where(
+                        Subscription.razorpay_subscription_id == sub_id
+                    )
                 )
                 sub = sub_result.scalar_one_or_none()
                 if sub:
@@ -179,7 +196,9 @@ async def _process_webhook_event(
             sub_id = sub_data.get("id")
             if sub_id:
                 sub_result = await session.execute(
-                    select(Subscription).where(Subscription.id == sub_id)
+                    select(Subscription).where(
+                        Subscription.razorpay_subscription_id == sub_id
+                    )
                 )
                 sub = sub_result.scalar_one_or_none()
                 if sub:
@@ -209,10 +228,12 @@ async def _process_webhook_event(
             update(PaymentEvent).where(PaymentEvent.id == pe_id).values(processed=True)
         )
         await session.commit()
+        return True
 
     except Exception as exc:
         logger.error("Webhook processing error for %s: %s", event_type, exc, exc_info=True)
         await session.rollback()
+        return False
 
 
 @billing_router.post("/webhook/{country}")
@@ -230,7 +251,11 @@ async def razorpay_webhook(
 
     payload = json.loads(body)
     event_type = payload.get("event", "unknown")
-    event_id = payload.get("id") or payload.get("payload", {}).get("id")
+    event_id = _provider_event_id(
+        "razorpay",
+        body,
+        payload.get("id") or payload.get("payload", {}).get("id"),
+    )
 
     if event_id:
         existing = await session.execute(
@@ -253,8 +278,10 @@ async def razorpay_webhook(
         await session.rollback()
         return {"status": "duplicate_ignored", "event": event_type}
 
-    # Process the event — update tenant/invoice state
-    await _process_webhook_event(event_type, payload, pe.id, session)
+    # Process the event — update tenant/invoice state. A failed transaction
+    # must return non-2xx so the provider retries instead of losing the event.
+    if not await _process_webhook_event(event_type, payload, pe.id, session):
+        raise HTTPException(status_code=503, detail="Webhook processing failed; please retry")
 
     return {"received": True, "event": event_type}
 
@@ -326,6 +353,7 @@ async def xendit_webhook(
 
     payload = json.loads(body)
     event_type, event_id, _ = xendit_service.parse_webhook_event(payload)
+    event_id = _provider_event_id("xendit", body, event_id)
 
     if event_id:
         existing = await session.execute(
@@ -349,7 +377,7 @@ async def xendit_webhook(
         return {"status": "duplicate_ignored", "event": event_type}
 
     # Activate tenant on successful payment
-    if event_type in ("PAID", "SETTLED"):
+    if str(event_type).upper() in ("PAID", "SETTLED", "INVOICE.PAID"):
         external_id = payload.get("external_id") or payload.get("id")
         if external_id:
             inv_result = await session.execute(

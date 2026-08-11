@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -79,8 +81,15 @@ class YOLOEngine:
         class_filter: Optional[List[str]] = None,
     ) -> None:
         self._model_path = model_path
-        self._device = device
+        self._device = self._resolve_device(device)
         self._conf_threshold = conf_threshold
+        # A single model instance is shared by camera tasks. Ultralytics'
+        # persist=True tracker is stateful, so serialize model calls rather
+        # than allowing concurrent tasks to mutate predictor state.
+        self._inference_lock = threading.RLock()
+        self._inference_count = 0
+        self._total_inference_ms = 0.0
+        self._last_inference_ms = 0.0
         self._class_filter: Optional[List[str]] = (
             [c.lower() for c in class_filter] if class_filter else None
         )
@@ -89,6 +98,20 @@ class YOLOEngine:
         self._loaded: bool = False
 
         self._load_model()
+
+    @staticmethod
+    def _resolve_device(device: str) -> str:
+        """Resolve ``auto`` without making CUDA/DirectML mandatory."""
+        requested = (device or "cpu").lower()
+        if requested not in {"", "auto"}:
+            return device
+        try:
+            import torch  # type: ignore[import]
+            if torch.cuda.is_available():
+                return "cuda"
+        except Exception:  # noqa: BLE001
+            pass
+        return "cpu"
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -110,6 +133,20 @@ class YOLOEngine:
             self._model = YOLO(self._model_path)
             # Warm-up move to device so the first real call is not delayed.
             self._model.to(self._device)
+            # Run one prediction during startup so model graph allocation,
+            # kernel selection, and memory planning do not hit the first live
+            # frame. Use predict rather than track so warm-up cannot pollute
+            # ByteTrack state.
+            try:
+                warmup = np.zeros((640, 640, 3), dtype=np.uint8)
+                self._model.predict(
+                    source=warmup,
+                    device=self._device,
+                    conf=self._conf_threshold,
+                    verbose=False,
+                )
+            except Exception as warmup_exc:  # noqa: BLE001
+                logger.debug("YOLOEngine warm-up skipped: %s", warmup_exc)
             # Cache class name mapping.
             if hasattr(self._model, "names"):
                 self._class_names = dict(self._model.names)
@@ -188,16 +225,24 @@ class YOLOEngine:
         if not self._loaded or frame is None or frame.size == 0:
             return []
 
+        started = time.perf_counter()
         try:
-            results = self._run_tracked(frame)
+            with self._inference_lock:
+                results = self._run_tracked(frame)
         except Exception as exc:  # noqa: BLE001
             logger.warning("YOLOEngine.detect: tracking failed (%s); falling back to predict.", exc)
             try:
-                results = self._run_untracked(frame)
+                with self._inference_lock:
+                    results = self._run_untracked(frame)
             except Exception as exc2:  # noqa: BLE001
                 logger.error("YOLOEngine.detect: predict also failed: %s", exc2)
                 return []
 
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        with self._inference_lock:
+            self._inference_count += 1
+            self._last_inference_ms = elapsed_ms
+            self._total_inference_ms += elapsed_ms
         detections: List[Detection] = []
         for result in results:
             boxes = result.boxes
@@ -225,6 +270,17 @@ class YOLOEngine:
                 )
         return detections
 
+    def stats(self) -> Dict[str, Any]:
+        """Return lightweight inference telemetry for agent/backend diagnostics."""
+        with self._inference_lock:
+            count = self._inference_count
+            return {
+                "inference_count": float(count),
+                "last_inference_ms": round(self._last_inference_ms, 2),
+                "avg_inference_ms": round(self._total_inference_ms / count, 2) if count else 0.0,
+                "device": self._device,
+            }
+
     def detect_pose(self, frame: np.ndarray) -> List[Detection]:
         """
         Run YOLOv8-pose inference on *frame* and return detections that
@@ -246,13 +302,15 @@ class YOLOEngine:
             return []
 
         try:
-            results = self._run_tracked(frame)
+            with self._inference_lock:
+                results = self._run_tracked(frame)
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "YOLOEngine.detect_pose: tracking failed (%s); falling back to predict.", exc
             )
             try:
-                results = self._run_untracked(frame)
+                with self._inference_lock:
+                    results = self._run_untracked(frame)
             except Exception as exc2:  # noqa: BLE001
                 logger.error("YOLOEngine.detect_pose: predict also failed: %s", exc2)
                 return []

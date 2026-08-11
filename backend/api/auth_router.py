@@ -111,14 +111,18 @@ except ImportError as _bcrypt_err:
 
 try:
     from jose import jwt
-    def make_token(payload: dict, expires_delta: timedelta) -> str:
-        data = payload.copy()
-        data["exp"] = datetime.now(timezone.utc) + expires_delta
-        return jwt.encode(data, _jwt_secret(), algorithm="HS256")
-except ImportError:
-    import json, base64, hmac, hashlib
-    def make_token(payload: dict, expires_delta: timedelta) -> str:
-        return secrets.token_urlsafe(40)
+except ImportError as exc:
+    raise RuntimeError(
+        "python-jose is required for JWT authentication. "
+        "Install it with: pip install 'python-jose[cryptography]>=3.3.0'"
+    ) from exc
+
+
+def make_token(payload: dict, expires_delta: timedelta) -> str:
+    data = payload.copy()
+    data["exp"] = datetime.now(timezone.utc)
+    data["exp"] = data["exp"] + expires_delta
+    return jwt.encode(data, _jwt_secret(), algorithm="HS256")
 
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 REFRESH_EXPIRE_DAYS = 30
@@ -232,22 +236,6 @@ async def register(
         "trial_ends_at": tenant.trial_ends_at.isoformat() if tenant.trial_ends_at else None,
         "onboarding_token": onboarding_token,
     }
-
-
-_DEMO_ACCOUNTS: dict[str, dict] = {
-    "demo@vantag.io": {
-        "password": "demo1234",
-        "user_id": "demo-user-001",
-        "tenant_id": "demo-tenant-001",
-        "role": "admin",
-        "name": "Vantag Demo Store",
-        "plan_id": "pro",
-        "country": "IN",
-        "language": "en",
-        "onboarding_step": 5,
-        "status": "active",
-    }
-}
 
 
 @auth_router.post("/login")

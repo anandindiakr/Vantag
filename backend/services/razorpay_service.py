@@ -61,6 +61,19 @@ def create_order(country: str, plan_id: str, tenant_id: str) -> dict[str, Any]:
     return dict(order)
 
 
+def _allow_explicit_test_mode() -> bool:
+    """Allow unsigned payment flows only for an explicit non-production test mode.
+
+    Missing gateway credentials must never silently turn a production payment
+    endpoint into an approval endpoint. Local development can opt in explicitly
+    with ``VANTAG_PAYMENT_TEST_MODE=1`` while production always fails closed.
+    """
+    return (
+        os.getenv("VANTAG_ENV", "development").lower() not in {"prod", "production"}
+        and os.getenv("VANTAG_PAYMENT_TEST_MODE", "").strip().lower() in {"1", "true", "yes"}
+    )
+
+
 def verify_payment_signature(
     order_id: str,
     payment_id: str,
@@ -71,7 +84,7 @@ def verify_payment_signature(
     region = get_region(country)
     key_secret = region.get("razorpay_key_secret", "")
     if not key_secret:
-        return True  # test mode: skip verification
+        return _allow_explicit_test_mode()
 
     body = f"{order_id}|{payment_id}"
     expected = hmac.new(key_secret.encode(), body.encode(), hashlib.sha256).hexdigest()
@@ -79,11 +92,10 @@ def verify_payment_signature(
 
 
 def verify_webhook_signature(payload: bytes, signature: str, country: str) -> bool:
-    """Verify Razorpay webhook signature."""
-    region = get_region(country)
-    webhook_secret = os.getenv(f"RAZORPAY_WEBHOOK_SECRET_{country}", "")
+    """Verify Razorpay webhook signature and fail closed when unconfigured."""
+    webhook_secret = os.getenv(f"RAZORPAY_WEBHOOK_SECRET_{country.upper()}", "")
     if not webhook_secret:
-        return True
+        return _allow_explicit_test_mode()
     expected = hmac.new(webhook_secret.encode(), payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 

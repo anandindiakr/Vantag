@@ -71,6 +71,11 @@ _HEATMAP_ROWS = 10
 _HEATMAP_COLS = 10
 _RISK_DECAY_FACTOR = 0.95       # applied per second when no new events arrive
 _FRAME_SLEEP_NO_DATA = 0.01     # seconds to yield when no frame is available
+# Live snapshots and heatmaps are dashboard telemetry, not inference inputs.
+# Updating them on every RTSP frame wastes CPU (especially on 1080p cameras)
+# without improving the operator experience.
+_SNAPSHOT_MIN_INTERVAL = 0.5    # at most 2 encoded snapshots per second/camera
+_HEATMAP_MIN_INTERVAL = 0.5     # at most 2 heatmap updates per second/camera
 
 
 # ---------------------------------------------------------------------------
@@ -209,13 +214,21 @@ class VantagPipeline:
 
         self._build_analyzers()
 
+        # CLAHE is comparatively expensive to construct. Keep one instance
+        # per pipeline and only use it for cameras that explicitly opt into
+        # low-light mode (the previous code enhanced every camera/frame even
+        # when low_light_mode was false).
+        self._clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+
         # ---- Shared state (read by API routers) ----
         self.risk_scores: Dict[str, dict] = {}          # store_id → {score, event_counts, ...}
         self.recent_events: Dict[str, Deque[dict]] = defaultdict(
             lambda: deque(maxlen=_MAX_RECENT_EVENTS)
         )
         self.latest_snapshots: Dict[str, bytes] = {}    # camera_id → JPEG bytes
+        self._last_snapshot_at: Dict[str, float] = {}
         self.heatmaps: Dict[str, Dict[str, dict]] = {}  # store_id → {window → grid}
+        self._last_heatmap_at: Dict[str, float] = {}
         self.queue_status: Dict[str, dict] = {}         # lane_id → queue data
 
         # ---- Rolling event timestamps for risk scoring ----
@@ -436,7 +449,13 @@ class VantagPipeline:
         detections: List[Detection] = []
         if self._yolo_engine is not None:
             try:
-                detections = self._yolo_engine.detect(enhanced)
+                # YOLO is CPU/GPU-bound and synchronous. Run it off the
+                # asyncio event loop so one slow model call cannot pause
+                # every other camera task, WebSocket, or API request.
+                detections = await asyncio.to_thread(
+                    self._yolo_engine.detect,
+                    enhanced,
+                )
             except Exception as exc:  # noqa: BLE001
                 logger.debug("YOLO inference error | camera=%s error=%s", camera_id, exc)
 
@@ -470,19 +489,33 @@ class VantagPipeline:
                     )
                 self._recompute_risk(store_id)
 
-        # 4. Cache annotated snapshot.
-        annotated = self._annotate_frame(frame, events)
-        try:
-            _, jpeg_buf = cv2.imencode(
-                ".jpg", annotated,
-                [cv2.IMWRITE_JPEG_QUALITY, _SNAPSHOT_JPEG_QUALITY],
-            )
-            self.latest_snapshots[camera_id] = jpeg_buf.tobytes()
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("Snapshot encoding failed | camera=%s error=%s", camera_id, exc)
+        # 4. Cache an annotated snapshot for the dashboard. Event frames are
+        # always captured immediately; ordinary live thumbnails are capped at
+        # two encodes/sec/camera so JPEG work cannot dominate inference.
+        now_mono = time.monotonic()
+        if (
+            events
+            or now_mono - self._last_snapshot_at.get(camera_id, 0.0)
+            >= _SNAPSHOT_MIN_INTERVAL
+        ):
+            annotated = self._annotate_frame(frame, events)
+            try:
+                ok, jpeg_buf = cv2.imencode(
+                    ".jpg", annotated,
+                    [cv2.IMWRITE_JPEG_QUALITY, _SNAPSHOT_JPEG_QUALITY],
+                )
+                if ok:
+                    self.latest_snapshots[camera_id] = jpeg_buf.tobytes()
+                    self._last_snapshot_at[camera_id] = now_mono
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Snapshot encoding failed | camera=%s error=%s", camera_id, exc)
 
-        # 5. Update heatmap (simple motion-based approximation).
-        self._update_heatmap(store_id, camera_id, frame)
+        # 5. Update heatmap (simple motion-based approximation). The grid is
+        # telemetry and does not need to run at detector FPS; throttling it
+        # avoids 200 Python cell updates per camera frame.
+        if now_mono - self._last_heatmap_at.get(camera_id, 0.0) >= _HEATMAP_MIN_INTERVAL:
+            self._update_heatmap(store_id, camera_id, frame)
+            self._last_heatmap_at[camera_id] = now_mono
 
         # 6. Broadcast events.
         for ev in events:
@@ -788,19 +821,19 @@ class VantagPipeline:
             "snapshot_url": None,
         }
 
-    @staticmethod
-    def _enhance_low_light(camera_id: str, frame: np.ndarray) -> np.ndarray:
-        """
-        Placeholder for LowLightEnhancer.
+    def _enhance_low_light(self, camera_id: str, frame: np.ndarray) -> np.ndarray:
+        """Enhance only cameras that explicitly enable low-light mode.
 
-        Currently applies CLAHE histogram equalisation on the L channel
-        of the LAB colour space as a lightweight substitute.
+        CLAHE is useful for dark scenes but is a full-frame CPU operation and
+        can make normal well-lit footage noisier. The old static helper ran it
+        unconditionally, so every normal camera paid this cost on every frame.
         """
         try:
+            if not self.registry.get_camera(camera_id).low_light_mode:
+                return frame
             lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
             l_ch, a_ch, b_ch = cv2.split(lab)
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-            l_eq = clahe.apply(l_ch)
+            l_eq = self._clahe.apply(l_ch)
             merged = cv2.merge([l_eq, a_ch, b_ch])
             return cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
         except Exception:  # noqa: BLE001
