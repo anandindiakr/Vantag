@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, Minimize2, X, ExternalLink, MapPin } from 'lucide-react';
 import clsx from 'clsx';
 import type { Camera } from '../store/useVantagStore';
+
+const SNAPSHOT_REFRESH_MS = 3000;
 
 const NO_SIGNAL_SVG =
   'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180">' +
@@ -38,10 +40,30 @@ export default function CameraTile({
   className,
 }: CameraTileProps) {
   const navigate = useNavigate();
-  const [streamError, setStreamError] = useState(false);
+  const [snapshotError, setSnapshotError] = useState(false);
+  const [tick, setTick] = useState(0);
+
+  // Use the same authenticated snapshot relay as the Cameras page. The
+  // edge agent publishes JPEG snapshots to this endpoint; the MJPEG stream
+  // endpoint can legitimately have no direct RTSP source on the VPS.
+  useEffect(() => {
+    if (!camera.online) {
+      setSnapshotError(false);
+      return undefined;
+    }
+
+    const interval = window.setInterval(() => {
+      setTick((current) => current + 1);
+      // Retry after a transient relay/network failure instead of leaving the
+      // tile permanently stuck on its first error state.
+      setSnapshotError(false);
+    }, SNAPSHOT_REFRESH_MS);
+
+    return () => window.clearInterval(interval);
+  }, [camera.id, camera.online]);
 
   const authToken = localStorage.getItem('vantag_token') ?? '';
-  const streamSrc = `/api/cameras/${camera.id}/stream?token=${encodeURIComponent(authToken)}`;
+  const snapshotSrc = `/api/cameras/${encodeURIComponent(camera.id)}/snapshot?t=${tick}&token=${encodeURIComponent(authToken)}`;
 
   const openFullView = () => navigate(`/cameras/${encodeURIComponent(camera.storeId)}/${encodeURIComponent(camera.id)}`);
 
@@ -57,7 +79,7 @@ export default function CameraTile({
       )}
     >
       {/* ── Stream ─────────────────────────────────────────────────── */}
-      {streamError || !camera.online ? (
+      {snapshotError || !camera.online ? (
         <div
           className={clsx(
             'bg-slate-900 flex items-center justify-center',
@@ -68,14 +90,15 @@ export default function CameraTile({
         </div>
       ) : (
         <img
-          src={streamSrc}
+          key={tick}
+          src={snapshotSrc}
           alt={`${camera.name} live stream`}
           className={clsx(
             'w-full cursor-pointer',
             expanded ? 'h-full object-contain' : 'aspect-video object-cover'
           )}
           onClick={openFullView}
-          onError={() => setStreamError(true)}
+          onError={() => setSnapshotError(true)}
         />
       )}
 
