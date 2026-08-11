@@ -65,7 +65,28 @@ check_health() {
   [ "$status" = "healthy" ] && [ "$http_code" = "200" ]
 }
 
-if build_and_start && check_health; then
+# Nginx resolves the Docker service name when its worker starts. Recreating
+# vantag-backend changes that container IP, so leaving nginx untouched can
+# leave it pointing at the old IP and return 502 for every /api request even
+# though the backend's own healthcheck is green. Restart nginx after the
+# backend is healthy so its upstream is resolved against the new container.
+refresh_nginx_upstream() {
+  echo "Refreshing nginx backend upstream after container replacement..."
+  docker compose -f "$COMPOSE_FILE" restart nginx
+
+  local nginx_status="starting" i
+  for i in $(seq 1 20); do
+    nginx_status=$(docker inspect --format='{{.State.Health.Status}}' vantag-nginx 2>/dev/null || echo "starting")
+    [ "$nginx_status" = "healthy" ] && break
+    sleep 3
+  done
+
+  docker exec vantag-nginx nginx -t
+  docker exec vantag-nginx wget -q -O /dev/null http://vantag-backend:8800/health
+  echo "Nginx upstream refresh successful (status=$nginx_status)."
+}
+
+if build_and_start && check_health && refresh_nginx_upstream; then
   echo "Backend deploy successful and healthy."
   docker image prune -f
   exit 0
@@ -74,7 +95,7 @@ fi
 echo "Backend unhealthy — rolling back to $PREV_SHA"
 git reset --hard "$PREV_SHA"
 build_and_start
-if check_health; then
+if check_health && refresh_nginx_upstream; then
   echo "Rolled back to previous version and it is healthy."
 else
   echo "WARNING: rollback target is ALSO unhealthy — backend needs manual attention."

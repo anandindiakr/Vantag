@@ -46,6 +46,7 @@ on:
       - "windows_agent/**"
       - "docker/Dockerfile"
       - "docker/docker-compose.prod.yml"
+      - "docker/deploy_backend.sh"
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
 
