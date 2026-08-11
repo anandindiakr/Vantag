@@ -32,6 +32,8 @@ volumes:
     driver: local
   vantag-data:
     driver: local
+  redis-data:
+    driver: local
 
 services:
 
@@ -84,6 +86,22 @@ services:
       timeout: 5s
       retries: 3
 
+  # ── Shared Redis relay (cross-worker live frames + short-lived tokens) ────
+  redis:
+    image: redis:7-alpine
+    container_name: vantag-redis-prod
+    restart: unless-stopped
+    command: redis-server --appendonly yes --save 60 1000
+    volumes:
+      - redis-data:/data
+    networks:
+      - vantag-prod
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   # ── Vantag backend (FastAPI) ──────────────────────────────────────────────
   vantag-backend:
     build:
@@ -106,6 +124,7 @@ services:
       VANTAG_FACE_KEY:      ${VANTAG_FACE_KEY}
       MQTT_BROKER:          mosquitto
       MQTT_PORT:            1883
+      REDIS_URL:            redis://redis:6379/0
       VANTAG_SMTP_HOST:     ${VANTAG_SMTP_HOST:-smtp.gmail.com}
       VANTAG_SMTP_PORT:     ${VANTAG_SMTP_PORT:-587}
       VANTAG_SMTP_USER:     ${VANTAG_SMTP_USER}
@@ -135,6 +154,8 @@ services:
       postgres:
         condition: service_healthy
       mosquitto:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - vantag-prod

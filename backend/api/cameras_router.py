@@ -225,10 +225,40 @@ async def list_cameras(
 
 
 def _db_camera_to_response(row) -> CameraResponse:  # noqa: ANN001
-    """Convert a ``CameraConfig`` DB row into the API ``CameraResponse``."""
+    """Convert a ``CameraConfig`` DB row into the API ``CameraResponse``.
+
+    Heartbeats and frames are separate signals. A heartbeat proves that the
+    edge agent is reachable, but it does not prove that this camera is
+    producing a usable image. In production the frame age is read from the
+    shared Redis relay so every Uvicorn worker reports the same truth.
+    """
     conn = (getattr(row, "conn_status", "") or "").lower()
+    frame_age_seconds = None
     if conn == "online":
-        cam_status = CameraStatus.ONLINE
+        try:
+            from .edge_router import get_latest_edge_frame_age
+
+            frame_age_seconds = get_latest_edge_frame_age(
+                str(getattr(row, "tenant_id", "")), str(row.camera_id)
+            )
+        except Exception:  # noqa: BLE001
+            frame_age_seconds = None
+
+        # On-box deployments can have a fresh local pipeline frame without an
+        # edge relay entry. Preserve that valid signal while keeping the
+        # multi-worker SaaS path Redis-backed.
+        if frame_age_seconds is None and _pipeline is not None:
+            try:
+                if _pipeline.latest_snapshots.get(row.camera_id):
+                    frame_age_seconds = 0.0
+            except Exception:  # noqa: BLE001
+                pass
+
+        cam_status = (
+            CameraStatus.ONLINE
+            if frame_age_seconds is not None
+            else CameraStatus.DEGRADED
+        )
     else:
         # pending / offline / unknown -> offline until the agent confirms a frame
         cam_status = CameraStatus.OFFLINE
@@ -270,6 +300,7 @@ def _db_camera_to_response(row) -> CameraResponse:  # noqa: ANN001
         status=cam_status,
         consecutive_failures=0,
         last_checked_at=getattr(row, "last_connected_at", None),
+        frame_age_seconds=round(frame_age_seconds, 1) if frame_age_seconds is not None else None,
         zones=[],
         confidence_threshold=_conf,
     )

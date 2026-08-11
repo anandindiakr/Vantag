@@ -222,8 +222,8 @@ def set_webhook_engine(engine) -> None:  # type: ignore[no-untyped-def]
 # cameras_router's /stream endpoint reads the latest one for that camera.
 #
 # Keyed by camera_id -> (jpeg_bytes, monotonic_timestamp, tenant_id).
-# In-memory only (per-process); fine for a single backend instance. If the
-# backend is ever scaled horizontally this should move to Redis.
+# This remains a development fallback only. Production runs multiple Uvicorn
+# workers, so the authoritative latest frame is stored in Redis below.
 _latest_edge_frames: dict[str, tuple[bytes, float, str]] = {}
 # Treat a frame as unavailable if older than this. Generous window (45s) so a
 # brief uplink hiccup on the store's network degrades to a slightly stale
@@ -231,6 +231,87 @@ _latest_edge_frames: dict[str, tuple[bytes, float, str]] = {}
 _FRAME_STALE_SEC = 45.0
 _MAX_SNAPSHOT_BYTES = 2_000_000
 _MAX_FRAME_BYTES = 1_000_000
+_FRAME_REDIS_PREFIX = "vantag:live-frame:"
+_frame_redis_client = None
+_frame_redis_url = None
+
+
+def _get_frame_redis():
+    """Return a binary Redis client for the cross-worker frame relay.
+
+    The normal bootstrap Redis client uses ``decode_responses=True`` and is
+    deliberately kept separate because JPEG bytes must not be decoded as
+    UTF-8. A short socket timeout makes Redis failure degrade to the local
+    development cache instead of blocking camera/API requests.
+    """
+    global _frame_redis_client, _frame_redis_url  # noqa: PLW0603
+    redis_url = os.getenv("REDIS_URL", "")
+    if not redis_url:
+        return None
+    if _frame_redis_client is not None and _frame_redis_url == redis_url:
+        return _frame_redis_client
+    try:
+        import redis as _redis
+
+        _frame_redis_client = _redis.from_url(
+            redis_url,
+            decode_responses=False,
+            socket_connect_timeout=0.15,
+            socket_timeout=0.15,
+            health_check_interval=30,
+        )
+        _frame_redis_url = redis_url
+        return _frame_redis_client
+    except Exception:  # noqa: BLE001
+        _frame_redis_client = None
+        _frame_redis_url = None
+        return None
+
+
+def _frame_key(tenant_id: str, camera_id: str) -> str:
+    return f"{_FRAME_REDIS_PREFIX}{tenant_id}:{camera_id}"
+
+
+def _frame_ts_key(tenant_id: str, camera_id: str) -> str:
+    return f"{_frame_key(tenant_id, camera_id)}:ts"
+
+
+def _store_latest_edge_frame(tenant_id: str, camera_id: str, raw: bytes) -> None:
+    """Store a frame in shared Redis and the local fallback cache."""
+    now = time.time()
+    _latest_edge_frames[camera_id] = (raw, time.monotonic(), str(tenant_id))
+    redis_client = _get_frame_redis()
+    if redis_client is None:
+        return
+    try:
+        ttl = int(_FRAME_STALE_SEC + 5)
+        pipe = redis_client.pipeline(transaction=True)
+        pipe.setex(_frame_key(str(tenant_id), camera_id), ttl, raw)
+        pipe.setex(_frame_ts_key(str(tenant_id), camera_id), ttl, str(now).encode())
+        pipe.execute()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Shared frame relay unavailable; using local cache: %s", exc)
+
+
+def get_latest_edge_frame_age(tenant_id: str, camera_id: str) -> float | None:
+    """Return the age of a fresh frame, or None when no fresh frame exists."""
+    redis_client = _get_frame_redis()
+    if redis_client is not None:
+        try:
+            raw_ts = redis_client.get(_frame_ts_key(str(tenant_id), camera_id))
+            raw_frame = redis_client.get(_frame_key(str(tenant_id), camera_id))
+            if raw_ts is not None and raw_frame:
+                age = max(0.0, time.time() - float(raw_ts.decode()))
+                if age <= _FRAME_STALE_SEC:
+                    return age
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Shared frame age lookup failed: %s", exc)
+
+    entry = _latest_edge_frames.get(camera_id)
+    if entry is None or str(entry[2]) != str(tenant_id):
+        return None
+    age = max(0.0, time.monotonic() - entry[1])
+    return age if age <= _FRAME_STALE_SEC else None
 
 
 def _is_safe_storage_component(value: str) -> bool:
@@ -240,14 +321,24 @@ def _is_safe_storage_component(value: str) -> bool:
 
 
 def get_latest_edge_frame(tenant_id: str, camera_id: str) -> bytes | None:
-    """Return the most recent JPEG frame pushed by the Edge Agent for this
-    camera, or None if no frame has arrived recently (or it belongs to a
-    different tenant)."""
+    """Return the latest tenant-scoped fresh frame across all workers."""
+    redis_client = _get_frame_redis()
+    if redis_client is not None:
+        try:
+            raw_frame = redis_client.get(_frame_key(str(tenant_id), camera_id))
+            raw_ts = redis_client.get(_frame_ts_key(str(tenant_id), camera_id))
+            if raw_frame and raw_ts:
+                age = max(0.0, time.time() - float(raw_ts.decode()))
+                if age <= _FRAME_STALE_SEC:
+                    return raw_frame
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Shared frame lookup failed; using local cache: %s", exc)
+
     entry = _latest_edge_frames.get(camera_id)
     if entry is None:
         return None
     jpeg_bytes, ts, frame_tenant_id = entry
-    if frame_tenant_id != tenant_id:
+    if str(frame_tenant_id) != str(tenant_id):
         return None
     if (time.monotonic() - ts) > _FRAME_STALE_SEC:
         return None
@@ -746,7 +837,7 @@ async def push_frame(
             return {"ok": False}
     except Exception:  # noqa: BLE001
         return {"ok": False}
-    _latest_edge_frames[body.camera_id] = (raw, time.monotonic(), agent.tenant_id)
+    _store_latest_edge_frame(str(agent.tenant_id), body.camera_id, raw)
     return {"ok": True}
 
 
@@ -1377,6 +1468,17 @@ async def list_agents(
     now = datetime.now(timezone.utc)
     stale_threshold = timedelta(minutes=5)
 
+    model_status_by_agent: dict[str, dict] = {}
+    try:
+        from ..db import system_health_store as _sh_store
+
+        model_status_by_agent = {
+            str(row["agent_id"]): row
+            for row in _sh_store.list_agent_model_status(tenant_id)
+        }
+    except Exception:  # noqa: BLE001 — status panel must remain available
+        logger.exception("Failed to load agent model telemetry")
+
     items = []
     for a in agents:
         if a.last_heartbeat is not None:
@@ -1394,6 +1496,7 @@ async def list_agents(
             last_heartbeat_iso = None
             last_heartbeat_age_seconds = None
 
+        telemetry = model_status_by_agent.get(str(a.id))
         items.append({
             "agent_id": a.id,
             "device_type": a.device_type,
@@ -1404,6 +1507,9 @@ async def list_agents(
             "camera_count": a.camera_count,
             "capabilities": a.capabilities,
             "created_at": a.created_at.isoformat() if a.created_at else None,
+            "model_status": telemetry.get("status") if telemetry else None,
+            "model_status_age_seconds": telemetry.get("age_seconds") if telemetry else None,
+            "model_status_stale": telemetry.get("stale") if telemetry else True,
         })
 
     return {"agents": items, "total": len(items)}

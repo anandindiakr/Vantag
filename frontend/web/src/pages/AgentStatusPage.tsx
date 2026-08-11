@@ -36,6 +36,23 @@ interface AgentItem {
   camera_count: number;
   capabilities: Record<string, unknown> | null;
   created_at: string | null;
+  model_status: {
+    architecture?: string;
+    provider?: string;
+    avg_inference_ms?: number;
+    inference_count?: number;
+    is_preferred?: boolean;
+  } | null;
+  model_status_stale: boolean;
+}
+
+interface AIQuality {
+  confirmed: number;
+  false_positive: number;
+  uncertain: number;
+  reviewed: number;
+  quality_proxy: number | null;
+  false_positive_rate: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +82,7 @@ export default function AgentStatusPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState<string | null>(null); // agent_id
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [quality, setQuality] = useState<AIQuality | null>(null);
 
   const fetchAgents = useCallback(async () => {
     const token = localStorage.getItem('vantag_token');
@@ -84,12 +102,29 @@ export default function AgentStatusPage() {
     }
   }, []);
 
+  const fetchQuality = useCallback(async () => {
+    const token = localStorage.getItem('vantag_token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/system/ai-quality', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setQuality(await res.json());
+    } catch {
+      // Quality metrics are diagnostic and must not affect agent status.
+    }
+  }, []);
+
   // Initial fetch + 30-second poll
   useEffect(() => {
     fetchAgents();
-    const id = setInterval(fetchAgents, 30_000);
+    fetchQuality();
+    const id = setInterval(() => {
+      fetchAgents();
+      fetchQuality();
+    }, 30_000);
     return () => clearInterval(id);
-  }, [fetchAgents]);
+  }, [fetchAgents, fetchQuality]);
 
   const triggerScan = async (agentId: string) => {
     const token = localStorage.getItem('vantag_token');
@@ -152,7 +187,7 @@ export default function AgentStatusPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           label="Total Agents"
           value={agents.length}
@@ -171,6 +206,15 @@ export default function AgentStatusPage() {
           icon={<AlertCircle size={18} className="text-slate-400" />}
           color="slate"
         />
+        <div className="rounded-xl border border-slate-700/60 bg-cyan-500/10 p-4">
+          <p className="text-xs text-slate-400">AI reviewed quality</p>
+          <p className="text-2xl font-bold text-slate-100">
+            {quality?.quality_proxy == null ? '—' : `${Math.round(quality.quality_proxy * 100)}%`}
+          </p>
+          <p className="text-xs text-slate-500">
+            {quality?.reviewed ?? 0} reviewed · labels improve future tuning
+          </p>
+        </div>
       </div>
 
       {/* Agent table */}
@@ -284,6 +328,14 @@ function AgentRow({
           <div>
             <p className="font-medium text-slate-200">{agent.device_name}</p>
             <p className="text-xs text-slate-500 capitalize">{agent.device_type}</p>
+            {agent.model_status && !agent.model_status_stale && (
+              <p className="text-[11px] text-cyan-400/80">
+                {agent.model_status.is_preferred ? 'YOLO26' : agent.model_status.architecture ?? 'Detector'}
+                {agent.model_status.avg_inference_ms != null
+                  ? ` · ${agent.model_status.avg_inference_ms.toFixed(1)} ms`
+                  : ''}
+              </p>
+            )}
           </div>
         </div>
       </td>

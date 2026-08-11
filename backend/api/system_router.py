@@ -17,9 +17,13 @@ import os
 import time
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..db.database import get_session
+from ..db.models.event import DetectionEvent
 from ..middleware.tenant_middleware import get_current_user_id
 
 logger = logging.getLogger(__name__)
@@ -41,6 +45,69 @@ class HealthCheckItem(BaseModel):
 class HealthCheckResponse(BaseModel):
     checks: List[HealthCheckItem]
     overall: str  # "healthy" | "degraded" | "broken"
+
+
+class AIFeedbackBody(BaseModel):
+    event_id: str = Field(..., min_length=1, max_length=36)
+    verdict: str = Field(..., description="confirmed, false_positive, or uncertain")
+    note: str = Field("", max_length=1000)
+
+
+# ---------------------------------------------------------------------------
+# AI quality feedback
+# ---------------------------------------------------------------------------
+
+@system_router.get("/ai-quality", summary="AI quality metrics from reviewed events")
+async def ai_quality(
+    user: dict = Depends(get_current_user_id),
+) -> dict:
+    """Return measured model quality, never a guessed accuracy percentage."""
+    from ..db import system_health_store as health_store
+
+    return health_store.ai_quality_summary(str(user["tenant_id"]))
+
+
+@system_router.post("/ai-feedback", summary="Label an AI incident for quality review")
+async def submit_ai_feedback(
+    body: AIFeedbackBody,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Record a tenant-scoped human label for a detection event.
+
+    This is the feedback loop used to improve thresholds/models offline. A
+    label is deliberately explicit and does not silently retrain production.
+    """
+    verdict = body.verdict.strip().lower()
+    if verdict not in {"confirmed", "false_positive", "uncertain"}:
+        raise HTTPException(
+            status_code=422,
+            detail="verdict must be confirmed, false_positive, or uncertain",
+        )
+    tenant_id = str(user["tenant_id"])
+    event = (
+        await session.execute(
+            select(DetectionEvent).where(
+                DetectionEvent.id == body.event_id,
+                DetectionEvent.tenant_id == tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if event is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    from ..db import system_health_store as health_store
+    feedback = health_store.record_ai_feedback(
+        tenant_id=tenant_id,
+        event_id=body.event_id,
+        verdict=verdict,
+        note=body.note,
+    )
+    return {
+        "ok": True,
+        "feedback": feedback,
+        "quality": health_store.ai_quality_summary(tenant_id),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -82,31 +149,30 @@ async def _probe_mqtt() -> tuple[bool, str, Optional[float]]:
 
 
 async def _probe_redis() -> tuple[bool, str, Optional[float]]:
-    """Ping the Redis instance if configured."""
+    """Ping the configured Redis relay using the installed redis client."""
     redis_url = os.getenv("REDIS_URL", "")
     t0 = time.monotonic()
     if not redis_url:
         return False, "REDIS_URL not configured", None
     try:
-        import aioredis  # type: ignore
-        r = await aioredis.from_url(redis_url, socket_connect_timeout=2)
-        await r.ping()
-        await r.close()
+        import redis
+
+        def _ping() -> bool:
+            client = redis.Redis.from_url(
+                redis_url,
+                socket_connect_timeout=1.5,
+                socket_timeout=1.5,
+            )
+            try:
+                return bool(client.ping())
+            finally:
+                client.close()
+
+        ok = await asyncio.to_thread(_ping)
         lat = round((time.monotonic() - t0) * 1000, 1)
-        return True, "Connected", lat
+        return (True, "Connected", lat) if ok else (False, "Ping failed", lat)
     except ImportError:
-        # aioredis not installed — try raw TCP to default Redis port
-        host_part = redis_url.replace("redis://", "").split(":")[0] or "localhost"
-        port_part = 6379
-        try:
-            r2, w2 = await asyncio.open_connection(host_part, port_part)
-            w2.close()
-            await w2.wait_closed()
-            lat = round((time.monotonic() - t0) * 1000, 1)
-            return True, "Connected (TCP)", lat
-        except Exception as exc2:  # noqa: BLE001
-            lat = round((time.monotonic() - t0) * 1000, 1)
-            return False, f"Unreachable: {exc2}", lat
+        return False, "redis package not installed", None
     except Exception as exc:  # noqa: BLE001
         lat = round((time.monotonic() - t0) * 1000, 1)
         return False, f"Error: {exc}", lat

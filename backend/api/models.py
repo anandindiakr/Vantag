@@ -207,6 +207,11 @@ class CameraResponse(BaseModel):
     status: CameraStatus
     consecutive_failures: int = Field(0, description="Number of consecutive health-check failures.")
     last_checked_at: Optional[datetime] = None
+    frame_age_seconds: Optional[float] = Field(
+        None,
+        ge=0.0,
+        description="Age of the latest fresh frame from the edge relay. None means no fresh frame is available.",
+    )
     zones: List[ZonePolygon] = Field(default_factory=list)
     confidence_threshold: float = Field(
         0.5,
