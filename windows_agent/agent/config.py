@@ -38,6 +38,12 @@ class CameraConfig:
     # agent — previously configured but never delivered here, so it had no
     # effect at all.
     inventory_zones: list[dict] = field(default_factory=list)
+    # High-Value Counter (jewellery / luxury goods) scene profile, delivered
+    # by the backend's /api/edge/config response as "high_value_counter".
+    # Structure: {"jewelry_handover": {...}, "jewelry_tray": {...},
+    # "grab_and_run": {...}} with polygon vertices normalized to 0-1
+    # fractions of the camera's reference resolution.
+    high_value_counter: dict = field(default_factory=dict)
     # Per-camera opt-in analytic toggles, delivered by the backend's
     # /api/edge/config response as "detections". Keys: shoplifting,
     # loitering, suspicious_behavior, crowding, fall_detected,

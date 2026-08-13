@@ -184,6 +184,7 @@ def _map_remote_camera(c: dict) -> CameraConfig:
         people_count_zones=c.get("people_count_zones") or [],
         exclusion_zones=c.get("exclusion_zones") or [],
         inventory_zones=c.get("inventory_zones") or [],
+        high_value_counter=c.get("high_value_counter") or {},
         detections=c.get("detections") or analyzer.get("detections") or {},
     )
 
@@ -212,6 +213,7 @@ def _build_worker(cam):
         inventory_zones=getattr(cam, "inventory_zones", []),
         detections=getattr(cam, "detections", {}) or {},
         product_count_detector=_product_count_detector,
+        high_value_counter=getattr(cam, "high_value_counter", {}),
     )
 
 
@@ -271,6 +273,9 @@ def reconcile_cameras():
             )
             or desired[cam_id].inventory_zones != getattr(
                 w.config, "inventory_zones", []
+            )
+            or desired[cam_id].high_value_counter != getattr(
+                w.config, "high_value_counter", {}
             )
         )
         if changed:
@@ -349,6 +354,7 @@ def start_monitoring():
             inventory_zones=getattr(cam, "inventory_zones", []),
             detections=getattr(cam, "detections", {}) or {},
             product_count_detector=_product_count_detector,
+            high_value_counter=getattr(cam, "high_value_counter", {}),
         )
         worker.start()
         _workers.append(worker)

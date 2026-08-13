@@ -40,6 +40,11 @@ from .inference import (
     ProductCountDetector,
 )
 from .tracker import ByteTracker
+from .jewelry import (
+    JewelryHandoverDetector,
+    JewelryTrayDetector,
+    GrabAndRunDetector,
+)
 
 log = logging.getLogger("vantag.camera")
 
@@ -86,6 +91,8 @@ STAFF_FACE_EVENTS = {
     "loitering",
     "suspicious_behavior",
     "fall_detected",
+    "jewelry_handover",
+    "grab_and_run",
 }
 
 # ---------------------------------------------------------------------------
@@ -607,6 +614,7 @@ class DetectionAnalyzer:
         inventory_zones: Optional[list[dict]] = None,
         detections: Optional[dict] = None,
         product_count_detector: Optional["ProductCountDetector"] = None,
+        high_value_counter: Optional[dict] = None,
     ):
         self.camera_id = camera_id
         self.cooldown_sec = cooldown_sec
@@ -723,6 +731,28 @@ class DetectionAnalyzer:
         # _analyze_inventory_zones below) — never per-frame. May be None
         # (model unavailable) — Tier 1 must keep working unaffected.
         self._product_count_detector = product_count_detector
+
+        # High-Value Counter (jewellery / luxury goods) detectors, fed the
+        # normalized scene profile from the backend's /api/edge/config
+        # response. Each detector no-ops until its polygons are drawn in the
+        # dashboard (see the High-Value Counter setup page).
+        hvc = dict(high_value_counter or {})
+        self._hvc_handover = JewelryHandoverDetector(
+            camera_id, hvc.get("jewelry_handover") or {}, cooldown_sec
+        )
+        self._hvc_tray = JewelryTrayDetector(
+            camera_id, hvc.get("jewelry_tray") or {}, cooldown_sec
+        )
+        self._hvc_grab = GrabAndRunDetector(
+            camera_id, hvc.get("grab_and_run") or {}, cooldown_sec
+        )
+
+    def _hvc_configured(self) -> bool:
+        return bool(
+            self._hvc_handover.configured
+            or self._hvc_tray.configured
+            or self._hvc_grab.configured
+        )
 
     def _can_emit(self, event_type: str) -> bool:
         last = self._last_event.get(event_type, 0)
@@ -1427,6 +1457,20 @@ class DetectionAnalyzer:
             if pose_evt:
                 events.append(pose_evt)
 
+        # 9. High-Value Counter detectors (jewellery / luxury goods). Each
+        # no-ops until its polygons are configured; they emit as review
+        # candidates for the operator, matching the backend pipeline's
+        # jewelry_handover / jewelry_tray / grab_and_run signals.
+        hvc_evt = self._hvc_handover.analyse(persons, frame)
+        if hvc_evt:
+            events.append(hvc_evt)
+        hvc_evt = self._hvc_tray.analyse(persons, frame)
+        if hvc_evt:
+            events.append(hvc_evt)
+        hvc_evt = self._hvc_grab.analyse(persons, frame)
+        if hvc_evt:
+            events.append(hvc_evt)
+
         # Attach a full-resolution person crop so the backend can run staff
         # face matching (Staff Faces enrolment) and suppress alerts for
         # recognised staff. The 320x180 snapshot is too small for faces.
@@ -1591,6 +1635,7 @@ class CameraWorker:
         inventory_zones: Optional[list[dict]] = None,
         detections: Optional[dict] = None,
         product_count_detector: Optional["ProductCountDetector"] = None,
+        high_value_counter: Optional[dict] = None,
     ):
         self.config = config
         self._inference = inference
@@ -1608,6 +1653,7 @@ class CameraWorker:
             inventory_zones=inventory_zones,
             detections=detections,
             product_count_detector=product_count_detector,
+            high_value_counter=high_value_counter,
         )
 
         self._stop_event = threading.Event()
@@ -1678,6 +1724,8 @@ class CameraWorker:
             zone_bits.append(f"shelf/inventory zones={len(self._analyzer._inventory_zones)}")
         if getattr(self._analyzer, "_people_count_zones", None):
             zone_bits.append(f"people-count zones={len(self._analyzer._people_count_zones)}")
+        if getattr(self._analyzer, "_hvc_configured", None) and self._analyzer._hvc_configured():
+            zone_bits.append("high-value counter polygons configured")
         if zone_bits:
             log.info(f"[{self.config.name}] Zones: {'; '.join(zone_bits)}")
 

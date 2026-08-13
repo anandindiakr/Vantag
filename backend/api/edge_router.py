@@ -150,6 +150,85 @@ def _normalized_inventory_zones(c) -> list[dict]:
     return out
 
 
+def _normalized_high_value_counter(c) -> dict:
+    """Return the camera's High-Value Counter (jewellery / luxury) polygons
+    with each polygon's vertices normalized to 0-1 fractions of the camera's
+    reference resolution.
+
+    The dashboard's point-and-click editor writes these into
+    ``analyzer_config`` under ``jewelry_handover`` / ``jewelry_tray`` /
+    ``grab_and_run`` (see zone_router.save_high_value_counter). The edge
+    agent decodes frames at whatever resolution the RTSP stream provides, so
+    absolute pixel polygons never line up — sending normalized fractions lets
+    the agent scale them per frame, exactly like the people-count / exclusion
+    / inventory helpers above.
+    """
+    ac = getattr(c, "analyzer_config", None) or {}
+    ref_w = float(getattr(c, "resolution_width", None) or 1920)
+    ref_h = float(getattr(c, "resolution_height", None) or 1080)
+
+    def norm_poly(points):
+        if not isinstance(points, list) or len(points) < 3:
+            return None
+        pts: list[tuple[float, float]] = []
+        for pt in points:
+            try:
+                x, y = float(pt[0]), float(pt[1])
+            except (TypeError, IndexError, ValueError):
+                continue
+            pts.append((x, y))
+        if len(pts) < 3:
+            return None
+        # Already normalized (legacy safety): every vertex within [0, 1].
+        if max(x for x, _ in pts) <= 1.0 and max(y for _, y in pts) <= 1.0:
+            return [[x, y] for x, y in pts]
+        return [
+            [max(0.0, min(1.0, x / ref_w)), max(0.0, min(1.0, y / ref_h))]
+            for x, y in pts
+        ]
+
+    handover = ac.get("jewelry_handover") or {}
+    tray_cfg = ac.get("jewelry_tray") or {}
+    grab = ac.get("grab_and_run") or {}
+
+    trays = []
+    for t in tray_cfg.get("trays") or []:
+        if not isinstance(t, dict):
+            continue
+        poly = norm_poly(t.get("polygon"))
+        if poly is not None:
+            trays.append({"label": str(t.get("label", "tray")), "polygon": poly})
+
+    return {
+        "jewelry_handover": {
+            "counter_polygon": norm_poly(handover.get("counter_polygon")),
+            "tray_polygon": norm_poly(handover.get("tray_polygon")),
+            "min_hand_inside_frames": handover.get("min_hand_inside_frames", 2),
+            "cooldown_seconds": handover.get("cooldown_seconds", 30.0),
+            "confidence_threshold": handover.get("confidence_threshold", 0.45),
+            "require_person_at_counter": handover.get("require_person_at_counter", True),
+        },
+        "jewelry_tray": {
+            "counter_polygon": norm_poly(tray_cfg.get("counter_polygon")),
+            "trays": trays,
+            "drop_ratio_threshold": tray_cfg.get("drop_ratio_threshold", 0.25),
+            "check_interval_seconds": tray_cfg.get("check_interval_seconds", 3.0),
+            "cooldown_seconds": tray_cfg.get("cooldown_seconds", 30.0),
+            "person_required": tray_cfg.get("person_required", True),
+            "confidence_threshold": tray_cfg.get("confidence_threshold", 0.45),
+        },
+        "grab_and_run": {
+            "case_polygon": norm_poly(grab.get("case_polygon")),
+            "exit_polygon": norm_poly(grab.get("exit_polygon")),
+            "approach_polygon": norm_poly(grab.get("approach_polygon")),
+            "max_window_seconds": grab.get("max_window_seconds", 8.0),
+            "min_exit_speed_px_s": grab.get("min_exit_speed_px_s", 120.0),
+            "cooldown_seconds": grab.get("cooldown_seconds", 30.0),
+            "confidence_threshold": grab.get("confidence_threshold", 0.45),
+        },
+    }
+
+
 def _detection_toggles(c) -> dict:
     """Return the camera's per-analytic enable flags for the edge agent.
 
@@ -709,6 +788,7 @@ async def register_agent(
                 "people_count_zones": _normalized_people_count_zones(c),
                 "exclusion_zones": _normalized_exclusion_zones(c),
                 "inventory_zones": _normalized_inventory_zones(c),
+                "high_value_counter": _normalized_high_value_counter(c),
                 # Per-camera opt-in analytic toggles. Previously NOT sent at
                 # all, so the agent ran every behaviour heuristic (pose
                 # shoplifting, loitering, crowding, suspicious, fall) on every
@@ -1051,6 +1131,14 @@ async def ingest_event(
         "restricted_zone": (analyzer_config.get("restricted_zone") or {}).get("restricted_zones") or [],
         "queue_breach": (analyzer_config.get("queue_length") or {}).get("queue_zones") or [],
         "queue_length": (analyzer_config.get("queue_length") or {}).get("queue_zones") or [],
+        # High-Value Counter detectors only fire once their polygons are
+        # drawn (the editor writes jewelry_handover / jewelry_tray /
+        # grab_and_run into analyzer_config). Gating here mirrors the edge
+        # agent's own no-polygon → no-event behaviour, so a misconfigured
+        # camera can never produce a jewellery event server-side either.
+        "jewelry_handover": (analyzer_config.get("jewelry_handover") or {}).get("tray_polygon") or [],
+        "jewelry_tray": (analyzer_config.get("jewelry_tray") or {}).get("trays") or [],
+        "grab_and_run": (analyzer_config.get("grab_and_run") or {}).get("case_polygon") or [],
     }
     if event_type in configured_zones and not configured_zones[event_type]:
         logger.info(
@@ -1434,6 +1522,7 @@ async def get_config(
                 "people_count_zones": _normalized_people_count_zones(c),
                 "exclusion_zones": _normalized_exclusion_zones(c),
                 "inventory_zones": _normalized_inventory_zones(c),
+                "high_value_counter": _normalized_high_value_counter(c),
                 # Per-camera opt-in analytic toggles. Previously NOT sent at
                 # all, so the agent ran every behaviour heuristic (pose
                 # shoplifting, loitering, crowding, suspicious, fall) on every
