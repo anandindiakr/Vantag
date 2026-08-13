@@ -53,6 +53,9 @@ from ..analyzers.inventory_movement import InventoryMovementDetector, InventoryE
 from ..analyzers.restricted_zone import RestrictedZoneDetector, ZoneEntryEvent
 from ..analyzers.queue_length import QueueLengthAnalyzer, QueueEvent
 from ..analyzers.fall_detection import FallDetector, FallEvent
+from ..analyzers.jewelry_handover import JewelryHandoverDetector, HandoverEvent
+from ..analyzers.jewelry_tray import JewelryTrayDetector, TrayEvent
+from ..analyzers.grab_and_run import GrabAndRunDetector, GrabAndRunEvent
 from ..inference.yolo_engine import YOLOEngine, Detection
 from ..ingestion.camera_registry import CameraRegistry
 from ..ingestion.health_monitor import HealthMonitor
@@ -96,6 +99,10 @@ _EVENT_WEIGHTS: Dict[str, float] = {
     "restricted_zone": 30.0,
     "queue_length": 10.0,
     "fall_detection": 50.0,
+    # Jewellery counter analyzers
+    "jewelry_handover": 45.0,
+    "jewelry_tray": 25.0,
+    "grab_and_run": 60.0,
     "unknown": 5.0,
 }
 
@@ -284,6 +291,9 @@ class VantagPipeline:
             restricted_cfg = acfg.get("restricted_zone", {})
             queue_cfg = acfg.get("queue_length", {})
             fall_cfg = acfg.get("fall_detection", {})
+            handover_cfg = acfg.get("jewelry_handover", {})
+            tray_cfg = acfg.get("jewelry_tray", {})
+            grab_cfg = acfg.get("grab_and_run", {})
 
             self._analyzers[cam.id] = [
                 # Legacy (1-arg) analyzer wrapped for uniform interface
@@ -294,6 +304,10 @@ class VantagPipeline:
                 RestrictedZoneDetector(cam.id, restricted_cfg),
                 QueueLengthAnalyzer(cam.id, queue_cfg),
                 FallDetector(cam.id, fall_cfg),
+                # Jewellery counter analyzers (disabled unless zones configured)
+                JewelryHandoverDetector(cam.id, handover_cfg),
+                JewelryTrayDetector(cam.id, tray_cfg),
+                GrabAndRunDetector(cam.id, grab_cfg),
             ]
 
         logger.info("Analyzers built | cameras=%d", len(self._analyzers))
@@ -797,6 +811,80 @@ class VantagPipeline:
                     "confidence": raw.confidence,
                     "bbox": list(raw.bbox),
                     "duration_frames": raw.duration_frames,
+                },
+                "acknowledged": False,
+                "snapshot_url": None,
+            }
+
+        # ── JewelryHandoverDetector ─────────────────────────────────────────
+        if isinstance(raw, HandoverEvent):
+            return {
+                "incident_id": str(uuid.uuid4()),
+                "type": "jewelry_handover",
+                "camera_id": camera_id,
+                "store_id": store_id,
+                "severity": raw.severity.upper(),
+                "timestamp": raw.timestamp,
+                "description": (
+                    f"Hand reached into display case and withdrew "
+                    f"(track #{raw.person_track_id}, {raw.frames_inside} frames)"
+                ),
+                "metadata": {
+                    "event_subtype": raw.event_subtype,
+                    "person_track_id": raw.person_track_id,
+                    "confidence": raw.confidence,
+                    "bbox": list(raw.bbox),
+                    "frames_inside": raw.frames_inside,
+                },
+                "acknowledged": False,
+                "snapshot_url": None,
+            }
+
+        # ── JewelryTrayDetector ──────────────────────────────────────────────
+        if isinstance(raw, TrayEvent):
+            return {
+                "incident_id": str(uuid.uuid4()),
+                "type": "jewelry_tray",
+                "camera_id": camera_id,
+                "store_id": store_id,
+                "severity": raw.severity.upper(),
+                "timestamp": raw.timestamp,
+                "description": (
+                    f"Display tray '{raw.tray_label}' contents "
+                    f"{raw.change_type} ({raw.previous_fill:.2f} → {raw.current_fill:.2f})"
+                    + (", person present" if raw.person_present else "")
+                ),
+                "metadata": {
+                    "tray_label": raw.tray_label,
+                    "change_type": raw.change_type,
+                    "previous_fill": raw.previous_fill,
+                    "current_fill": raw.current_fill,
+                    "person_present": raw.person_present,
+                },
+                "acknowledged": False,
+                "snapshot_url": None,
+            }
+
+        # ── GrabAndRunDetector ───────────────────────────────────────────────
+        if isinstance(raw, GrabAndRunEvent):
+            return {
+                "incident_id": str(uuid.uuid4()),
+                "type": "grab_and_run",
+                "camera_id": camera_id,
+                "store_id": store_id,
+                "severity": raw.severity.upper(),
+                "timestamp": raw.timestamp,
+                "description": (
+                    f"Grab-and-run: fast case→exit movement "
+                    f"(track #{raw.person_track_id}, {raw.exit_speed_px_s:.0f} px/s "
+                    f"over {raw.travel_seconds}s)"
+                ),
+                "metadata": {
+                    "person_track_id": raw.person_track_id,
+                    "confidence": raw.confidence,
+                    "bbox": list(raw.bbox),
+                    "travel_seconds": raw.travel_seconds,
+                    "exit_speed_px_s": raw.exit_speed_px_s,
                 },
                 "acknowledged": False,
                 "snapshot_url": None,

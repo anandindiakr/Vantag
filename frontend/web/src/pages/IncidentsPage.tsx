@@ -131,6 +131,9 @@ const EVENT_TYPE_LABELS: Record<EventType, string> = {
   loitering:          'Loitering',
   face_match:         'Face Match',
   tamper:             'Camera Tamper',
+  jewelry_handover:   'Case Hand Reach',
+  jewelry_tray:       'Tray Change',
+  grab_and_run:       'Grab & Run',
 };
 
 function SeverityBadge({ s }: { s: Severity }) {

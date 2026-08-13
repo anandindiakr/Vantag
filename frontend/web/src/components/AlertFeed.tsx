@@ -8,6 +8,9 @@ import {
   Crosshair,
   ShoppingCart,
   AlertOctagon,
+  Hand,
+  Gem,
+  Zap,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useVantagStore, VantagEvent, EventType, Severity } from '../store/useVantagStore';
@@ -23,6 +26,9 @@ function eventIcon(type: EventType) {
     case 'loitering':          return <Users size={14} className={cls} />;
     case 'face_match':         return <User size={14} className={cls} />;
     case 'tamper':             return <AlertOctagon size={14} className={cls} />;
+    case 'jewelry_handover':   return <Hand size={14} className={cls} />;
+    case 'jewelry_tray':       return <Gem size={14} className={cls} />;
+    case 'grab_and_run':       return <Zap size={14} className={cls} />;
     default:                   return <AlertCircle size={14} className={cls} />;
   }
 }
@@ -32,10 +38,13 @@ function eventIconColor(type: EventType): string {
     case 'shoplifting':
     case 'restricted_zone':
     case 'face_match':
-    case 'tamper':             return 'text-vantag-red';
+    case 'tamper':
+    case 'jewelry_handover':
+    case 'grab_and_run':       return 'text-vantag-red';
     case 'fall_detected':
     case 'loitering':
-    case 'queue_breach':       return 'text-vantag-amber';
+    case 'queue_breach':
+    case 'jewelry_tray':       return 'text-vantag-amber';
     case 'inventory_movement': return 'text-slate-400';
     default:                   return 'text-slate-500';
   }

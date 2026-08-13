@@ -68,7 +68,10 @@ export type EventType =
   | 'fall_detected'
   | 'loitering'
   | 'face_match'
-  | 'tamper';
+  | 'tamper'
+  | 'jewelry_handover'
+  | 'jewelry_tray'
+  | 'grab_and_run';
 
 export interface VantagEvent {
   id: string;
