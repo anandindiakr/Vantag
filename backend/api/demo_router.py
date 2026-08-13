@@ -50,6 +50,10 @@ _EVENT_WEIGHTS: dict[str, int] = {
     "loitering":          15,
     "inventory_movement": 10,
     "queue_breach":       10,
+    # Jewellery-counter detectors (vision-only — no POS / no shelves required)
+    "jewelry_handover":   45,
+    "jewelry_tray":       25,
+    "grab_and_run":       60,
 }
 
 # ── Camera → store mapping ────────────────────────────────────────────────────
@@ -77,7 +81,32 @@ _DESCRIPTIONS: dict[str, str] = {
     "loitering":          "Individual stationary beyond configured dwell threshold in monitored zone.",
     "face_match":         "Positive watchlist match detected. Elevated alert level — review immediately.",
     "tamper":             "Camera tamper event detected: sudden scene change or possible occlusion of lens.",
+    "jewelry_handover":   "Hand reached into the display case and withdrew. Review footage to confirm whether an item was taken.",
+    "jewelry_tray":       "Display tray contents changed while a person was at the counter. Review footage to confirm item removal.",
+    "grab_and_run":       "Fast case-to-exit movement detected — possible grab-and-run. Review exit footage immediately.",
 }
+
+# ── Jewellery-counter theft scenario (vision-only, no POS) ─────────────────────
+# Fired in story order so a demo tells the whole theft chain: hand reaches in,
+# the tray changes, the item count drops, and the suspect flees to the exit.
+_JEWELRY_SEQUENCE: list[tuple[str, str, str, str]] = [
+    (
+        "jewelry_handover", "cam-03", "high",
+        "Hand reached into the display case and withdrew. Review footage to confirm whether an item was taken.",
+    ),
+    (
+        "jewelry_tray", "cam-03", "high",
+        "Display tray contents changed while the person remained at the counter. Possible item removed from the tray.",
+    ),
+    (
+        "inventory_movement", "cam-03", "medium",
+        "Item count dropped in the monitored display-case zone. No authorised staff present in the vicinity at the time.",
+    ),
+    (
+        "grab_and_run", "cam-03", "critical",
+        "Fast case-to-exit movement detected — the person moved from the counter to the exit unusually quickly.",
+    ),
+]
 
 
 def _zone_description(event_type: str, zone_name: str, zone_label: str, camera_id: str, bbox: list) -> str:
@@ -197,6 +226,8 @@ def _build_event(
     incident_id: str,
     snapshot_url: Optional[str] = None,
     tenant_id: Optional[str] = None,
+    description: Optional[str] = None,
+    scenario: Optional[str] = None,
 ) -> dict:
     """
     Build a canonical event dict.
@@ -214,14 +245,26 @@ def _build_event(
     severity    = req.severity.lower()
     now_iso     = datetime.now(timezone.utc).isoformat()
 
-    if req.zone_name:
-        description = _zone_description(
+    if description:
+        text = description
+    elif req.zone_name:
+        text = _zone_description(
             event_type, req.zone_name,
             req.zone_label or "Zone",
             camera_id, req.zone_bbox
         )
     else:
-        description = _DESCRIPTIONS.get(event_type, f"Demo event: {event_type}")
+        text = _DESCRIPTIONS.get(event_type, f"Demo event: {event_type}")
+
+    metadata: dict = {}
+    if req.zone_name:
+        metadata.update({
+            "zone_name":  req.zone_name,
+            "zone_label": req.zone_label,
+            "zone_bbox":  req.zone_bbox,
+        })
+    if scenario:
+        metadata["scenario"] = scenario
 
     return {
         # ── canonical keys (match real pipeline) ──
@@ -235,16 +278,12 @@ def _build_event(
         "camera_id":    camera_id,
         "camera_name":  f"Camera — {_STORE_NAMES.get(store_id, store_id)} (Demo)",
         "severity":     severity,
-        "risk_score":   _EVENT_WEIGHTS.get(event_type, 10) * 2,
-        "description":  description,
+        "risk_score":   min(100, _EVENT_WEIGHTS.get(event_type, 10) * 2),
+        "description":  text,
         "acknowledged": False,
         "is_demo":      True,
         "snapshot_url": snapshot_url,
-        "metadata":     {
-            "zone_name":  req.zone_name,
-            "zone_label": req.zone_label,
-            "zone_bbox":  req.zone_bbox,
-        } if req.zone_name else {},
+        "metadata":     metadata,
     }
 
 
@@ -364,6 +403,53 @@ async def trigger_sequence(
         await asyncio.sleep(0.3)
 
     return {"fired": len(fired), "events": fired}
+
+
+@router.post(
+    "/trigger-jewelry",
+    summary="Fire the jewellery-counter theft scenario (all four detectors, no POS)",
+)
+async def trigger_jewelry(
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """
+    Run the four vision-only jewellery theft signals in story order.
+
+    No POS integration and no shelf zones are required — this is the counter
+    scenario for a jewellery shop where staff hand items across a display
+    case instead of stocking shelves.
+    """
+    fired = []
+    for event_type, camera_id, severity, description in _JEWELRY_SEQUENCE:
+        req = TriggerRequest(
+            event_type=event_type,
+            camera_id=camera_id,
+            severity=severity,
+        )
+        incident_id = f"demo-{uuid.uuid4().hex[:8]}"
+        event = _build_event(
+            req,
+            incident_id,
+            tenant_id=str(user.get("tenant_id")),
+            description=description,
+            scenario="jewelry_counter",
+        )
+        await _inject(event)
+        fired.append({
+            "event_type":  event["type"],
+            "camera_id":   event["camera_id"],
+            "store_id":    event["store_id"],
+            "severity":    event["severity"],
+            "incident_id": event["incident_id"],
+            "description": event["description"],
+        })
+        await asyncio.sleep(0.4)
+
+    return {
+        "scenario": "jewelry_counter",
+        "fired":    len(fired),
+        "events":   fired,
+    }
 
 
 def _is_demo_event(e: dict) -> bool:
