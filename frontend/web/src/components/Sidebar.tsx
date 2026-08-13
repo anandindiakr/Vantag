@@ -22,6 +22,7 @@ import {
   Store as StoreIcon,
   Wand2,
   MonitorPlay,
+  Gem,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useVantagStore } from '../store/useVantagStore';
@@ -48,6 +49,7 @@ const navItems: NavItem[] = [
   { label: 'Staff Faces',  to: '/staff-faces',  icon: <UserCheck size={20} /> },
   { label: 'People Count', to: '/people-count', icon: <Users size={20} /> },
   { label: 'Zone Editor',  to: '/zone-editor',  icon: <PenTool size={20} />, dividerBefore: true },
+  { label: 'High-Value Counter', to: '/high-value-counter', icon: <Gem size={20} /> },
   { label: 'Demo Center',  to: '/demo',         icon: <Zap size={20} /> },
   { label: 'Health Check', to: '/health-check', icon: <HeartPulse size={20} />, dividerBefore: true },
   { label: 'Install Edge Agent', to: '/download', icon: <Download size={20} />, dividerBefore: true },

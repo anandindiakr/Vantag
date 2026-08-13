@@ -35,6 +35,7 @@ const CamerasManage = lazy(() => import('./pages/CamerasManage'));
 const SetupWizard   = lazy(() => import('./pages/SetupWizard'));
 const DemoCenter    = lazy(() => import('./pages/DemoCenter'));
 const ZoneEditor    = lazy(() => import('./pages/ZoneEditorPage'));
+const HighValueCounter = lazy(() => import('./pages/HighValueCounterSetup'));
 const CameraView   = lazy(() => import('./pages/CameraView'));
 const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
@@ -157,6 +158,7 @@ export default function App() {
               <Route path="/cameras/manage"        element={<CamerasManage />} />
               <Route path="/demo"                  element={<DemoCenter />} />
               <Route path="/zone-editor"           element={<ZoneEditor />} />
+              <Route path="/high-value-counter"     element={<HighValueCounter />} />
               <Route path="/cameras/:storeId/:cameraId" element={<CameraView />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
               <Route path="/watchlist"  element={<WatchlistPage />} />
