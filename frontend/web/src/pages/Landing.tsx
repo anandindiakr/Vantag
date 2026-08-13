@@ -12,6 +12,7 @@ import {
   Monitor, Activity, Users, Package,
   MapPin, Timer, TrendingDown, ChevronRight, Play,
   Wifi, BrainCircuit, ShieldAlert, Flame,
+  Gem, Hand, RefreshCw, DoorOpen,
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────
@@ -119,6 +120,33 @@ const AI_FEATURES = [
     desc: 'Match detected faces against your custom watchlist of known shoplifters. Get instant alerts when a flagged individual enters the store.',
     badge: 'CRITICAL',
   },
+];
+
+/* High-Value Counter — the three purpose-built detectors for jewellery /
+   luxury / high-value goods sold across a counter (no shelves, no POS). */
+const HIGH_VALUE_DETECTORS = [
+  {
+    icon: Hand,
+    title: 'Case Hand Reach',
+    desc: 'Flags a hand that reaches into the display tray and withdraws — the exact motion of someone palming a piece.',
+    badge: 'HIGH',
+  },
+  {
+    icon: RefreshCw,
+    title: 'Tray Change',
+    desc: 'Watches the tray\'s contents. A sudden change while a person is at the counter fires an instant review alert.',
+    badge: 'HIGH',
+  },
+  {
+    icon: DoorOpen,
+    title: 'Grab & Run',
+    desc: 'Detects a person who moves from the display case to the exit unusually fast — a classic snatch-and-run.',
+    badge: 'CRITICAL',
+  },
+];
+
+const HIGH_VALUE_VERTICALS = [
+  'Jewellery', 'Watches', 'Luxury Bags', 'Electronics Showcases', 'Phones & Accessories',
 ];
 
 const PLATFORM_FEATURES = [
@@ -459,7 +487,7 @@ export default function Landing() {
             </h1>
 
             <p className="text-[1.1rem] text-white/50 leading-relaxed mb-6 max-w-lg font-body-alt">
-              The DIY AI security platform for <strong className="text-white/80">shops, malls, hospitals, post offices, police stations, small offices and homes</strong>. Turn any existing IP camera into a 24/7 guardian — detects shoplifting, loitering, falls, empty shelves, intrusion and more. Plug &amp; play. 30-minute setup.
+              The DIY AI security platform for <strong className="text-white/80">shops, jewellers, high-value counters, malls, hospitals, post offices, police stations, small offices and homes</strong>. Turn any existing IP camera into a 24/7 guardian — detects shoplifting, loitering, falls, empty shelves, intrusion and more. Plug &amp; play. 30-minute setup.
             </p>
 
             {/* The honest headline claim. See the note on STATS above: this is a
@@ -610,6 +638,64 @@ export default function Landing() {
           </motion.div>
         </div>
       </section>
+
+      {/* ═══════════════════════════════════════════════════
+          HIGH-VALUE COUNTER — BOLD FEATURE (JEWELLERS)
+      ═══════════════════════════════════════════════════ */}
+      <Section className="py-20 border-t border-white/5" id="high-value">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 font-mono-alt text-[11px] tracking-[0.2em] uppercase mb-6">
+              <Gem className="w-3.5 h-3.5" /> For Jewellers &amp; High-Value Retail
+            </span>
+            <h2 className="font-syne text-3xl sm:text-4xl lg:text-5xl font-black text-white mb-5">
+              No shelves. No POS. <span className="text-amber-400">Still caught.</span>
+            </h2>
+            <p className="text-white/50 text-lg max-w-3xl mx-auto font-body-alt">
+              Jewellery, watches, luxury bags and high-value electronics are handed across a counter — not stocked on shelves. Vantag's High-Value Counter suite watches the three moments that actually matter at the counter, and alerts your team the second something is wrong.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5 mb-10">
+            {HIGH_VALUE_DETECTORS.map((f, i) => (
+              <motion.div
+                key={f.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-40px' }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                className="group relative flex flex-col p-6 rounded-2xl border border-amber-400/15 bg-[#0d1117] hover:border-amber-400/40 transition-all duration-300"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-amber-400/10 border border-amber-400/25 flex items-center justify-center">
+                    <f.icon className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <SeverityBadge level={f.badge} />
+                </div>
+                <h3 className="font-syne text-lg font-bold text-white mb-2">{f.title}</h3>
+                <p className="text-sm text-white/45 leading-relaxed font-body-alt">{f.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-3 mb-10">
+            {HIGH_VALUE_VERTICALS.map((v) => (
+              <span key={v} className="px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm text-white/70 font-medium">
+                {v}
+              </span>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link to="/register" className="group inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-base font-bold transition-all hover:scale-[1.02]">
+              Protect Your Counter <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <Link to="/how-it-works" className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl border border-white/10 text-white/70 hover:text-white hover:border-white/25 text-base font-semibold transition-all">
+              See how it works
+            </Link>
+          </div>
+        </div>
+      </Section>
 
       {/* ═══════════════════════════════════════════════════
           AI FEATURES — 11 DETECTORS

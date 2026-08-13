@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useRegion } from '../hooks/useRegion';
 import Seo from '../components/Seo';
+import HighValueCounterStory from '../components/HighValueCounterStory';
 
 interface FaqItem { q: string; a: string; }
 interface FaqCategory { id: string; title: string; icon: string; diagram?: string; items: FaqItem[]; }
@@ -129,6 +130,12 @@ export default function FAQ({ embedded = false }: { embedded?: boolean }) {
               {cat.diagram && (
                 <div className="mb-5 rounded-xl overflow-hidden border border-white/10 bg-white/5">
                   <img src={cat.diagram} alt={`${cat.title} diagram`} className="w-full h-auto" loading="lazy" />
+                </div>
+              )}
+
+              {cat.id === 'high-value-counter' && (
+                <div className="mb-5">
+                  <HighValueCounterStory />
                 </div>
               )}
 

@@ -3,6 +3,7 @@
  */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Gem, Hand, RefreshCw, DoorOpen } from 'lucide-react';
 import Seo from '../components/Seo';
 
 const Step = ({ num, title, body, icon }: { num: number; title: string; body: string; icon: string }) => (
@@ -80,6 +81,37 @@ export default function HowItWorks({ embedded = false }: { embedded?: boolean })
             title={t('how.s6.title', 'Live alerts start')}
             body={t('how.s6.body', 'Theft, loitering, falls, empty shelves — real-time alerts + evidence snapshots on your phone.')}
           />
+        </div>
+
+        {/* High-Value Counter highlight — jewellers & luxury goods */}
+        <div className="mb-16 rounded-2xl border border-amber-400/25 bg-gradient-to-br from-amber-400/10 to-transparent p-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Gem className="w-5 h-5 text-amber-400" />
+            <h2 className="text-2xl font-bold">Built for jewellers &amp; high-value counters</h2>
+          </div>
+          <p className="text-white/70 mb-6 max-w-3xl">
+            Jewellery, watches, luxury bags and high-value electronics are handed across a counter — not stocked on shelves. On top of every standard detector, the same camera runs three purpose-built high-value detections:
+          </p>
+          <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <div className="bg-white/5 border border-white/10 rounded-xl p-5">
+              <Hand className="w-6 h-6 text-amber-400 mb-2" />
+              <h3 className="font-bold mb-1">Case Hand Reach</h3>
+              <p className="text-white/60 text-sm">Flags a hand that reaches into the display tray and withdraws — the exact palm-and-pull motion.</p>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-xl p-5">
+              <RefreshCw className="w-6 h-6 text-amber-400 mb-2" />
+              <h3 className="font-bold mb-1">Tray Change</h3>
+              <p className="text-white/60 text-sm">Watches the tray's contents — a sudden change while a person is at the counter fires instantly.</p>
+            </div>
+            <div className="bg-white/5 border border-white/10 rounded-xl p-5">
+              <DoorOpen className="w-6 h-6 text-amber-400 mb-2" />
+              <h3 className="font-bold mb-1">Grab &amp; Run</h3>
+              <p className="text-white/60 text-sm">Detects a person moving from the display case to the exit unusually fast.</p>
+            </div>
+          </div>
+          <Link to="/#high-value" className="inline-flex items-center gap-2 text-amber-300 hover:text-amber-200 font-semibold">
+            See the High-Value Counter in detail →
+          </Link>
         </div>
 
         {!embedded && (
