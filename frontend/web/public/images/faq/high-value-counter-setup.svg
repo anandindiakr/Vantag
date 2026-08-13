@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" font-family="Segoe UI, system-ui, sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#94A3B8"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="700" fill="#0B1220"/>
+
+  <!-- Header -->
+  <text x="40" y="46" fill="#E5E7EB" font-size="28" font-weight="700">How to draw High-Value Counter zones</text>
+  <text x="40" y="72" fill="#94A3B8" font-size="15">Jewellery shops have no shelves — you draw the counter, tray, case, exit and approach instead.</text>
+
+  <!-- ============ LEFT: camera view ============ -->
+  <rect x="40" y="96" width="640" height="430" rx="12" fill="#111A2E" stroke="#1E293B"/>
+  <text x="60" y="126" fill="#E5E7EB" font-size="15" font-weight="700">1 · Camera view — what you trace on the live frame</text>
+
+  <!-- scene -->
+  <rect x="60" y="140" width="600" height="360" fill="#0D1526" stroke="#1E293B"/>
+
+  <!-- exit door (background right) -->
+  <rect x="470" y="160" width="140" height="250" rx="4" fill="#1A2236" stroke="#F43F5E" stroke-width="2"/>
+  <text x="508" y="196" fill="#F43F5E" font-size="16" font-weight="700">EXIT</text>
+  <rect x="480" y="212" width="120" height="198" rx="4" fill="#0D1526" stroke="#F43F5E" stroke-dasharray="4 4" opacity="0.6"/>
+
+  <!-- display counter (glass cabinet) -->
+  <rect x="120" y="360" width="350" height="100" rx="4" fill="#1A2236" stroke="#22D3EE" stroke-width="1.5"/>
+  <rect x="120" y="340" width="350" height="24" rx="3" fill="#164E63" opacity="0.7"/>
+  <rect x="132" y="372" width="326" height="14" fill="#0E7490" opacity="0.35"/>
+  <rect x="132" y="398" width="326" height="14" fill="#0E7490" opacity="0.35"/>
+
+  <!-- display tray on the counter -->
+  <rect x="200" y="306" width="150" height="34" rx="3" fill="#78350F" stroke="#F59E0B" stroke-width="2"/>
+  <circle cx="232" cy="323" r="7" fill="#FBBF24"/>
+  <circle cx="258" cy="323" r="6" fill="#FCD34D"/>
+  <circle cx="284" cy="323" r="7" fill="#FBBF24"/>
+  <circle cx="312" cy="323" r="5" fill="#FCD34D"/>
+
+  <!-- customer silhouette -->
+  <circle cx="300" cy="476" r="20" fill="#1E293B" stroke="#64748B" stroke-width="2"/>
+  <path d="M240,500 Q300,470 360,500 L360,512 Q300,492 240,512 Z" fill="#1E293B" stroke="#64748B" stroke-width="2"/>
+
+  <!-- polygon overlays -->
+  <!-- counter polygon (cyan) -->
+  <polygon points="105,315 485,315 485,485 105,485" fill="#22D3EE" opacity="0.08" stroke="#22D3EE" stroke-width="2" stroke-dasharray="7 5"/>
+  <!-- tray polygon (amber, tight) -->
+  <polygon points="190,296 360,296 360,352 190,352" fill="#F59E0B" opacity="0.12" stroke="#F59E0B" stroke-width="2" stroke-dasharray="5 4"/>
+  <!-- exit polygon (rose) -->
+  <polygon points="455,148 625,148 625,425 455,425" fill="#F43F5E" opacity="0.08" stroke="#F43F5E" stroke-width="2" stroke-dasharray="7 5"/>
+
+  <!-- leader labels -->
+  <text x="430" y="330" fill="#22D3EE" font-size="13" font-weight="600">Serving Counter</text>
+  <line x1="490" y1="330" x2="486" y2="360" stroke="#22D3EE" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="372" y="296" fill="#F59E0B" font-size="13" font-weight="600">Display Tray</text>
+  <line x1="400" y1="298" x2="362" y2="306" stroke="#F59E0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="430" y="448" fill="#F43F5E" font-size="13" font-weight="600">Exit Door</text>
+  <line x1="455" y1="448" x2="540" y2="410" stroke="#F43F5E" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ============ RIGHT: floor plan ============ -->
+  <rect x="704" y="96" width="456" height="430" rx="12" fill="#111A2E" stroke="#1E293B"/>
+  <text x="724" y="126" fill="#E5E7EB" font-size="15" font-weight="700">2 · Floor plan — the same shapes from above</text>
+
+  <rect x="724" y="140" width="416" height="360" fill="#0D1526" stroke="#1E293B"/>
+
+  <!-- entrance -->
+  <rect x="800" y="500" width="90" height="6" fill="#34D399"/>
+  <text x="800" y="526" fill="#34D399" font-size="12" font-weight="600">Entrance</text>
+
+  <!-- approach corridor (green dashed) -->
+  <polygon points="812,494 892,494 972,388 1010,388 1010,470 912,470" fill="#34D399" opacity="0.10" stroke="#34D399" stroke-width="2" stroke-dasharray="6 5"/>
+
+  <!-- display case region (violet) -->
+  <polygon points="850,290 1050,290 1050,450 850,450" fill="#A78BFA" opacity="0.08" stroke="#A78BFA" stroke-width="2" stroke-dasharray="7 5"/>
+
+  <!-- serving counter (cyan) -->
+  <rect x="872" y="330" width="156" height="96" rx="6" fill="#164E63" stroke="#22D3EE" stroke-width="2"/>
+
+  <!-- tray (amber) on counter -->
+  <rect x="884" y="322" width="132" height="34" rx="4" fill="#78350F" stroke="#F59E0B" stroke-width="2"/>
+  <circle cx="906" cy="339" r="5" fill="#FBBF24"/>
+  <circle cx="930" cy="339" r="5" fill="#FBBF24"/>
+  <circle cx="954" cy="339" r="5" fill="#FBBF24"/>
+
+  <!-- exit door (rose) on right wall -->
+  <rect x="1124" y="290" width="22" height="110" rx="3" fill="#F43F5E" opacity="0.25" stroke="#F43F5E" stroke-width="2"/>
+  <text x="1102" y="272" fill="#F43F5E" font-size="12" font-weight="600">Exit</text>
+
+  <!-- people markers -->
+  <circle cx="820" cy="460" r="14" fill="#1E293B" stroke="#64748B" stroke-width="2"/>
+  <text x="780" y="492" fill="#64748B" font-size="11">CUSTOMER</text>
+  <circle cx="950" cy="258" r="14" fill="#1E293B" stroke="#64748B" stroke-width="2"/>
+  <text x="924" y="236" fill="#64748B" font-size="11">STAFF</text>
+
+  <!-- labels -->
+  <text x="860" y="312" fill="#F59E0B" font-size="12" font-weight="600">Tray</text>
+  <text x="1058" y="318" fill="#22D3EE" font-size="12" font-weight="600">Counter</text>
+  <text x="860" y="478" fill="#A78BFA" font-size="12" font-weight="600">Display Case</text>
+  <text x="820" y="408" fill="#34D399" font-size="12" font-weight="600">Approach corridor</text>
+
+  <!-- ============ Legend ============ -->
+  <text x="40" y="566" fill="#E5E7EB" font-size="15" font-weight="700">Legend</text>
+
+  <g font-size="13" fill="#CBD5E1">
+    <rect x="40" y="580" width="20" height="20" rx="4" fill="#22D3EE" opacity="0.9"/>
+    <text x="68" y="595">Serving Counter</text>
+    <rect x="220" y="580" width="20" height="20" rx="4" fill="#F59E0B" opacity="0.9"/>
+    <text x="248" y="595">Display Tray</text>
+    <rect x="390" y="580" width="20" height="20" rx="4" fill="#A78BFA" opacity="0.9"/>
+    <text x="418" y="595">Display Case</text>
+    <rect x="560" y="580" width="20" height="20" rx="4" fill="#F43F5E" opacity="0.9"/>
+    <text x="588" y="595">Exit Door</text>
+    <rect x="740" y="580" width="20" height="20" rx="4" fill="#34D399" opacity="0.9"/>
+    <text x="768" y="595">Approach Corridor (optional)</text>
+  </g>
+
+  <text x="40" y="650" fill="#94A3B8" font-size="14">One camera runs every zone at once — each detector reads only its own shape. Keep the tray polygon tight around the actual tray.</text>
+</svg>

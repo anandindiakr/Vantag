@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BookOpen, Download, MessageCircle, Mail, ShieldCheck,
-  Rocket, Wifi, HardDrive, Bell, AlertTriangle, Brain, CreditCard, HelpCircle,
+  Rocket, Wifi, HardDrive, Bell, AlertTriangle, Brain, CreditCard, HelpCircle, Gem,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useRegion } from '../hooks/useRegion';
@@ -14,7 +14,7 @@ interface FaqItem { q: string; a: string; }
 interface FaqCategory { id: string; title: string; icon: string; diagram?: string; items: FaqItem[]; }
 
 const ICONS: Record<string, typeof HelpCircle> = {
-  Rocket, Wifi, HardDrive, Bell, AlertTriangle, Brain, CreditCard, Shield: ShieldCheck,
+  Rocket, Wifi, HardDrive, Bell, AlertTriangle, Brain, CreditCard, Shield: ShieldCheck, Gem,
 };
 
 function CategoryIcon({ name, className }: { name: string; className?: string }) {

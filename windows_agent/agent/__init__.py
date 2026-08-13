@@ -1,4 +1,16 @@
 """Vantag Windows Edge Agent"""
+# 1.7.0 — High-Value Counter detectors run on-box. Ported the three
+# jewellery / luxury-counter analyzers (jewelry_handover reach-in→withdraw,
+# jewelry_tray foreground-change-while-person-present, grab_and_run fast
+# case→exit traversal) into windows_agent/agent/jewelry.py and wired them
+# into DetectionAnalyzer. The backend's /api/edge/config now ships the
+# camera's normalized High-Value Counter polygons (serving counter, display
+# tray, display case, exit, approach) under "high_value_counter", and the
+# agent scales them to each frame. Each detector stays OFF until its polygons
+# are drawn, and all three fire as operator-review candidates alongside the
+# existing detectors — one camera keeps running every enabled analytic at
+# once on the same stream.
+#
 # 1.6.1 — shelf/inventory accuracy. The old detector compared a 32-bin
 # GRAYSCALE histogram of a coarse 2x3 grid, so it could not distinguish a
 # removed product from a shadow (both just shift grey levels), and a single
@@ -33,4 +45,4 @@
 # NMS on the fallback path so a fallback can no longer inflate people counts,
 # and reports the verified status in every heartbeat so Admin -> System Health
 # shows the truth instead of an assumption.
-__version__ = "1.6.1"
+__version__ = "1.7.0"

@@ -105,16 +105,24 @@ analyzer_config:
 
 ## 5. Enabling the module
 
-- **Self-hosted / single-tenant pipeline** — add the `jewelry_handover`,
-  `jewelry_tray`, and `grab_and_run` blocks above to the camera's
-  `analyzer_config` in `backend/config/cameras.yaml`, then restart the pipeline.
-- **SaaS dashboard** — draw the zones in **Zone Editor** (shelf/restricted/queue
-  shapes for the `inventory_movement` display-case zone today); the three
-  jewellery polygons are read from the camera's analyzer config. Confirm the
-  zones appear in the camera view before going live.
+- **SaaS dashboard (recommended)** — open **High-Value Counter** in the
+  sidebar, pick the camera, and draw the five polygons point-and-click on the
+  live snapshot (Serving Counter, Display Tray, Display Case, Exit Door,
+  optional Approach Corridor), then **Save**. The polygons are written to the
+  camera's `analyzer_config` (`jewelry_handover` / `jewelry_tray` /
+  `grab_and_run`), exactly as in the YAML below.
+- **Self-hosted / single-tenant pipeline** — add the same blocks directly to
+  the camera's `analyzer_config` in `backend/config/cameras.yaml`, then
+  restart the pipeline.
 
-All three detectors are already wired into the live pipeline and risk scorer —
-no code changes are needed; configuration is what turns them on.
+> **Edge Agent:** the three detectors also run **on-box** in the Windows/Linux
+> Edge Agent (v1.7.0+). The backend delivers the normalized polygons to the
+> agent automatically — no extra config. Existing stores must update their
+> agent from the dashboard (Download page) to pick up the new detectors.
+
+All three detectors are wired into the live pipeline and risk scorer — drawing
+the zones is what turns them on. See **Help Center → FAQ → High-Value Counter**
+for a diagram of where each shape goes.
 
 ---
 

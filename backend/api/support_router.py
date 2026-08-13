@@ -862,6 +862,80 @@ async def get_faq() -> dict:
                 ],
             },
             {
+                "id": "high-value-counter",
+                "title": "High-Value Counter (Jewellery & Luxury)",
+                "icon": "Gem",
+                "diagram": "/images/faq/high-value-counter-setup.svg",
+                "items": [
+                    {
+                        "q": "What is High-Value Counter mode and who is it for?",
+                        "a": "It's a vision-only detection set for jewellery shops, watch "
+                             "showrooms, and luxury / electronics counters where staff hand "
+                             "merchandise across a display case instead of stocking shelves. "
+                             "It watches three moments: a hand reaching into the display tray "
+                             "and withdrawing, the tray contents changing while a person is at "
+                             "the counter, and a fast case-to-exit grab-and-run. No POS "
+                             "integration or shelf zones are needed.",
+                    },
+                    {
+                        "q": "Can one camera run multiple AI detections at the same time?",
+                        "a": "Yes. Every camera runs ALL of its enabled detectors on the same "
+                             "single video stream at once — shoplifting, loitering, fall, "
+                             "crowding, suspicious behaviour, shelf/empty-shelf, people "
+                             "counting, and the High-Value Counter detectors. The same camera "
+                             "watching your serving counter can also watch the exit door for a "
+                             "grab-and-run, as long as both areas are in its frame. Each "
+                             "detector reads only its own drawn polygons.",
+                    },
+                    {
+                        "q": "Which lines/polygons do I draw, and where?",
+                        "a": "Five shapes, drawn on top of the live camera view in the "
+                             "High-Value Counter page: Serving Counter (where the customer "
+                             "stands), Display Tray (the tray/case a hand reaches into), "
+                             "Display Case (for grab-and-run), Exit Door (the door), and "
+                             "Approach Corridor (optional). The counter camera gets the "
+                             "counter / tray / case shapes; the exit camera (or the same "
+                             "camera if the door is in frame) gets the exit + optional "
+                             "approach. Keep the tray polygon tight around the actual tray — "
+                             "a hand-sized zone is far more accurate than a loose box.",
+                    },
+                    {
+                        "q": "How do the three detectors decide something happened?",
+                        "a": "Case Hand Reach flags a hand that enters the tray and then "
+                             "withdraws. Tray Change flags a significant change in the tray's "
+                             "foreground while a person is at the counter. Grab & Run flags a "
+                             "person who enters the case area and reaches the exit unusually "
+                             "fast (within a short window, above a speed threshold).",
+                    },
+                    {
+                        "q": "Do I need a POS or shelves for jewellery detection?",
+                        "a": "No. Jewellery counters have no shelves and the sales team hands "
+                             "items across, so POS/shelf logic doesn't apply. High-Value "
+                             "Counter is vision-only: it reads hand position, tray appearance "
+                             "and walking speed from the camera — exactly how theft at a "
+                             "counter is visible.",
+                    },
+                    {
+                        "q": "How do I test that it's working?",
+                        "a": "Open Demo Center and press 'Fire High-Value Counter Demo' to "
+                             "replay the whole story (hand reach-in → tray change → grab-and-"
+                             "run), or fire each detector's card individually. For a real "
+                             "test, draw the polygons in the High-Value Counter page, save, "
+                             "then have a staff member reach into the tray, move an item, and "
+                             "walk briskly from the case to the exit — events appear in "
+                             "Incidents.",
+                    },
+                    {
+                        "q": "Why is a jewellery event a 'review candidate' and not proof?",
+                        "a": "A camera alone can't tell a staff member showing a necklace from "
+                             "a customer pocketing one. So Case Hand Reach and Tray Change "
+                             "flag the moment for an operator to confirm with footage rather "
+                             "than accuse automatically. Grab & Run (case to exit at speed) is "
+                             "a much stronger signal, but still shows footage for confirmation.",
+                    },
+                ],
+            },
+            {
                 "id": "billing",
                 "title": "Billing & Plans",
                 "icon": "CreditCard",
