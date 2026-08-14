@@ -82,7 +82,7 @@ services:
     networks:
       - vantag-prod
     healthcheck:
-      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "health", "-m", "ping", "-q", "0"]
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "health", "-m", "ping", "-q", "0", "-u", "vantag_backend", "-P", "nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO"]
       interval: 15s
       timeout: 5s
       retries: 3

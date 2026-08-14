@@ -86,7 +86,28 @@ refresh_nginx_upstream() {
   echo "Nginx upstream refresh successful (status=$nginx_status)."
 }
 
+# Mosquitto config + password file are bind-mounted, so changing them in the
+# repo does not take effect until the broker restarts. Restart it AFTER the
+# backend is healthy so the backend (already running with credentials) keeps
+# its MQTT connection across the auth switch.
+restart_mosquitto() {
+  echo "Restarting Mosquitto to reload authentication config..."
+  docker compose -f "$COMPOSE_FILE" restart mosquitto
+
+  local mq_status="starting" i
+  for i in $(seq 1 20); do
+    mq_status=$(docker inspect --format='{{.State.Health.Status}}' vantag-mosquitto-prod 2>/dev/null || echo "starting")
+    [ "$mq_status" = "healthy" ] && break
+    sleep 3
+  done
+  echo "Mosquitto restart status=$mq_status"
+  if [ "$mq_status" != "healthy" ]; then
+    echo "WARNING: Mosquitto did not become healthy — inspect docker logs vantag-mosquitto-prod"
+  fi
+}
+
 if build_and_start && check_health && refresh_nginx_upstream; then
+  restart_mosquitto
   echo "Backend deploy successful and healthy."
   docker image prune -f
   exit 0
@@ -96,6 +117,7 @@ echo "Backend unhealthy — rolling back to $PREV_SHA"
 git reset --hard "$PREV_SHA"
 build_and_start
 if check_health && refresh_nginx_upstream; then
+  restart_mosquitto
   echo "Rolled back to previous version and it is healthy."
 else
   echo "WARNING: rollback target is ALSO unhealthy — backend needs manual attention."
