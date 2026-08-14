@@ -1,14 +1,24 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import mqtt, { MqttClient, IClientOptions } from 'mqtt';
-import toast from 'react-hot-toast';
 import { useVantagStore, DoorState } from '../store/useVantagStore';
 
-// Mosquitto WebSocket listener on port 9001 (exposed by Docker).
-// Path /mqtt is the standard WebSocket path for Mosquitto 2.x.
-const MQTT_BROKER_URL  = 'ws://localhost:9001/mqtt';
-const DOOR_STATUS_TOPIC = 'vantag/+/doors/+/status';
-const DOOR_CMD_TOPIC    = (storeId: string, doorId: string) =>
-  `vantag/${storeId}/doors/${doorId}/command`;
+// Canonical door status topic (matches backend/mqtt/client.py).
+const DOOR_STATUS_TOPIC = 'vantag/stores/+/doors/+/status';
+
+// In local development Mosquitto exposes its WebSocket listener on port 9001.
+// In production the browser connects over the same origin (wss://) and nginx
+// proxies `/mqtt` to the broker — this avoids the mixed-content block that
+// broke the old hardcoded `ws://localhost:9001/mqtt` URL.
+function resolveBrokerUrl(): string {
+  const host = window.location.hostname;
+  const isLocal =
+    host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';
+  if (isLocal) {
+    return 'ws://localhost:9001/mqtt';
+  }
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${window.location.host}/mqtt`;
+}
 
 interface MqttOptions extends IClientOptions {
   clientId: string;
@@ -17,30 +27,32 @@ interface MqttOptions extends IClientOptions {
   connectTimeout: number;
 }
 
-interface UseMQTTReturn {
+export interface UseMQTTReturn {
   connected: boolean;
-  publishDoorCommand: (
-    storeId: string,
-    doorId: string,
-    action: 'lock' | 'unlock'
-  ) => void;
 }
 
 export function useMQTT(): UseMQTTReturn {
   const [connected, setConnected] = useState(false);
-  const clientRef                 = useRef<MqttClient | null>(null);
-  const { setDoorState, setMqttConnected } = useVantagStore.getState();
+  const clientRef = useRef<MqttClient | null>(null);
 
   useEffect(() => {
+    const { setDoorState, setMqttConnected } = useVantagStore.getState();
+
     const options: MqttOptions = {
-      clientId:        `vantag-dashboard-${Math.random().toString(16).slice(2, 10)}`,
-      keepalive:       60,
+      clientId: `vantag-dashboard-${Math.random().toString(16).slice(2, 10)}`,
+      keepalive: 60,
       reconnectPeriod: 3000,
-      connectTimeout:  10_000,
-      clean:           true,
+      connectTimeout: 10_000,
+      clean: true,
     };
 
-    const client = mqtt.connect(MQTT_BROKER_URL, options);
+    let client: MqttClient;
+    try {
+      client = mqtt.connect(resolveBrokerUrl(), options);
+    } catch {
+      setConnected(false);
+      return;
+    }
     clientRef.current = client;
 
     client.on('connect', () => {
@@ -53,15 +65,11 @@ export function useMQTT(): UseMQTTReturn {
       });
     });
 
-    client.on('reconnect', () => {
-      setConnected(false);
-    });
-
+    client.on('reconnect', () => setConnected(false));
     client.on('offline', () => {
       setConnected(false);
       setMqttConnected(false);
     });
-
     client.on('error', (err) => {
       console.error('[MQTT] Error:', err);
       setConnected(false);
@@ -69,13 +77,13 @@ export function useMQTT(): UseMQTTReturn {
     });
 
     client.on('message', (topic: string, payload: Buffer) => {
-      // Topic pattern: vantag/<storeId>/doors/<doorId>/status
+      // Topic: vantag/stores/{storeId}/doors/{doorId}/status
       const parts = topic.split('/');
-      if (parts.length === 5 && parts[2] === 'doors' && parts[4] === 'status') {
-        const doorId = `${parts[1]}:${parts[3]}`;
+      if (parts.length === 6 && parts[1] === 'stores' && parts[3] === 'doors' && parts[5] === 'status') {
+        const doorId = `${parts[2]}:${parts[4]}`;
         try {
           const data = JSON.parse(payload.toString()) as { state: DoorState };
-          setDoorState(doorId, data.state);
+          if (data.state) setDoorState(doorId, data.state);
         } catch {
           // malformed payload
         }
@@ -85,34 +93,7 @@ export function useMQTT(): UseMQTTReturn {
     return () => {
       client.end(true);
     };
-  }, [setDoorState, setMqttConnected]);
+  }, []);
 
-  const publishDoorCommand = useCallback(
-    (storeId: string, doorId: string, action: 'lock' | 'unlock') => {
-      const client = clientRef.current;
-      if (!client || !client.connected) {
-        toast.error('MQTT not connected — cannot send door command');
-        return;
-      }
-
-      const topic   = DOOR_CMD_TOPIC(storeId, doorId);
-      const payload = JSON.stringify({
-        action,
-        doorId,
-        storeId,
-        ts: new Date().toISOString(),
-      });
-
-      client.publish(topic, payload, { qos: 1, retain: false }, (err) => {
-        if (err) {
-          toast.error(`Door command failed: ${err.message}`);
-        } else {
-          toast.success(`Door ${doorId} ${action} command sent`);
-        }
-      });
-    },
-    []
-  );
-
-  return { connected, publishDoorCommand };
+  return { connected };
 }

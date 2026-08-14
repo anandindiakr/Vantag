@@ -45,6 +45,7 @@ from .jewelry import (
     JewelryTrayDetector,
     GrabAndRunDetector,
 )
+from .hand_landmarks import get_hand_detector
 
 log = logging.getLogger("vantag.camera")
 
@@ -746,6 +747,13 @@ class DetectionAnalyzer:
         self._hvc_grab = GrabAndRunDetector(
             camera_id, hvc.get("grab_and_run") or {}, cooldown_sec
         )
+
+        # 21-point hand landmarker for the HVC handover detector. Shared
+        # across workers and rate-limited below so MediaPipe's per-frame cost
+        # never starves the primary YOLO detector. ``available=False`` when
+        # mediapipe/model is missing — the bbox fallback keeps working.
+        self._hand_last_run = 0.0
+        self._hand_interval = 0.5  # seconds between hand inference passes
 
     def _hvc_configured(self) -> bool:
         return bool(
@@ -1461,7 +1469,16 @@ class DetectionAnalyzer:
         # no-ops until its polygons are configured; they emit as review
         # candidates for the operator, matching the backend pipeline's
         # jewelry_handover / jewelry_tray / grab_and_run signals.
-        hvc_evt = self._hvc_handover.analyse(persons, frame)
+        hands = None
+        if self._hvc_handover.configured:
+            now_m = time.monotonic()
+            if now_m - self._hand_last_run >= self._hand_interval:
+                self._hand_last_run = now_m
+                try:
+                    hands = get_hand_detector().detect(frame)
+                except Exception:  # noqa: BLE001 — hand tracking must never break detection
+                    hands = None
+        hvc_evt = self._hvc_handover.analyse(persons, frame, hands)
         if hvc_evt:
             events.append(hvc_evt)
         hvc_evt = self._hvc_tray.analyse(persons, frame)

@@ -1913,6 +1913,12 @@ def _build_agent_zip(config: dict, platform: str) -> bytes:
             )
         # Prefilled config.json (sits next to the package; loaded by config.load()).
         zf.writestr("config.json", json.dumps(config, indent=2))
+        # MediaPipe 21-point hand-landmark model for the High-Value Counter
+        # handover detector (agent/hand_landmarks.py resolves it relative to
+        # the agent package). Bundled so the agent needs no runtime download.
+        hand_task = _REPO_ROOT / "models" / "hand_landmarker.task"
+        if hand_task.exists():
+            zf.write(hand_task, "models/hand_landmarker.task")
         # Version stamp so users can tell which build they have.
         zf.writestr("VERSION.txt", f"Vantag Edge Agent v{_agent_version()}\n")
         # Launchers + readme.

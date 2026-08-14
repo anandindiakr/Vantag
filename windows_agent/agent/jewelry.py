@@ -36,6 +36,9 @@ log = logging.getLogger("vantag.jewelry")
 Point2D = Tuple[float, float]
 Polygon = List[Tuple[float, float]]
 
+# MediaPipe Hands 21-landmark fingertip indices (thumb..pinky tips).
+FINGERTIPS = (4, 8, 12, 16, 20)
+
 
 # ---------------------------------------------------------------------------
 # Geometry helpers (pure Python, dependency-free — mirrors jewelry_scene.py)
@@ -108,6 +111,45 @@ def _hand_points(bbox: Tuple[float, float, float, float]) -> List[Point2D]:
     ]
 
 
+def _hand_points_with_hands(
+    bbox: Tuple[float, float, float, float], hands: Optional[list]
+) -> List[Point2D]:
+    """Fingertip points from 21-point landmarks whose hand box overlaps *bbox*.
+
+    When the agent's hand landmarker produced results (MediaPipe 21-point),
+    the reach is measured from the real fingertips (indices 4/8/12/16/20)
+    rather than a bbox guess — matching the backend pipeline. Returns an
+    empty list when no hand overlaps the person box, so the caller falls back
+    to ``_hand_points``.
+    """
+    if not hands:
+        return []
+    x1, y1, x2, y2 = bbox
+    pts: List[Point2D] = []
+    for hand in hands:
+        lm = getattr(hand, "landmarks", hand)
+        if not lm:
+            continue
+        try:
+            xs = [float(p[0]) for p in lm]
+            ys = [float(p[1]) for p in lm]
+        except (TypeError, IndexError, ValueError):
+            continue
+        if not xs:
+            continue
+        hx1, hy1, hx2, hy2 = min(xs), min(ys), max(xs), max(ys)
+        if hx2 < x1 or hx1 > x2 or hy2 < y1 or hy1 > y2:
+            continue  # hand belongs to a different person
+        for i in FINGERTIPS:
+            try:
+                fx, fy, fv = lm[i]
+            except (IndexError, ValueError):
+                continue
+            if float(fv) >= 0.3:
+                pts.append((float(fx), float(fy)))
+    return pts
+
+
 def _snapshot(frame: np.ndarray) -> str:
     """Downsized JPEG evidence snapshot, matching the other edge detectors."""
     small = cv2.resize(frame, (320, 180))
@@ -147,7 +189,9 @@ class JewelryHandoverDetector:
     def configured(self) -> bool:
         return self._tray is not None
 
-    def analyse(self, persons: list, frame: np.ndarray) -> Optional[dict]:
+    def analyse(
+        self, persons: list, frame: np.ndarray, hands: Optional[list] = None
+    ) -> Optional[dict]:
         if self._tray is None:
             return None
         fh, fw = frame.shape[:2]
@@ -172,8 +216,9 @@ class JewelryHandoverDetector:
                 cx, cy = centroid(bbox)
                 at_counter = point_in_polygon(cx, cy, counter_px)
 
+            hand_pts = _hand_points_with_hands(bbox, hands) or _hand_points(bbox)
             hand_inside = any(
-                point_in_polygon(hx, hy, tray_px) for hx, hy in _hand_points(bbox)
+                point_in_polygon(hx, hy, tray_px) for hx, hy in hand_pts
             )
 
             if at_counter and hand_inside:

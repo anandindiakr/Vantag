@@ -60,10 +60,17 @@ class AgentConfig:
     agent_id: str = ""
     backend_url: str = "https://retail-vantag.com"
     mqtt_host: str = "retail-vantag.com"
-    mqtt_port: int = 8883               # public MQTTS (TLS) port on the broker
+    # The production Mosquitto broker listens on 1883 (plain TCP) and 9001
+    # (WebSocket). Use 8883 only when a TLS listener has been configured on
+    # the broker; the agent auto-enables TLS when the port is 8883.
+    mqtt_port: int = 1883
     mqtt_username: str = "vantag_edge"  # shared edge broker user
     mqtt_password: str = ""             # shared edge broker password (falls back to api_key)
     tenant_id: str = ""
+    # Door / access-control relay configuration. Structure:
+    #   {"relay_type": "simulate"|"http"|"gpio", "http_url": "...", "gpio_pin": 17}
+    # "simulate" (default) logs and reports status without physical hardware.
+    door_control: dict = field(default_factory=dict)
     cameras: List[CameraConfig] = field(default_factory=list)
     inference_device: str = "cpu"       # "cpu" | "cuda" | "dml"
     inference_fps: int = 5              # target inference FPS per camera
