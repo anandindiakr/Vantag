@@ -50,6 +50,11 @@ class Detection:
     """Pose keypoints as a list of ``(x, y, conf)`` tuples.  ``None`` for
     non-pose detections."""
 
+    hand_landmarks: Optional[List[List[Tuple[float, float, float]]]] = field(default=None)
+    """Per-hand 21-point MediaPipe landmarks as a list of hands, each a list
+    of ``(x, y, visibility)`` tuples in pixel coordinates.  ``None`` when hand
+    tracking is unavailable or no hands were matched to this person."""
+
 
 # ---------------------------------------------------------------------------
 # YOLOEngine

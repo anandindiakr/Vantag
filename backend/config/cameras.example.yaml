@@ -11,6 +11,10 @@ global:
   pose_fps_limit: 3
   gpu_load_threshold: 0.8
   face_fps_limit: 2
+  hand_landmarker_model_path: models/hand_landmarker.task
+  hand_fps_limit: 3
+  hand_max_hands: 2
+  hand_min_confidence: 0.5
   product_classes:
   - bottle
   - cup

@@ -51,6 +51,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_GPU_LOAD_THRESHOLD: float = 0.80
 _DEFAULT_POSE_FPS_LIMIT: int = 5
 _DEFAULT_FACE_FPS_LIMIT: int = 2
+_DEFAULT_HAND_FPS_LIMIT: int = 3
 
 # How often (seconds) to re-query nvidia-smi.  Querying every frame is
 # expensive; we amortise the cost by caching the last reading.
@@ -126,9 +127,11 @@ class ModelScheduler:
         )
         pose_fps: int = int(cfg.get("pose_fps_limit", _DEFAULT_POSE_FPS_LIMIT))
         face_fps: int = int(cfg.get("face_fps_limit", _DEFAULT_FACE_FPS_LIMIT))
+        hand_fps: int = int(cfg.get("hand_fps_limit", _DEFAULT_HAND_FPS_LIMIT))
 
         self._pose_limiter = _FrameRateLimiter(pose_fps)
         self._face_limiter = _FrameRateLimiter(face_fps)
+        self._hand_limiter = _FrameRateLimiter(hand_fps)
 
         # Cached GPU load state.
         self._lock = threading.Lock()
@@ -139,15 +142,18 @@ class ModelScheduler:
         # Per-model run counters (cumulative, for diagnostics).
         self._pose_runs: int = 0
         self._face_runs: int = 0
+        self._hand_runs: int = 0
         self._pose_skips: int = 0
         self._face_skips: int = 0
+        self._hand_skips: int = 0
 
         logger.info(
             "ModelScheduler initialised — gpu_load_threshold=%.0f%%, "
-            "pose_fps=%d, face_fps=%d.",
+            "pose_fps=%d, face_fps=%d, hand_fps=%d.",
             self._gpu_load_threshold * 100,
             pose_fps,
             face_fps,
+            hand_fps,
         )
 
     # ------------------------------------------------------------------
@@ -291,6 +297,30 @@ class ModelScheduler:
                 self._face_skips += 1
         return allowed
 
+    def should_run_hands(self) -> bool:
+        """
+        Return ``True`` if the hand-landmark engine should run for this frame.
+
+        Blocked when:
+        * GPU utilisation ≥ ``gpu_load_threshold``, OR
+        * The hand FPS limiter denies the frame.
+        """
+        with self._lock:
+            overloaded = self._gpu_overloaded
+
+        if overloaded:
+            with self._lock:
+                self._hand_skips += 1
+            return False
+
+        allowed = self._hand_limiter.allow()
+        with self._lock:
+            if allowed:
+                self._hand_runs += 1
+            else:
+                self._hand_skips += 1
+        return allowed
+
     # ------------------------------------------------------------------
     # Diagnostics
     # ------------------------------------------------------------------
@@ -312,11 +342,14 @@ class ModelScheduler:
                 "gpu_overloaded": self._gpu_overloaded,
                 "pose_fps_limit": self._pose_limiter.fps_limit,
                 "face_fps_limit": self._face_limiter.fps_limit,
+                "hand_fps_limit": self._hand_limiter.fps_limit,
                 "gpu_load_threshold": self._gpu_load_threshold,
                 "pose_runs": self._pose_runs,
                 "pose_skips": self._pose_skips,
                 "face_runs": self._face_runs,
                 "face_skips": self._face_skips,
+                "hand_runs": self._hand_runs,
+                "hand_skips": self._hand_skips,
             }
 
     def update_thresholds(
@@ -325,6 +358,7 @@ class ModelScheduler:
         gpu_load_threshold: Optional[float] = None,
         pose_fps_limit: Optional[int] = None,
         face_fps_limit: Optional[int] = None,
+        hand_fps_limit: Optional[int] = None,
     ) -> None:
         """
         Dynamically update scheduler parameters at runtime.
@@ -337,6 +371,8 @@ class ModelScheduler:
             New pose inference FPS cap.
         face_fps_limit:
             New face inference FPS cap.
+        hand_fps_limit:
+            New hand-landmark inference FPS cap.
         """
         with self._lock:
             if gpu_load_threshold is not None:
@@ -354,4 +390,9 @@ class ModelScheduler:
             self._face_limiter.fps_limit = face_fps_limit
             logger.info(
                 "ModelScheduler: face_fps_limit updated to %d.", face_fps_limit
+            )
+        if hand_fps_limit is not None:
+            self._hand_limiter.fps_limit = hand_fps_limit
+            logger.info(
+                "ModelScheduler: hand_fps_limit updated to %d.", hand_fps_limit
             )

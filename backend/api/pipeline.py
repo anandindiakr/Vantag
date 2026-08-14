@@ -58,6 +58,7 @@ from ..analyzers.jewelry_tray import JewelryTrayDetector, TrayEvent
 from ..analyzers.grab_and_run import GrabAndRunDetector, GrabAndRunEvent
 from ..inference.yolo_engine import YOLOEngine, Detection
 from ..inference.model_scheduler import ModelScheduler
+from ..inference.hand_landmarks import HandLandmarkEngine
 from ..ingestion.camera_registry import CameraRegistry
 from ..ingestion.health_monitor import HealthMonitor
 from ..ingestion.stream_manager import StreamManager
@@ -228,10 +229,18 @@ class VantagPipeline:
         # and enriches person detections with wrist/elbow keypoints for the
         # fall detector and the High-Value Counter hand-reach detector.
         self._pose_engine: Optional[YOLOEngine] = self._init_pose(global_cfg)
+        # Hand-landmark engine (MediaPipe HandLandmarker) for 21-point
+        # per-finger tracking in the High-Value Counter hand-reach detector.
+        self._hand_engine: HandLandmarkEngine = HandLandmarkEngine(
+            model_path=global_cfg.get("hand_landmarker_model_path", "") or "models/hand_landmarker.task",
+            max_hands=int(global_cfg.get("hand_max_hands", 2)),
+            min_confidence=float(global_cfg.get("hand_min_confidence", 0.5)),
+        )
         self._scheduler = ModelScheduler(config={
             "gpu_load_threshold": float(global_cfg.get("gpu_load_threshold", 0.80)),
             "pose_fps_limit": int(global_cfg.get("pose_fps_limit", 3)),
             "face_fps_limit": int(global_cfg.get("face_fps_limit", 2)),
+            "hand_fps_limit": int(global_cfg.get("hand_fps_limit", 3)),
         })
 
         self._build_analyzers()
@@ -516,6 +525,12 @@ class VantagPipeline:
         if detections and self._pose_engine is not None:
             detections = await self._enrich_with_pose(enhanced, detections)
 
+        # 2c. Hand-landmark inference (rate-limited) — attach 21-point per-finger
+        # landmarks so the High-Value Counter detector can measure an actual
+        # fingertip dipping into the tray instead of a bounding-box guess.
+        if detections:
+            detections = await self._enrich_with_hands(enhanced, detections)
+
         # 3. Run analyzers – all expose analyze(frame, detections, timestamp) -> List.
         events: List[dict] = []
         analyzers = self._analyzers.get(camera_id, [])
@@ -649,6 +664,73 @@ class VantagPipeline:
                     best = pp
             if best is not None and best_iou >= 0.5:
                 det.keypoints = best.keypoints
+        return detections
+
+    # ------------------------------------------------------------------
+    # Hand-landmark enrichment (21-point per-finger tracking)
+    # ------------------------------------------------------------------
+
+    async def _enrich_with_hands(
+        self,
+        frame: np.ndarray,
+        detections: List[Detection],
+    ) -> List[Detection]:
+        """Run MediaPipe HandLandmarker (rate-limited) and attach fingertips.
+
+        Returns the original detections with ``hand_landmarks`` populated on the
+        person whose bbox contains each detected hand.
+        """
+        if not self._hand_engine.available:
+            return detections
+        if not self._scheduler.should_run_hands():
+            return detections
+        try:
+            hands = await asyncio.to_thread(self._hand_engine.detect_hands, frame)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Hand-landmark inference error | error=%s", exc)
+            return detections
+        if not hands:
+            return detections
+        return self._attach_hands(detections, hands)
+
+    @staticmethod
+    def _hand_inside_fraction(
+        hand_bbox: Tuple[int, int, int, int],
+        person_bbox: Tuple[int, int, int, int],
+    ) -> float:
+        """Fraction of the hand bbox area that lies inside the person bbox."""
+        hx1, hy1, hx2, hy2 = hand_bbox
+        px1, py1, px2, py2 = person_bbox
+        ix1 = max(hx1, px1)
+        iy1 = max(hy1, py1)
+        ix2 = min(hx2, px2)
+        iy2 = min(hy2, py2)
+        inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+        hand_area = max(0, hx2 - hx1) * max(0, hy2 - hy1)
+        return inter / hand_area if hand_area > 0 else 0.0
+
+    @classmethod
+    def _attach_hands(
+        cls,
+        detections: List[Detection],
+        hands: List[Any],
+    ) -> List[Detection]:
+        """Attach each hand's 21 landmarks to the best-matching person."""
+        for hand in hands:
+            hand_bbox = hand.bbox()
+            best: Optional[Detection] = None
+            best_overlap = 0.0
+            for det in detections:
+                if det.class_name != "person":
+                    continue
+                overlap = cls._hand_inside_fraction(hand_bbox, det.bbox)
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best = det
+            if best is not None and best_overlap >= 0.5:
+                if best.hand_landmarks is None:
+                    best.hand_landmarks = []
+                best.hand_landmarks.append(list(hand.landmarks))
         return detections
 
     # ------------------------------------------------------------------

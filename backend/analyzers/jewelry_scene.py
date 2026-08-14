@@ -61,6 +61,11 @@ _MIN_WRIST_CONF = 0.15
 _MIN_ELBOW_CONF = 0.15
 _HAND_EXTEND_FACTOR = 0.6  # extend this fraction of the forearm past the wrist
 
+# MediaPipe Hands 21-landmark layout (per-finger precision).
+_HAND_TIP_INDICES = (4, 8, 12, 16, 20)  # thumb..pinky fingertips
+_HAND_WRIST_INDEX = 0
+_MIN_HAND_CONF = 0.1  # MediaPipe visibility threshold for a fingertip
+
 
 # ---------------------------------------------------------------------------
 # Geometry helpers (pure Python, dependency-free)
@@ -126,14 +131,34 @@ def parse_polygon(points: Sequence[Sequence[float]]) -> Optional[Polygon]:
 def hand_points(detection: Detection) -> List[Point2D]:
     """Return candidate hand pixel points for a person detection.
 
-    Prefers pose keypoints when ``detection.keypoints`` is populated (COCO
-    17-point layout): for each arm it returns the wrist plus a point projected
-    past the wrist along the forearm (wrist − elbow) to approximate the
-    palm/fingertips — the part that actually reaches into a tray.  Falls back
-    to a small set of bbox-proportional points — bottom corners/centre and
-    mid-height sides — which is a conservative approximation for a standing
-    person reaching toward a counter.
+    Prefers 21-point MediaPipe hand landmarks when
+    ``detection.hand_landmarks`` is populated — the actual fingertip points
+    (indices 4/8/12/16/20) give per-finger precision for tray reach detection.
+    Falls back to COCO 17-point pose keypoints (wrists plus a point projected
+    past the wrist along the forearm), and finally to a small set of
+    bbox-proportional points — bottom corners/centre and mid-height sides —
+    which is a conservative approximation for a standing person reaching
+    toward a counter.
     """
+    hands = getattr(detection, "hand_landmarks", None)
+    if hands:
+        points: List[Point2D] = []
+        for hand in hands:
+            if not isinstance(hand, (list, tuple)):
+                continue
+            for idx in _HAND_TIP_INDICES:
+                if idx >= len(hand):
+                    continue
+                kp = hand[idx]
+                if (
+                    isinstance(kp, (list, tuple))
+                    and len(kp) >= 3
+                    and float(kp[2]) >= _MIN_HAND_CONF
+                ):
+                    points.append((float(kp[0]), float(kp[1])))
+        if points:
+            return points
+
     kps = getattr(detection, "keypoints", None)
     if kps:
         points: List[Point2D] = []
