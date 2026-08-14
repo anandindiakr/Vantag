@@ -44,6 +44,10 @@ on:
       # without this path the VPS would keep serving the previous agent
       # code even though the repo has a newer version.
       - "windows_agent/**"
+      # Model weights are bind-mounted from the host repo's models/ dir
+      # (docker-compose.prod.yml: ../models -> /app/models), so new weights
+      # must trigger a backend redeploy to reach the running container.
+      - "models/**"
       - "docker/Dockerfile"
       - "docker/docker-compose.prod.yml"
       - "docker/deploy_backend.sh"
