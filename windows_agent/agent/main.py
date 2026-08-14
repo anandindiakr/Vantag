@@ -312,6 +312,9 @@ def start_monitoring():
     if remote and remote.get("cameras"):
         cams = [_map_remote_camera(c) for c in remote["cameras"]]
         _config.cameras = cams
+        # Door-relay configuration set in the dashboard wizard (tenant-scoped).
+        if isinstance(remote.get("door_control"), dict):
+            _config.door_control = remote["door_control"]
         _config.save()
 
     if not _config.cameras:

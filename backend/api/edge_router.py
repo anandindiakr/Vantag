@@ -1510,7 +1510,14 @@ async def get_config(
         stmt = stmt.where(CameraConfig.site_id == agent_site)
     result = await session.execute(stmt)
     cameras = result.scalars().all()
+
+    # Door-relay configuration (door_control) is tenant-scoped and edited via
+    # the relay setup wizard. The agent applies it to its MQTT relay driver.
+    tenant = await session.get(Tenant, agent.tenant_id)
+    door_control = (tenant.relay_settings or {}) if tenant else {}
+
     return {
+        "door_control": door_control,
         "cameras": [
             {
                 "camera_id": c.camera_id,
@@ -1999,6 +2006,10 @@ async def download_agent(
         "backend_url": backend_url,
         "mqtt_host": mqtt_host,
         "mqtt_port": int(os.getenv("MQTT_PORT", "1883")),
+        # Broker credentials so the agent can authenticate (allow_anonymous
+        # is disabled). Env-overridable for rotation.
+        "mqtt_username": os.getenv("MQTT_EDGE_USERNAME", "vantag_edge"),
+        "mqtt_password": os.getenv("MQTT_EDGE_PASSWORD", "nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO"),
         "tenant_id": tenant_id,
         # NOTE: keys here MUST match windows_agent/agent/config.py::CameraConfig
         # fields (id, name, rtsp_url, location, ...). Any extra/renamed key makes

@@ -7,7 +7,6 @@ import './i18n/index';
 import Sidebar from './components/Sidebar';
 import SupportChat from './components/SupportChat';
 import { useWebSocket } from './hooks/useWebSocket';
-import { useMQTT } from './hooks/useMQTT';
 
 // ── React Query client ──────────────────────────────────────────────────────
 const queryClient = new QueryClient({
@@ -36,6 +35,7 @@ const SetupWizard   = lazy(() => import('./pages/SetupWizard'));
 const DemoCenter    = lazy(() => import('./pages/DemoCenter'));
 const ZoneEditor    = lazy(() => import('./pages/ZoneEditorPage'));
 const HighValueCounter = lazy(() => import('./pages/HighValueCounterSetup'));
+const RelaySetup     = lazy(() => import('./pages/RelaySetup'));
 const CameraView   = lazy(() => import('./pages/CameraView'));
 const IncidentsPage = lazy(() => import('./pages/IncidentsPage'));
 const WatchlistPage = lazy(() => import('./pages/WatchlistPage'));
@@ -96,9 +96,9 @@ function Loading() {
 
 // ── App shell with sidebar (authenticated pages) ────────────────────────────
 function AppLayout() {
-  // Initialise WebSocket + MQTT connections once for all dashboard pages
+  // Initialise the authenticated WebSocket once for all dashboard pages.
+  // Live door status now arrives over this connection (door_state messages).
   useWebSocket();
-  useMQTT();
   return (
     <div className="flex min-h-screen bg-vantag-dark">
       <Sidebar />
@@ -159,6 +159,7 @@ export default function App() {
               <Route path="/demo"                  element={<DemoCenter />} />
               <Route path="/zone-editor"           element={<ZoneEditor />} />
               <Route path="/high-value-counter"     element={<HighValueCounter />} />
+              <Route path="/relay-setup"            element={<RelaySetup />} />
               <Route path="/cameras/:storeId/:cameraId" element={<CameraView />} />
               <Route path="/incidents"  element={<IncidentsPage />} />
               <Route path="/watchlist"  element={<WatchlistPage />} />

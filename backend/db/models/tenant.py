@@ -41,6 +41,7 @@ class Tenant(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     network_settings: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # {nvr_ip, scan_subnet, ...}
     alert_settings: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # {twilio: {...}, whatsapp: {...}, email: {...}}
+    relay_settings: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # {relay_type, http_url, gpio_pin, ...}
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 

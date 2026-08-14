@@ -50,7 +50,7 @@ from .reports_router import set_pipeline as reports_set_pipeline
 from .watchlist_router import router as watchlist_router
 from ..audio.intercom import router as audio_router
 from ..mqtt.client import MQTTClient
-from ..mqtt.door_controller import DoorController, door_router, set_controller
+from ..mqtt.door_controller import DoorController, door_router, set_controller, set_status_broadcast
 from ..pos.pos_router import router as pos_router
 from ..webhooks.webhook_engine import WebhookEngine
 from ..db.database import AsyncSessionLocal, init_db
@@ -63,6 +63,7 @@ from .manual_router import manual_router
 from .edge_router import set_pipeline as edge_set_pipeline
 from .edge_router import set_webhook_engine as edge_set_webhook_engine
 from .billing_router import billing_router
+from .relay_router import relay_router
 from .camera_probe_router import camera_probe_router
 from .demo_router import router as demo_router
 from .demo_router import set_pipeline as demo_set_pipeline
@@ -241,6 +242,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # ------------------------------------------------------------------
     _door_controller = DoorController(_mqtt_client)
     set_controller(_door_controller)
+    set_status_broadcast(ws_manager.broadcast)
 
     # ------------------------------------------------------------------
     # 3. Inject pipeline into routers.
@@ -418,6 +420,7 @@ app.include_router(reports_router,    dependencies=_sub_gate)
 app.include_router(watchlist_router,  dependencies=_sub_gate)
 app.include_router(audio_router,      dependencies=_sub_gate)
 app.include_router(door_router,       dependencies=_sub_gate)
+app.include_router(relay_router,      dependencies=_sub_gate)
 app.include_router(pos_router,        dependencies=_sub_gate)
 app.include_router(auth_router)
 app.include_router(onboarding_router)

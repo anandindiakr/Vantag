@@ -76,6 +76,7 @@ services:
       - "9001:9001"
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
       - mosquitto-data:/mosquitto/data
       - mosquitto-logs:/mosquitto/log
     networks:
@@ -126,8 +127,10 @@ services:
       MQTT_PORT:            ${MQTT_PORT:-1883}
       MQTT_TLS:             ${MQTT_TLS:-false}
       MQTT_TLS_CA:          ${MQTT_TLS_CA:-}
-      MQTT_USERNAME:        ${MQTT_USERNAME:-}
-      MQTT_PASSWORD:        ${MQTT_PASSWORD:-}
+      MQTT_USERNAME:        ${MQTT_USERNAME:-vantag_backend}
+      MQTT_PASSWORD:        ${MQTT_PASSWORD:-nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO}
+      MQTT_EDGE_USERNAME:   ${MQTT_EDGE_USERNAME:-vantag_edge}
+      MQTT_EDGE_PASSWORD:   ${MQTT_EDGE_PASSWORD:-nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO}
       MQTT_REQUIRED:        ${MQTT_REQUIRED:-false}
       REDIS_URL:            redis://redis:6379/0
       VANTAG_SMTP_HOST:     ${VANTAG_SMTP_HOST:-smtp.gmail.com}

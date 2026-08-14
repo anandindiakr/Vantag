@@ -120,6 +120,7 @@ async def init_db() -> None:
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS refresh_token_hash VARCHAR(128)",
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS refresh_token_expires_at TIMESTAMPTZ",
             "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS alert_settings JSONB",
+            "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS relay_settings JSONB",
             "ALTER TABLE partners ADD COLUMN IF NOT EXISTS commission_rule_id VARCHAR(36) "
             "REFERENCES commission_rules(id) ON DELETE SET NULL",
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ",

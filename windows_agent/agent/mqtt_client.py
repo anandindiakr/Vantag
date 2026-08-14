@@ -2,8 +2,8 @@
 MQTT client for the Vantag Edge Agent (door / access control).
 
 Receives door lock/unlock commands from the backend on the canonical topic
-namespace and actuates a configurable relay, then publishes the resulting
-door state back so the dashboard's One-Tap Lock reflects real state.
+namespace, actuates a pluggable relay (see ``agent/relay.py``), and publishes
+the resulting door state back so the dashboard reflects real state.
 
 Canonical topic namespace (matches ``backend/mqtt/client.py``):
 
@@ -11,33 +11,20 @@ Canonical topic namespace (matches ``backend/mqtt/client.py``):
     vantag/stores/{store_id}/doors/{door_id}/status    <- agent publishes
 
 The agent subscribes with a wildcard (``vantag/stores/+/doors/+/command``) so
-a command reaches it regardless of how the backend derives ``store_id``
-(site id vs legacy location slug). ``store_id`` and ``door_id`` are parsed
-from the topic; the payload only needs ``action``.
-
-Relay backends
---------------
-Configured via ``AgentConfig.door_control``:
-
-    {"relay_type": "simulate" | "http" | "gpio",
-     "http_url": "http://192.168.1.50/relay",   # for relay_type=http
-     "gpio_pin": 17}                             # for relay_type=gpio
-
-* ``simulate`` (default) — logs the command and publishes the resulting
-  state back after a short delay. Used when no physical relay is wired yet.
-* ``http`` — POSTs ``{door_id, action}`` to ``http_url``. Treats any 2xx as
-  success.
-* ``gpio`` — drives a relay pin via ``RPi.GPIO`` (Linux/SBC only; best-effort,
-  falls back to simulate when the library/pin isn't available).
+a command reaches it regardless of how the backend derives ``store_id``.
+``store_id`` / ``door_id`` are parsed from the topic; ``tenant_id`` is added
+to the status payload so the backend can route the update to the right
+dashboard.
 """
 
 import json
 import logging
 import threading
-import time
 from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
+
+from .relay import build_relay
 
 log = logging.getLogger("vantag.mqtt")
 
@@ -46,82 +33,6 @@ COMMAND_TOPIC = "vantag/stores/+/doors/+/command"
 
 def _status_topic(store_id: str, door_id: str) -> str:
     return f"vantag/stores/{store_id}/doors/{door_id}/status"
-
-
-class _SimulateRelay:
-    """Logs commands and pretends the relay actuated (no hardware)."""
-
-    def actuate(self, door_id: str, action: str) -> bool:
-        log.info("Relay (simulate) | door=%s action=%s", door_id, action)
-        return True
-
-
-class _HttpRelay:
-    """Drives a LAN/Wi-Fi relay board via a simple HTTP endpoint."""
-
-    def __init__(self, url: str, timeout: float = 5.0):
-        self._url = url
-        self._timeout = timeout
-
-    def actuate(self, door_id: str, action: str) -> bool:
-        import urllib.request
-
-        req = urllib.request.Request(
-            self._url,
-            data=json.dumps({"door_id": door_id, "action": action}).encode(),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
-                return 200 <= resp.status < 300
-        except Exception as exc:  # noqa: BLE001
-            log.error("Relay (http) request failed | url=%s error=%s", self._url, exc)
-            return False
-
-
-class _GpioRelay:
-    """Drives a relay via RPi.GPIO (SBCs only). Falls back to simulate."""
-
-    def __init__(self, pin: int):
-        self._pin = int(pin)
-        self._gpio = None
-        try:
-            import RPi.GPIO as GPIO  # type: ignore[import]
-
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self._pin, GPIO.OUT)
-            self._gpio = GPIO
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "Relay (gpio) unavailable (%s) — falling back to simulate.", exc
-            )
-            self._gpio = None
-
-    def actuate(self, door_id: str, action: str) -> bool:
-        if self._gpio is None:
-            log.info("Relay (gpio->simulate) | door=%s action=%s", door_id, action)
-            return True
-        try:
-            self._gpio.output(self._pin, self._gpio.HIGH if action == "unlock" else self._gpio.LOW)
-            log.info("Relay (gpio) | door=%s action=%s pin=%d", door_id, action, self._pin)
-            return True
-        except Exception as exc:  # noqa: BLE001
-            log.error("Relay (gpio) failed: %s", exc)
-            return False
-
-
-def _build_relay(door_control: dict):
-    cfg = door_control or {}
-    kind = str(cfg.get("relay_type", "simulate")).lower()
-    if kind == "http":
-        url = cfg.get("http_url")
-        if url:
-            return _HttpRelay(str(url))
-        log.warning("door_control.relay_type=http but no http_url — using simulate.")
-    elif kind == "gpio":
-        return _GpioRelay(cfg.get("gpio_pin", 17))
-    return _SimulateRelay()
 
 
 class VantagMqttClient:
@@ -142,7 +53,7 @@ class VantagMqttClient:
         self.port = port
         self.tenant_id = tenant_id
         self.door_control = dict(door_control or {})
-        self._relay = _build_relay(self.door_control)
+        self._relay = build_relay(self.door_control)
         # TLS is required on the public MQTTS port (8883). Auto-enable when the
         # caller doesn't specify and the port is the standard MQTTS port.
         self.tls = (port == 8883) if tls is None else bool(tls)
@@ -240,6 +151,7 @@ class VantagMqttClient:
             "state": state,
             "door_id": door_id,
             "store_id": store_id,
+            "tenant_id": self.tenant_id,
             "timestamp": datetime.now(tz=timezone.utc).isoformat(),
         }
         try:

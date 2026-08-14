@@ -14,8 +14,8 @@ interface OneTapLockProps {
 export default function OneTapLock({ storeId, doorId, doorLabel }: OneTapLockProps) {
   const [loading, setLoading] = useState(false);
 
-  // Combined key used in the store. Real state arrives via MQTT status
-  // (see useMQTT); we set it optimistically on a successful command.
+  // Combined key used in the store. Real state arrives via the authenticated
+  // WebSocket (door_state messages); we set it optimistically on success.
   const storeKey = `${storeId}:${doorId}`;
   const doorState = useVantagStore((s) => s.doorStates[storeKey] ?? 'unknown') as DoorState;
 
