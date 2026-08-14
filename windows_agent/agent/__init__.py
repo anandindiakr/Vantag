@@ -1,4 +1,14 @@
 """Vantag Windows Edge Agent"""
+# 1.8.0 — per-finger hand tracking + fixed MQTT door control. Ported the
+# MediaPipe 21-point HandLandmarker into agent/hand_landmarks.py (bundled
+# hand_landmarker.task in the download zip) and wired it into the High-Value
+# Counter handover detector, which now measures a reach from the real
+# fingertips with the bbox-proportional fallback intact. Also fixed door
+# control: the agent now subscribes to the canonical
+# vantag/stores/+/doors/+/command topic, actuates a configurable relay
+# (simulate/http/gpio) and publishes door status back, and the default
+# broker port is corrected to 1883.
+#
 # 1.7.0 — High-Value Counter detectors run on-box. Ported the three
 # jewellery / luxury-counter analyzers (jewelry_handover reach-in→withdraw,
 # jewelry_tray foreground-change-while-person-present, grab_and_run fast
@@ -45,4 +55,4 @@
 # NMS on the fallback path so a fallback can no longer inflate people counts,
 # and reports the verified status in every heartbeat so Admin -> System Health
 # shows the truth instead of an assumption.
-__version__ = "1.7.0"
+__version__ = "1.8.0"
