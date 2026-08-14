@@ -4,9 +4,13 @@ global:
   reconnect_backoff_max: 64
   frame_buffer_size: 30
   risk_score_window_seconds: 60
-  yolo_model_path: models/yolov8n.pt
+  yolo_model_path: models/yolo26n.pt
+  pose_model_path: models/yolo26n-pose.pt
   yolo_device: cpu
   yolo_conf_threshold: 0.25
+  pose_fps_limit: 3
+  gpu_load_threshold: 0.8
+  face_fps_limit: 2
   product_classes:
   - bottle
   - cup

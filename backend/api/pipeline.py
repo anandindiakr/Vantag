@@ -42,7 +42,7 @@ import uuid
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Deque, Dict, List, Optional
+from typing import Any, Callable, Deque, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -57,6 +57,7 @@ from ..analyzers.jewelry_handover import JewelryHandoverDetector, HandoverEvent
 from ..analyzers.jewelry_tray import JewelryTrayDetector, TrayEvent
 from ..analyzers.grab_and_run import GrabAndRunDetector, GrabAndRunEvent
 from ..inference.yolo_engine import YOLOEngine, Detection
+from ..inference.model_scheduler import ModelScheduler
 from ..ingestion.camera_registry import CameraRegistry
 from ..ingestion.health_monitor import HealthMonitor
 from ..ingestion.stream_manager import StreamManager
@@ -223,6 +224,15 @@ class VantagPipeline:
         # ---- YOLO inference engines ----
         # One shared engine (per global config); per-camera engines can be added later.
         self._yolo_engine: Optional[YOLOEngine] = self._init_yolo(global_cfg)
+        # Pose engine (YOLO26n-pose) runs at a reduced FPS via ModelScheduler
+        # and enriches person detections with wrist/elbow keypoints for the
+        # fall detector and the High-Value Counter hand-reach detector.
+        self._pose_engine: Optional[YOLOEngine] = self._init_pose(global_cfg)
+        self._scheduler = ModelScheduler(config={
+            "gpu_load_threshold": float(global_cfg.get("gpu_load_threshold", 0.80)),
+            "pose_fps_limit": int(global_cfg.get("pose_fps_limit", 3)),
+            "face_fps_limit": int(global_cfg.get("face_fps_limit", 2)),
+        })
 
         self._build_analyzers()
 
@@ -263,7 +273,7 @@ class VantagPipeline:
     @staticmethod
     def _init_yolo(global_cfg: dict) -> Optional[YOLOEngine]:
         """Initialise the shared YOLO inference engine from global config."""
-        model_path = global_cfg.get("yolo_model_path", "")
+        model_path = global_cfg.get("yolo_model_path", "") or "models/yolo26n.pt"
         device = global_cfg.get("yolo_device", "cpu")
         conf = float(global_cfg.get("yolo_conf_threshold", 0.45))
         try:
@@ -272,6 +282,27 @@ class VantagPipeline:
             return engine
         except Exception as exc:  # noqa: BLE001
             logger.warning("YOLOEngine init failed (%s) – analyzers will run without detections.", exc)
+            return None
+
+    @staticmethod
+    def _init_pose(global_cfg: dict) -> Optional[YOLOEngine]:
+        """Initialise the shared pose-estimation engine from global config.
+
+        A missing pose model is non-fatal: the fall and hand-reach detectors
+        degrade gracefully to bounding-box heuristics.
+        """
+        model_path = global_cfg.get("pose_model_path", "") or "models/yolo26n-pose.pt"
+        device = global_cfg.get("yolo_device", "cpu")
+        conf = float(global_cfg.get("yolo_conf_threshold", 0.45))
+        if not os.path.isfile(model_path):
+            logger.info("Pose engine skipped (model file not found) | path=%s", model_path)
+            return None
+        try:
+            engine = YOLOEngine(model_path=model_path, device=device, conf_threshold=conf)
+            logger.info("Pose engine initialised | model=%s device=%s", model_path, device)
+            return engine
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Pose engine init failed (%s) – hand/fall detection will use bbox heuristics.", exc)
             return None
 
     # ------------------------------------------------------------------
@@ -478,6 +509,13 @@ class VantagPipeline:
             except Exception as exc:  # noqa: BLE001
                 logger.debug("YOLO inference error | camera=%s error=%s", camera_id, exc)
 
+        # 2b. Pose inference (rate-limited by ModelScheduler) — enrich person
+        # detections with wrist/elbow keypoints so the High-Value Counter
+        # hand-reach detector and the fall detector can use real pose geometry
+        # instead of bounding-box heuristics.
+        if detections and self._pose_engine is not None:
+            detections = await self._enrich_with_pose(enhanced, detections)
+
         # 3. Run analyzers – all expose analyze(frame, detections, timestamp) -> List.
         events: List[dict] = []
         analyzers = self._analyzers.get(camera_id, [])
@@ -539,6 +577,79 @@ class VantagPipeline:
         # 6. Broadcast events.
         for ev in events:
             await self._emit_event(ev, store_id)
+
+    # ------------------------------------------------------------------
+    # Pose enrichment
+    # ------------------------------------------------------------------
+
+    async def _enrich_with_pose(
+        self,
+        frame: np.ndarray,
+        detections: List[Detection],
+    ) -> List[Detection]:
+        """Run pose inference (rate-limited) and attach wrist keypoints.
+
+        Returns the original detections with ``keypoints`` populated on person
+        detections whose bbox overlaps a pose detection.  No-ops when the
+        scheduler suppresses the frame or the pose engine is unavailable.
+        """
+        if not self._scheduler.should_run_pose():
+            return detections
+        try:
+            pose_dets = await asyncio.to_thread(self._pose_engine.detect_pose, frame)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Pose inference error | error=%s", exc)
+            return detections
+        return self._merge_pose_keypoints(detections, pose_dets)
+
+    @staticmethod
+    def _bbox_iou(
+        a: Tuple[int, int, int, int],
+        b: Tuple[int, int, int, int],
+    ) -> float:
+        """Intersection-over-union of two ``(x1, y1, x2, y2)`` boxes."""
+        ix1 = max(a[0], b[0])
+        iy1 = max(a[1], b[1])
+        ix2 = min(a[2], b[2])
+        iy2 = min(a[3], b[3])
+        inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+        area_a = max(0, a[2] - a[0]) * max(0, a[3] - a[1])
+        area_b = max(0, b[2] - b[0]) * max(0, b[3] - b[1])
+        union = area_a + area_b - inter
+        return inter / union if union > 0 else 0.0
+
+    @classmethod
+    def _merge_pose_keypoints(
+        cls,
+        detections: List[Detection],
+        pose_detections: List[Detection],
+    ) -> List[Detection]:
+        """Attach pose keypoints to person detections by best bbox IoU.
+
+        The pose and detection engines run separate ByteTrack state, so their
+        ``track_id`` values are not comparable; bbox IoU is the reliable join
+        key for a single frame.
+        """
+        pose_persons = [
+            p for p in pose_detections
+            if p.class_name == "person" and p.keypoints
+        ]
+        if not pose_persons:
+            return detections
+
+        for det in detections:
+            if det.class_name != "person":
+                continue
+            best: Optional[Detection] = None
+            best_iou = 0.0
+            for pp in pose_persons:
+                iou = cls._bbox_iou(det.bbox, pp.bbox)
+                if iou > best_iou:
+                    best_iou = iou
+                    best = pp
+            if best is not None and best_iou >= 0.5:
+                det.keypoints = best.keypoints
+        return detections
 
     # ------------------------------------------------------------------
     # Risk scoring

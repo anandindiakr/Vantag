@@ -52,9 +52,14 @@ except ImportError:
 Point2D = Tuple[float, float]
 Polygon = List[Tuple[float, float]]
 
-# COCO 17-keypoint layout: wrists at indices 9 (left) and 10 (right).
-_WRIST_INDICES = (9, 10)
+# COCO 17-keypoint layout. Arms are (elbow, wrist): left = (7, 9),
+# right = (8, 10). The forearm direction (wrist − elbow) lets us project a
+# point past the wrist toward the palm/fingertips — which is what actually
+# dips into a display tray — instead of stopping at the wrist.
+_WRIST_ELBOW_PAIRS = ((9, 7), (10, 8))  # (wrist_index, elbow_index)
 _MIN_WRIST_CONF = 0.15
+_MIN_ELBOW_CONF = 0.15
+_HAND_EXTEND_FACTOR = 0.6  # extend this fraction of the forearm past the wrist
 
 
 # ---------------------------------------------------------------------------
@@ -121,26 +126,45 @@ def parse_polygon(points: Sequence[Sequence[float]]) -> Optional[Polygon]:
 def hand_points(detection: Detection) -> List[Point2D]:
     """Return candidate hand pixel points for a person detection.
 
-    Prefers pose wrists when ``detection.keypoints`` is populated (COCO
-    17-point layout, wrists at indices 9/10).  Falls back to a small set of
-    bbox-proportional points — bottom corners/centre and mid-height sides —
-    which is a conservative approximation for a standing person reaching
-    toward a counter.
+    Prefers pose keypoints when ``detection.keypoints`` is populated (COCO
+    17-point layout): for each arm it returns the wrist plus a point projected
+    past the wrist along the forearm (wrist − elbow) to approximate the
+    palm/fingertips — the part that actually reaches into a tray.  Falls back
+    to a small set of bbox-proportional points — bottom corners/centre and
+    mid-height sides — which is a conservative approximation for a standing
+    person reaching toward a counter.
     """
     kps = getattr(detection, "keypoints", None)
     if kps:
-        wrists: List[Point2D] = []
-        for idx in _WRIST_INDICES:
-            if idx >= len(kps):
+        points: List[Point2D] = []
+        for wrist_idx, elbow_idx in _WRIST_ELBOW_PAIRS:
+            if wrist_idx >= len(kps):
                 continue
-            kp = kps[idx]
-            if not isinstance(kp, (list, tuple)) or len(kp) < 3:
+            wrist = kps[wrist_idx]
+            if not isinstance(wrist, (list, tuple)) or len(wrist) < 3:
                 continue
-            conf = float(kp[2])
-            if conf >= _MIN_WRIST_CONF:
-                wrists.append((float(kp[0]), float(kp[1])))
-        if wrists:
-            return wrists
+            if float(wrist[2]) < _MIN_WRIST_CONF:
+                continue
+            wx, wy = float(wrist[0]), float(wrist[1])
+            points.append((wx, wy))  # the wrist itself
+
+            # Project past the wrist along the forearm toward the fingertips.
+            if elbow_idx < len(kps):
+                elbow = kps[elbow_idx]
+                if (
+                    isinstance(elbow, (list, tuple))
+                    and len(elbow) >= 3
+                    and float(elbow[2]) >= _MIN_ELBOW_CONF
+                ):
+                    ex, ey = float(elbow[0]), float(elbow[1])
+                    points.append(
+                        (
+                            wx + _HAND_EXTEND_FACTOR * (wx - ex),
+                            wy + _HAND_EXTEND_FACTOR * (wy - ey),
+                        )
+                    )
+        if points:
+            return points
 
     x1, y1, x2, y2 = detection.bbox
     cx = (x1 + x2) / 2.0

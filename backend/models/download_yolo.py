@@ -1,14 +1,15 @@
 """
 backend/models/download_yolo.py
 ================================
-One-time script to download YOLOv8 model weights required by the
+One-time script to download the YOLO26 model weights required by the
 Vantag AI pipeline.  Run once before starting the backend.
 
 Usage:
     python -m backend.models.download_yolo
 
-Downloads to the path specified by `yolo_model_path` in cameras.yaml
-(default: models/yolov8n.pt relative to the project root).
+Downloads the primary detector (``yolo26n.pt``) and the pose estimator
+(``yolo26n-pose.pt``) to the directory specified by ``VANTAG_MODEL_DIR``
+(default: ``models/`` relative to the project root).
 """
 from __future__ import annotations
 
@@ -19,6 +20,10 @@ from pathlib import Path
 
 # ── Model catalogue ────────────────────────────────────────────────────────
 MODELS = {
+    # Current generation (default) — YOLO26 is NMS-free and DFL-free.
+    "yolo26n.pt":      "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n.pt",
+    "yolo26n-pose.pt": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n-pose.pt",
+    # Legacy YOLOv8 fallbacks (kept for existing deployments / A-B rollbacks).
     "yolov8n.pt":      "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt",
     "yolov8n-pose.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n-pose.pt",
 }
@@ -52,20 +57,17 @@ def main() -> None:
     dest_dir = Path(os.getenv("VANTAG_MODEL_DIR", str(DEFAULT_DIR)))
 
     print("=" * 55)
-    print("  Vantag — YOLOv8 Model Downloader")
+    print("  Vantag — YOLO26 Model Downloader")
     print("=" * 55)
 
-    # Always download the base detection model
-    download("yolov8n.pt", dest_dir)
-
-    # Optionally download pose model (for fall detection)
-    ans = input("\nDownload pose model too? (enables fall detection, +7 MB) [Y/n]: ").strip().lower()
-    if ans in ("", "y", "yes"):
-        download("yolov8n-pose.pt", dest_dir)
+    # Detection model (primary pipeline) + pose model (fall detection and the
+    # High-Value Counter hand-reach keypoints).
+    download("yolo26n.pt", dest_dir)
+    download("yolo26n-pose.pt", dest_dir)
 
     print("\n" + "=" * 55)
     print("  Done! Update cameras.yaml → yolo_model_path if needed.")
-    print(f"  Default path: {dest_dir / 'yolov8n.pt'}")
+    print(f"  Default path: {dest_dir / 'yolo26n.pt'}")
     print("=" * 55 + "\n")
 
 
