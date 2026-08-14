@@ -693,7 +693,7 @@ export default function Landing() {
             <Link to="/how-it-works" className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl border border-white/10 text-white/70 hover:text-white hover:border-white/25 text-base font-semibold transition-all">
               See how it works
             </Link>
-            <a href="/high-value-counter-handout.pdf" download className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:border-white/25 text-base font-semibold transition-all">
+            <a href={`/handouts/high-value-counter-handout-${region.region.toLowerCase()}.pdf`} download className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:border-white/25 text-base font-semibold transition-all">
               <Download className="w-4 h-4" /> Download one-page handout
             </a>
           </div>

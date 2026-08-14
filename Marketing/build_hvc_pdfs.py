@@ -269,10 +269,22 @@ def render_table(rows):
 # ----------------------------------------------------------------------
 # page chrome
 # ----------------------------------------------------------------------
-def cover(title, subtitle, meta):
+# Per-region handout branding. Brand follows each website's own identity;
+# the support email stays the same everywhere (support@retail-vantag.com).
+HANDOUT_REGIONS = {
+    "in": {"brand": "Retail Nazar",  "domain": "retailnazar.com",  "symbol": "₹",   "starter": 1999},
+    "sg": {"brand": "Vantag",        "domain": "retail-vantag.com", "symbol": "S$",  "starter": 19},
+    "my": {"brand": "JagaJaga",      "domain": "jagajaga.my",      "symbol": "RM",  "starter": 29},
+    "ph": {"brand": "Retail Bantay", "domain": "retailbantay.com", "symbol": "PHP ", "starter": 2499},
+    "id": {"brand": "Retail Pantau", "domain": "retailpantau.com", "symbol": "Rp",  "starter": 149000},
+}
+EMAIL = "support@retail-vantag.com"
+
+
+def cover(title, subtitle, meta, brand="Retail Nazar"):
     """Dark cover band rendered as a full-width table."""
     inner = [
-        [Paragraph('<font color="#22D3EE">RETAIL NAZAR · HIGH-VALUE COUNTER</font>', S_META)],
+        [Paragraph(f'<font color="#22D3EE">{brand.upper()} · HIGH-VALUE COUNTER</font>', S_META)],
         [Paragraph(inline(title), S_TITLE)],
         [Paragraph(inline(subtitle), S_SUBTITLE)],
         [Paragraph(inline(meta), S_META)],
@@ -313,7 +325,7 @@ def build_doc(out_path, doc_title, footer, flow):
 # ----------------------------------------------------------------------
 # one-page handout (self-contained flyer)
 # ----------------------------------------------------------------------
-def build_handout(out_path):
+def build_handout(out_path, r):
     S_TITLE2 = _style("ht", fontName="Noto-Bold", fontSize=19, leading=23, textColor=colors.white)
     S_TAG = _style("htag", fontSize=10.5, leading=15, textColor=colors.HexColor("#CBD5E1"))
     S_H3 = _style("h3", fontName="Noto-Bold", fontSize=11, leading=14, spaceBefore=6, spaceAfter=3)
@@ -327,6 +339,7 @@ def build_handout(out_path):
         "High-Value Counter",
         "No shelves. No POS. Still caught.",
         "AI theft detection for jewellers, watch boutiques & luxury counters  ·  BrainGuardX AI Technologies Pvt. Ltd.",
+        brand=r["brand"],
     ))
     flow.append(Spacer(1, 4 * mm))
 
@@ -389,9 +402,10 @@ def build_handout(out_path):
 
     # roi strip
     roi = Paragraph(
-        '<b>One prevented theft pays for the year.</b> A single lost chain/watch is ₹50,000–₹3,00,000; '
-        'Retail Nazar Starter is ₹1,999/month (~₹24,000/year). If it stops one ₹50,000 piece, you are already ahead — '
-        'and it keeps guarding every day after.',
+        '<b>One prevented theft pays for the year.</b> '
+        f'{r["brand"]} Starter is just {r["symbol"]}{r["starter"]:,}/month '
+        f'(~ {r["symbol"]}{r["starter"] * 12:,}/year) — less than a single lost chain or watch. '
+        'If it stops one theft, you are already ahead, and it keeps guarding every day after.',
         _style("roi", fontSize=9.2, leading=13.5, textColor=INK))
     panel = Table([[roi]], colWidths=[CW])
     panel.setStyle(TableStyle([
@@ -420,8 +434,8 @@ def build_handout(out_path):
 
     # footer contact
     foot = Table([[Paragraph(
-        '<font color="#22D3EE"><b>Retail Nazar</b></font>  ·  '
-        'support@retailnazar.com  ·  retailnazar.com  ·  '
+        f'<font color="#22D3EE"><b>{r["brand"]}</b></font>  ·  '
+        f'{EMAIL}  ·  {r["domain"]}  ·  '
         'Jewellery · Watches · Luxury Bags · Electronics Showcases · Phones & Accessories', S_META)]],
         colWidths=[CW])
     foot.setStyle(TableStyle([
@@ -434,7 +448,7 @@ def build_handout(out_path):
     flow.append(foot)
 
     build_doc(out_path, "High-Value Counter — One-Page Handout",
-              "Retail Nazar · High-Value Counter", flow)
+              f'{r["brand"]} · High-Value Counter', flow)
 
 
 # ----------------------------------------------------------------------
@@ -452,13 +466,20 @@ def main():
               "High-Value Counter — Retail Sales Pitch Playbook",
               "Retail Nazar · High-Value Counter · Sales Pitch Playbook", p)
 
-    build_handout(os.path.join(BASE, "high_value_counter_handout.pdf"))
+    handout_dir = os.path.join(BASE, "handouts")
+    os.makedirs(handout_dir, exist_ok=True)
+    for slug, r in HANDOUT_REGIONS.items():
+        build_handout(os.path.join(handout_dir, f"high_value_counter_handout_{slug}.pdf"), r)
 
     for name in ("high_value_counter_feature.pdf",
-                 "high_value_counter_sales_pitch.pdf",
-                 "high_value_counter_handout.pdf"):
+                 "high_value_counter_sales_pitch.pdf"):
         path = os.path.join(BASE, name)
         print(f"WROTE {name} ({os.path.getsize(path):,} bytes)")
+
+    for slug in HANDOUT_REGIONS:
+        name = f"high_value_counter_handout_{slug}.pdf"
+        path = os.path.join(handout_dir, name)
+        print(f"WROTE handouts/{name} ({os.path.getsize(path):,} bytes)")
 
 
 if __name__ == "__main__":
