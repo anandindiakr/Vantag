@@ -75,6 +75,13 @@ services:
       - "1883:1883"
       - "9001:9001"
       - "8883:8883"
+    environment:
+      # Mirrors the broker credentials so the healthcheck always uses the
+      # same username/password as the backend, and keeps working after the
+      # operator rotates MQTT_PASSWORD in .env (the old healthcheck had the
+      # default password hardcoded and went red after rotation).
+      MQTT_USERNAME: ${MQTT_USERNAME:-vantag_backend}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO}
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ./mosquitto/passwd:/mosquitto/config/passwd:ro
@@ -84,7 +91,7 @@ services:
     networks:
       - vantag-prod
     healthcheck:
-      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "health", "-m", "ping", "-q", "0", "-u", "vantag_backend", "-P", "nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO"]
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -t health -m ping -q 0 -u \"$${MQTT_USERNAME}\" -P \"$${MQTT_PASSWORD}\""]
       interval: 15s
       timeout: 5s
       retries: 3

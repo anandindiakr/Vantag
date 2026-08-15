@@ -9,6 +9,10 @@
 # installs a certbot renewal hook so future renewals keep the broker's cert
 # fresh, and verifies the TLS handshake.
 #
+# Certificates are located in one of two places (whichever is live on the
+# host): the host certbot path (host-level nginx TLS) or, failing that, the
+# certbot Docker volume, read out via the running `certbot` container.
+#
 # Usage (as root):
 #   sudo sh docker/enable_mqtts.sh
 #
@@ -24,6 +28,7 @@ DOMAIN="${MQTT_DOMAIN:-retail-vantag.com}"
 CERT_SRC="${CERT_SRC:-/etc/letsencrypt/live/${DOMAIN}}"
 CERT_DST="/opt/vantag/mqtt-certs"
 COMPOSE_FILE="${COMPOSE_FILE:-docker/docker-compose.prod.yml}"
+ABS_COMPOSE="${REPO_ROOT}/${COMPOSE_FILE}"
 BROKER_UID=1883
 CONTAINER="${MOSQUITTO_CONTAINER:-vantag-mosquitto-prod}"
 
@@ -33,25 +38,41 @@ fail()  { echo "[enable_mqtts] ERROR: $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || fail "run as root: sudo sh docker/enable_mqtts.sh"
 cd "$REPO_ROOT"
 
-# ── 1. Certificate source present? ────────────────────────────────────────
-[ -f "${CERT_SRC}/fullchain.pem" ] || fail "missing ${CERT_SRC}/fullchain.pem — run certbot first for ${DOMAIN}"
-[ -f "${CERT_SRC}/privkey.pem" ]  || fail "missing ${CERT_SRC}/privkey.pem — run certbot first for ${DOMAIN}"
+# ── 1. Provision certs into a broker-readable directory (idempotent) ──────
+# Prefer the host certbot path (host-level nginx terminates TLS). If that is
+# absent, the certs live in the certbot Docker volume — read them out via the
+# running certbot container so both TLS setups work.
+provision_certs() {
+  mkdir -p "$CERT_DST"
 
-# ── 2. Provision certs into a broker-readable directory (idempotent) ──────
-mkdir -p "$CERT_DST"
-cp -Lf "${CERT_SRC}/fullchain.pem" "${CERT_DST}/fullchain.pem"
-cp -Lf "${CERT_SRC}/privkey.pem"  "${CERT_DST}/privkey.pem"
-chown -R "${BROKER_UID}:${BROKER_UID}" "$CERT_DST"
-chmod 640 "${CERT_DST}/fullchain.pem" "${CERT_DST}/privkey.pem"
-info "certificates provisioned into ${CERT_DST}"
+  if [ -s "${CERT_SRC}/fullchain.pem" ] && [ -s "${CERT_SRC}/privkey.pem" ]; then
+    cp -Lf "${CERT_SRC}/fullchain.pem" "$CERT_DST/fullchain.pem"
+    cp -Lf "${CERT_SRC}/privkey.pem"  "$CERT_DST/privkey.pem"
+    info "certificates copied from ${CERT_SRC}"
+  else
+    info "no certs at ${CERT_SRC} — reading from the certbot container volume"
+    docker compose -f "$COMPOSE_FILE" exec -T certbot cat "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" > "$CERT_DST/fullchain.pem" \
+      || { rm -f "$CERT_DST/fullchain.pem" "$CERT_DST/privkey.pem"; fail "could not read fullchain.pem for ${DOMAIN} from the certbot container"; }
+    docker compose -f "$COMPOSE_FILE" exec -T certbot cat "/etc/letsencrypt/live/${DOMAIN}/privkey.pem" > "$CERT_DST/privkey.pem" \
+      || { rm -f "$CERT_DST/fullchain.pem" "$CERT_DST/privkey.pem"; fail "could not read privkey.pem for ${DOMAIN} from the certbot container"; }
+    info "certificates extracted from the certbot container"
+  fi
 
-# ── 3. Confirm the repo config is enabled ────────────────────────────────
+  [ -s "$CERT_DST/fullchain.pem" ] || fail "no fullchain.pem for ${DOMAIN} — run certbot first"
+  [ -s "$CERT_DST/privkey.pem" ]  || fail "no privkey.pem for ${DOMAIN} — run certbot first"
+  chown -R "${BROKER_UID}:${BROKER_UID}" "$CERT_DST"
+  chmod 640 "$CERT_DST/fullchain.pem" "$CERT_DST/privkey.pem"
+  info "certificates provisioned into ${CERT_DST}"
+}
+provision_certs
+
+# ── 2. Confirm the repo config is enabled ────────────────────────────────
 grep -q '^listener 8883' docker/mosquitto.conf \
   || fail "docker/mosquitto.conf has no active 'listener 8883' — git pull the latest config first"
 grep -q '/mosquitto/certs:ro' "$COMPOSE_FILE" \
   || fail "${COMPOSE_FILE} does not mount ${CERT_DST} — git pull the latest config first"
 
-# ── 4. Recreate the broker so it loads 8883 + the cert mount ──────────────
+# ── 3. Recreate the broker so it loads 8883 + the cert mount ──────────────
 info "recreating mosquitto broker..."
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate mosquitto
 sleep 4
@@ -63,13 +84,13 @@ docker logs "$CONTAINER" --tail 200 | grep -q 'listen socket on port 8883' \
   || { docker logs "$CONTAINER" --tail 40; fail "broker did not open port 8883 — check cert mount + mosquitto.conf"; }
 info "broker listening on 8883"
 
-# ── 5. Verify the TLS handshake end-to-end ────────────────────────────────
+# ── 4. Verify the TLS handshake end-to-end ────────────────────────────────
 echo | openssl s_client -connect "${DOMAIN}:8883" -servername "${DOMAIN}" 2>/dev/null \
   | openssl x509 -noout -subject -dates \
   || fail "TLS handshake on ${DOMAIN}:8883 failed (is 8883 open in the firewall?)"
 info "TLS handshake OK on ${DOMAIN}:8883"
 
-# ── 6. Install certbot renewal deploy hook (idempotent) ───────────────────
+# ── 5. Install certbot renewal deploy hook (idempotent) ───────────────────
 HOOK_DIR="/etc/letsencrypt/renewal-hooks/deploy"
 HOOK="${HOOK_DIR}/vantag-mqtt-certs.sh"
 mkdir -p "$HOOK_DIR"
@@ -78,11 +99,17 @@ cat > "$HOOK" <<EOF
 # Auto-generated by docker/enable_mqtts.sh — copy renewed certs into the
 # broker's cert dir and restart Mosquitto so MQTTS keeps working.
 set -e
-cp -Lf "${CERT_SRC}/fullchain.pem" "${CERT_DST}/fullchain.pem"
-cp -Lf "${CERT_SRC}/privkey.pem"  "${CERT_DST}/privkey.pem"
+mkdir -p "${CERT_DST}"
+if [ -s "${CERT_SRC}/fullchain.pem" ] && [ -s "${CERT_SRC}/privkey.pem" ]; then
+  cp -Lf "${CERT_SRC}/fullchain.pem" "${CERT_DST}/fullchain.pem"
+  cp -Lf "${CERT_SRC}/privkey.pem"  "${CERT_DST}/privkey.pem"
+else
+  docker compose -f "${ABS_COMPOSE}" exec -T certbot cat "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" > "${CERT_DST}/fullchain.pem"
+  docker compose -f "${ABS_COMPOSE}" exec -T certbot cat "/etc/letsencrypt/live/${DOMAIN}/privkey.pem" > "${CERT_DST}/privkey.pem"
+fi
 chown -R "${BROKER_UID}:${BROKER_UID}" "${CERT_DST}"
 chmod 640 "${CERT_DST}/fullchain.pem" "${CERT_DST}/privkey.pem"
-docker restart "$CONTAINER" >/dev/null
+docker restart "${CONTAINER}" >/dev/null
 EOF
 chmod +x "$HOOK"
 info "renewal hook installed: ${HOOK}"
