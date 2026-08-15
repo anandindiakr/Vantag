@@ -116,7 +116,7 @@ provision_mqtt_certs() {
   local as_root=""
   [ "$(id -u)" -eq 0 ] || as_root="sudo -n"
 
-  if $as_root sh docker/enable_mqtts.sh; then
+  if $as_root bash docker/enable_mqtts.sh; then
     echo "MQTT TLS certs provisioned."
     return 0
   fi

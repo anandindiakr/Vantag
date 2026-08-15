@@ -86,7 +86,7 @@ environment, not in the repository.
 - [ ] **Enable TLS on port 8883** for MQTTS. The listener is already enabled
       in `docker/mosquitto.conf` and the cert mount, `8883` port publish and
       `MQTT_AGENT_PORT=8883` are already wired in `docker-compose.prod.yml`.
-      Run `sudo sh docker/enable_mqtts.sh` on the VPS to provision the Let's
+      Run `sudo bash docker/enable_mqtts.sh` on the VPS to provision the Let's
       Encrypt certs, restart the broker and verify the handshake. Newly
       downloaded agents then connect over MQTTS (the backend keeps its
       private-Docker connection on `1883`). The agent auto-enables TLS when

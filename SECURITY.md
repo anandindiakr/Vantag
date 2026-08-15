@@ -53,7 +53,7 @@ After each new deployment to a VPS or container environment:
    broker requires authentication (`allow_anonymous false`) and stores
    passwords hashed in `docker/mosquitto/passwd`. The MQTTS listener on
    port 8883 is enabled in `docker/mosquitto.conf`; run
-   `sudo sh docker/enable_mqtts.sh` on the VPS to provision the Let's
+   `sudo bash docker/enable_mqtts.sh` on the VPS to provision the Let's
    Encrypt certs, restart the broker and verify TLS, then point agents at
    port 8883 so door-control traffic is encrypted in transit.
 

@@ -14,7 +14,7 @@
 # certbot Docker volume, read out via the running `certbot` container.
 #
 # Usage (as root):
-#   sudo sh docker/enable_mqtts.sh
+#   sudo bash docker/enable_mqtts.sh
 #
 # Env overrides:
 #   MQTT_DOMAIN    domain to serve (default: retail-vantag.com)
@@ -35,7 +35,7 @@ CONTAINER="${MOSQUITTO_CONTAINER:-vantag-mosquitto-prod}"
 info()  { echo "[enable_mqtts] $*"; }
 fail()  { echo "[enable_mqtts] ERROR: $*" >&2; exit 1; }
 
-[ "$(id -u)" -eq 0 ] || fail "run as root: sudo sh docker/enable_mqtts.sh"
+[ "$(id -u)" -eq 0 ] || fail "run as root: sudo bash docker/enable_mqtts.sh"
 cd "$REPO_ROOT"
 
 # ── 1. Provision certs into a broker-readable directory (idempotent) ──────
