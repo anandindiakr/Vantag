@@ -80,8 +80,14 @@ sleep 4
 state="$(docker inspect --format='{{.State.Status}}' "$CONTAINER" 2>/dev/null || echo missing)"
 [ "$state" = "running" ] || { docker logs "$CONTAINER" --tail 40; fail "mosquitto container is not running (state=$state)"; }
 
-docker logs "$CONTAINER" --tail 200 | grep -q 'listen socket on port 8883' \
-  || { docker logs "$CONTAINER" --tail 40; fail "broker did not open port 8883 — check cert mount + mosquitto.conf"; }
+# Avoid `docker logs | grep -q` here: grep -q exits as soon as it matches,
+# which SIGPIPEs docker logs, and `set -o pipefail` then reports a false
+# failure even though the broker opened 8883. Capture first, then grep.
+mq_log="$(docker logs "$CONTAINER" --tail 200 2>&1 || true)"
+if ! grep -q 'listen socket on port 8883' <<< "$mq_log"; then
+  echo "$mq_log" | tail -40
+  fail "broker did not open port 8883 — check cert mount + mosquitto.conf"
+fi
 info "broker listening on 8883"
 
 # ── 4. Verify the TLS handshake end-to-end ────────────────────────────────
