@@ -74,9 +74,11 @@ services:
     ports:
       - "1883:1883"
       - "9001:9001"
+      - "8883:8883"
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ./mosquitto/passwd:/mosquitto/config/passwd:ro
+      - /opt/vantag/mqtt-certs:/mosquitto/certs:ro
       - mosquitto-data:/mosquitto/data
       - mosquitto-logs:/mosquitto/log
     networks:
@@ -130,7 +132,7 @@ services:
       # Public port baked into downloaded edge-agent configs. Leave empty to
       # match MQTT_PORT; set to 8883 to ship MQTTS to store-LAN agents while
       # the backend keeps its private-Docker connection on 1883.
-      MQTT_AGENT_PORT:      ${MQTT_AGENT_PORT:-}
+      MQTT_AGENT_PORT:      ${MQTT_AGENT_PORT:-8883}
       MQTT_USERNAME:        ${MQTT_USERNAME:-vantag_backend}
       MQTT_PASSWORD:        ${MQTT_PASSWORD:-nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO}
       MQTT_EDGE_USERNAME:   ${MQTT_EDGE_USERNAME:-vantag_edge}
