@@ -51,6 +51,7 @@ on:
       - "docker/Dockerfile"
       - "docker/docker-compose.prod.yml"
       - "docker/deploy_backend.sh"
+      - "docker/enable_mqtts.sh"
       - "docker/mosquitto.conf"
       - "docker/mosquitto/passwd"
       - ".github/workflows/deploy-backend.yml"
