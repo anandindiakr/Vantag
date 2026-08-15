@@ -2040,7 +2040,7 @@ async def download_agent(
         "agent_id": agent.id,
         "backend_url": backend_url,
         "mqtt_host": mqtt_host,
-        "mqtt_port": int(os.getenv("MQTT_PORT", "1883")),
+        "mqtt_port": int(os.getenv("MQTT_AGENT_PORT") or os.getenv("MQTT_PORT") or 1883),
         # Broker credentials so the agent can authenticate (allow_anonymous
         # is disabled). Env-overridable for rotation.
         "mqtt_username": os.getenv("MQTT_EDGE_USERNAME", "vantag_edge"),
