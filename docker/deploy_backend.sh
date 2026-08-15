@@ -106,6 +106,47 @@ restart_mosquitto() {
   fi
 }
 
+# The committed mosquitto.conf declares a TLS listener on 8883, so the broker
+# will not start unless certs exist at /opt/vantag/mqtt-certs. Provision them
+# BEFORE the backend is recreated: the backend depends on a healthy broker, so
+# missing certs would otherwise take the whole platform down (this happened on
+# the first MQTTS rollout — mosquitto went to Error and blocked the backend).
+provision_mqtt_certs() {
+  echo "Provisioning MQTT TLS certs for the broker..."
+  local as_root=""
+  [ "$(id -u)" -eq 0 ] || as_root="sudo -n"
+
+  if $as_root sh docker/enable_mqtts.sh; then
+    echo "MQTT TLS certs provisioned."
+    return 0
+  fi
+
+  # enable_mqtts.sh failed (e.g. certbot has not issued a cert yet). Keep the
+  # platform up with a temporary self-signed cert instead of leaving the broker
+  # — and therefore the backend — down. Agents must not trust this cert; it
+  # only holds the line until certbot issues the real one.
+  echo "WARNING: MQTT TLS provisioning failed — writing a temporary self-signed cert so the broker can start."
+  local dir="/opt/vantag/mqtt-certs"
+  local domain="${MQTT_DOMAIN:-retail-vantag.com}"
+  if ! $as_root mkdir -p "$dir"; then
+    echo "ERROR: cannot create ${dir} — Mosquitto will not start. Check deploy user permissions."
+    return 0
+  fi
+  if [ ! -s "$dir/fullchain.pem" ] || [ ! -s "$dir/privkey.pem" ]; then
+    if ! $as_root openssl req -x509 -nodes -newkey rsa:2048 -days 30 \
+        -keyout "$dir/privkey.pem" -out "$dir/fullchain.pem" \
+        -subj "/CN=${domain}" >/dev/null 2>&1; then
+      echo "ERROR: could not generate fallback cert — Mosquitto will not start."
+      return 0
+    fi
+  fi
+  $as_root chown -R 1883:1883 "$dir" 2>/dev/null || true
+  $as_root chmod 640 "$dir/fullchain.pem" "$dir/privkey.pem" 2>/dev/null || true
+  echo "Temporary MQTT cert present at ${dir}. Run docker/enable_mqtts.sh once certbot issues the real certificate."
+}
+
+provision_mqtt_certs
+
 if build_and_start && check_health && refresh_nginx_upstream; then
   restart_mosquitto
   echo "Backend deploy successful and healthy."

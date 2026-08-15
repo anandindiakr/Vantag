@@ -85,10 +85,16 @@ docker logs "$CONTAINER" --tail 200 | grep -q 'listen socket on port 8883' \
 info "broker listening on 8883"
 
 # ── 4. Verify the TLS handshake end-to-end ────────────────────────────────
-echo | openssl s_client -connect "${DOMAIN}:8883" -servername "${DOMAIN}" 2>/dev/null \
-  | openssl x509 -noout -subject -dates \
-  || fail "TLS handshake on ${DOMAIN}:8883 failed (is 8883 open in the firewall?)"
-info "TLS handshake OK on ${DOMAIN}:8883"
+# Operator convenience check. It needs 8883 reachable from the outside
+# (firewall), so a failed external handshake must not fail the whole
+# provisioning — the deploy calls this script and would otherwise treat a
+# correctly-provisioned broker as failed and fall back to a self-signed cert.
+if echo | openssl s_client -connect "${DOMAIN}:8883" -servername "${DOMAIN}" 2>/dev/null \
+     | openssl x509 -noout -subject -dates 2>/dev/null; then
+  info "TLS handshake OK on ${DOMAIN}:8883"
+else
+  info "WARNING: external TLS handshake on ${DOMAIN}:8883 failed — the broker is up; open 8883/tcp in the firewall and re-run to verify."
+fi
 
 # ── 5. Install certbot renewal deploy hook (idempotent) ───────────────────
 HOOK_DIR="/etc/letsencrypt/renewal-hooks/deploy"
