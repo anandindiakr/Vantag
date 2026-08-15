@@ -536,6 +536,13 @@ _bootstrap_tokens: dict[str, str] = {}  # token → tenant_id
 # consumes the flag on its next heartbeat.
 _scan_requests: dict[str, bool] = {}  # tenant_id → scan_requested
 
+# In-memory per-tenant door-relay discovery state. The agent discovers relay
+# hardware on the store LAN (see windows_agent/agent/relay.py) and reports the
+# candidates in its heartbeat; the Door Relay setup wizard lists them as
+# plug-and-play options. Single uvicorn process, so a plain dict is sufficient.
+_relay_scan_requests: dict[str, bool] = {}  # tenant_id → relay scan requested
+_discovered_relays: dict[str, list] = {}    # tenant_id → relay candidates
+
 # ---------------------------------------------------------------------------
 # RTSP probe jobs — the cloud cannot reach private LAN IPs, so path probing
 # (e.g. "auto-detect RTSP path" for Hikvision/Dahua/...) is delegated to the
@@ -588,6 +595,26 @@ def request_camera_scan(tenant_id: str) -> None:
 def consume_camera_scan(tenant_id: str) -> bool:
     """Return True (and clear) if a scan was requested for this tenant."""
     return _scan_requests.pop(tenant_id, False)
+
+
+def request_relay_scan(tenant_id: str) -> None:
+    """Mark that the given tenant's agent should run a relay discovery scan."""
+    _relay_scan_requests[str(tenant_id)] = True
+
+
+def consume_relay_scan(tenant_id: str) -> bool:
+    """Return True (and clear) if a relay scan was requested for this tenant."""
+    return _relay_scan_requests.pop(str(tenant_id), False)
+
+
+def store_discovered_relays(tenant_id: str, relays: list) -> None:
+    """Cache the latest plug-and-play relay candidates reported by an agent."""
+    _discovered_relays[str(tenant_id)] = relays or []
+
+
+def get_discovered_relays(tenant_id: str) -> list:
+    """Return the latest relay candidates reported by this tenant's agent."""
+    return _discovered_relays.get(str(tenant_id), [])
 
 
 def _store_bootstrap_token(token: str, tenant_id: str) -> None:
@@ -657,6 +684,9 @@ class HeartbeatBody(BaseModel):
     # ultralytics_version, acquire_error.
     model_status: dict | None = None
     pending_incidents: int | None = None  # durable agent outbox depth
+    # Plug-and-play door-relay candidates found on the store LAN by the agent
+    # (windows_agent/agent/relay.py). Listed by the Door Relay setup wizard.
+    discovered_relays: list[dict] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -878,11 +908,16 @@ async def heartbeat(
             logger.exception(
                 "Failed to record agent model status for agent %s", agent.id
             )
+    # Cache plug-and-play relay candidates discovered by the agent's LAN scan
+    # so the Door Relay setup wizard can offer one-click configuration.
+    if body.discovered_relays is not None:
+        store_discovered_relays(agent.tenant_id, body.discovered_relays)
     await session.commit()
     return {
         "ok": True,
         "server_time": now.isoformat(),
         "scan_requested": consume_camera_scan(agent.tenant_id),
+        "relay_scan_requested": consume_relay_scan(agent.tenant_id),
         "rtsp_probe_jobs": consume_rtsp_probes(agent.tenant_id),
         "pending_incidents": body.pending_incidents,
     }

@@ -65,7 +65,25 @@ _pose_inference: YoloPoseInference = None
 _product_count_detector = ProductCountDetector()
 _workers: list[CameraWorker] = []
 _recent_events: list[dict] = []   # in-memory event log for tray tooltip
+_discovered_relays: list[dict] = []  # plug-and-play door relays found on the LAN
 _scan_lock = threading.Lock()     # guards against concurrent discovery scans
+
+
+def run_relay_discovery(reason: str = "startup"):
+    """Discover door relays on the store LAN and cache the candidates.
+
+    Runs in a background thread so a slow mDNS/gateway probe never delays the
+    agent or blocks the heartbeat scheduler. Results are included in the next
+    heartbeat and surface in the dashboard's Door Relay setup wizard.
+    """
+    global _discovered_relays
+    try:
+        from .relay import discover_relays
+        found = discover_relays() or []
+        _discovered_relays = found
+        log.info("Relay discovery (%s) found %d candidate(s)", reason, len(found))
+    except Exception as e:  # noqa: BLE001
+        log.warning("Relay discovery failed: %s", e)
 
 
 def run_discovery_and_report(reason: str = "startup"):
@@ -379,6 +397,15 @@ def start_monitoring():
     )
     _mqtt.connect()
 
+    # Best-effort plug-and-play relay discovery on the store LAN, reported in
+    # the next heartbeat so the Door Relay wizard can offer one-click setup.
+    threading.Thread(
+        target=run_relay_discovery,
+        args=("startup",),
+        daemon=True,
+        name="relay-discovery-startup",
+    ).start()
+
     # Heartbeat scheduler
     def send_heartbeat():
         if _api is None:
@@ -442,6 +469,7 @@ def start_monitoring():
             "agent_version": _agent_ver,
             "model_status": model_status,
             "pending_incidents": _api.pending_incidents,
+            "discovered_relays": _discovered_relays,
         })
         # Backend may request an on-demand LAN camera scan
         if isinstance(resp, dict) and resp.get("scan_requested"):
@@ -450,6 +478,14 @@ def start_monitoring():
                 args=("scan_requested",),
                 daemon=True,
                 name="discovery-ondemand",
+            ).start()
+        # Backend may request an on-demand door-relay discovery scan
+        if isinstance(resp, dict) and resp.get("relay_scan_requested"):
+            threading.Thread(
+                target=run_relay_discovery,
+                args=("scan_requested",),
+                daemon=True,
+                name="relay-discovery-ondemand",
             ).start()
         # Backend may delegate RTSP path probes (cloud can't reach LAN IPs)
         if isinstance(resp, dict):

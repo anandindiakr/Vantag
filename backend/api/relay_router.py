@@ -119,6 +119,30 @@ async def test_relay(
     return {"ok": True, "message": f"Test {action} command sent to door '{door_id}'."}
 
 
+@relay_router.post("/scan")
+async def scan_relays(user: dict = Depends(get_current_user_id)) -> dict:
+    """Ask the tenant's edge agent to discover relay hardware on the LAN.
+
+    The agent picks up the flag on its next heartbeat (within a few seconds),
+    scans the store network for common relay boards, and reports the
+    candidates back in a subsequent heartbeat. They then appear via
+    ``GET /api/relay/discovered``.
+    """
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=400, detail="No tenant in session")
+    from .edge_router import request_relay_scan
+    request_relay_scan(tenant_id)
+    return {"ok": True, "message": "Relay scan requested. Your edge agent will scan shortly."}
+
+
+@relay_router.get("/discovered")
+async def discovered_relays(user: dict = Depends(get_current_user_id)) -> dict:
+    """Return plug-and-play relay candidates found by the tenant's agent."""
+    from .edge_router import get_discovered_relays
+    return {"relays": get_discovered_relays(user.get("tenant_id", ""))}
+
+
 @relay_router.get("/drivers")
 async def download_driver_pack() -> Response:
     """Serve a zip of example driver scripts + wiring notes for common relays."""

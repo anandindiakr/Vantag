@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Lock, Wifi, Cpu, Usb, Cable, FlaskConical, Download, Save, Loader2, CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Lock, Wifi, Cpu, Usb, Cable, FlaskConical, Download, Save, Loader2, CheckCircle2, ArrowLeft, ArrowRight, Radar } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { api } from '../hooks/useApi';
@@ -8,6 +8,13 @@ interface RelayType {
   type: string;
   label: string;
   needs: string[];
+}
+
+interface DiscoveredRelay {
+  type?: string;
+  name?: string;
+  http_url?: string;
+  discovered?: boolean;
 }
 
 interface FieldDef {
@@ -58,6 +65,8 @@ export default function RelaySetup() {
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [discovered, setDiscovered] = useState<DiscoveredRelay[]>([]);
 
   useEffect(() => {
     api.get('/relay/types')
@@ -70,6 +79,9 @@ export default function RelaySetup() {
         setSettings(s);
       })
       .catch(() => undefined);
+    api.get('/relay/discovered')
+      .then((r) => setDiscovered(r.data.relays ?? []))
+      .catch(() => setDiscovered([]));
   }, []);
 
   const currentType = types.find((t) => t.type === relayType);
@@ -109,6 +121,38 @@ export default function RelaySetup() {
     } finally {
       setDownloading(false);
     }
+  };
+
+  const handleScan = async () => {
+    setScanning(true);
+    try {
+      await api.post('/relay/scan');
+      toast.success('Scan requested — checking your edge agent…');
+      // The agent reports candidates on its next heartbeat; poll briefly.
+      for (let i = 0; i < 6; i += 1) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const res = await api.get('/relay/discovered');
+        const relays: DiscoveredRelay[] = res.data.relays ?? [];
+        setDiscovered(relays);
+        if (relays.length > 0) {
+          toast.success(`Found ${relays.length} relay candidate(s)`);
+          return;
+        }
+      }
+      toast('No relay found automatically. Pick a type below to configure manually.', {
+        icon: '🔎',
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Scan failed');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const applyDiscovered = (relay: DiscoveredRelay) => {
+    if (relay.http_url) setField('http_url', relay.http_url);
+    setRelayType('http');
+    setStep(2);
   };
 
   const handleSave = async () => {
@@ -194,26 +238,68 @@ export default function RelaySetup() {
 
       {/* Step 1 — choose type */}
       {step === 1 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {types.map((t) => (
-            <button
-              key={t.type}
-              type="button"
-              onClick={() => { setRelayType(t.type); setStep(2); }}
-              className={clsx(
-                'flex items-start gap-3 p-4 rounded-xl border text-left transition-all',
-                relayType === t.type
-                  ? 'border-vantag-red bg-vantag-red/10'
-                  : 'border-slate-700 bg-slate-800/60 hover:border-slate-500'
-              )}
-            >
-              <span className="text-vantag-red mt-0.5">{TYPE_ICONS[t.type] ?? <Cpu size={20} />}</span>
-              <span>
-                <span className="block text-sm font-semibold text-slate-100">{t.label}</span>
-                <span className="block text-xs text-slate-400 mt-1 capitalize">Type: {t.type}</span>
-              </span>
-            </button>
-          ))}
+        <div className="space-y-4">
+          {/* Plug-and-play discovery */}
+          <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Radar size={18} className="text-vantag-green" />
+                <div>
+                  <p className="text-sm font-semibold text-slate-200">Auto-detect relays on your network</p>
+                  <p className="text-xs text-slate-400">Your on-site edge agent scans for Shelly, Tasmota, ESPHome and other common boards.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleScan}
+                disabled={scanning}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-vantag-green/15 text-vantag-green border border-vantag-green/40 text-sm font-semibold hover:bg-vantag-green/25 disabled:opacity-60 whitespace-nowrap"
+              >
+                {scanning ? <Loader2 size={16} className="animate-spin" /> : <Radar size={16} />}
+                {scanning ? 'Scanning…' : 'Scan network'}
+              </button>
+            </div>
+            {discovered.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {discovered.map((relay, i) => (
+                  <button
+                    key={`${relay.http_url ?? relay.name ?? 'relay'}-${i}`}
+                    type="button"
+                    onClick={() => applyDiscovered(relay)}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 rounded-lg border border-slate-600 bg-slate-800 hover:border-vantag-green/60 text-left"
+                  >
+                    <span className="flex items-center gap-2 text-sm text-slate-200">
+                      <Wifi size={16} className="text-vantag-green" />
+                      {relay.name ?? relay.http_url ?? 'Discovered relay'}
+                    </span>
+                    <span className="text-xs text-vantag-green font-semibold">Use this →</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {types.map((t) => (
+              <button
+                key={t.type}
+                type="button"
+                onClick={() => { setRelayType(t.type); setStep(2); }}
+                className={clsx(
+                  'flex items-start gap-3 p-4 rounded-xl border text-left transition-all',
+                  relayType === t.type
+                    ? 'border-vantag-red bg-vantag-red/10'
+                    : 'border-slate-700 bg-slate-800/60 hover:border-slate-500'
+                )}
+              >
+                <span className="text-vantag-red mt-0.5">{TYPE_ICONS[t.type] ?? <Cpu size={20} />}</span>
+                <span>
+                  <span className="block text-sm font-semibold text-slate-100">{t.label}</span>
+                  <span className="block text-xs text-slate-400 mt-1 capitalize">Type: {t.type}</span>
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
