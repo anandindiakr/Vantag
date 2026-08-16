@@ -1,4 +1,16 @@
 """Vantag Windows Edge Agent"""
+# 1.9.0 — universal plug-and-play door relay + MQTT security. The relay
+# driver layer (agent/relay.py) now exposes one interface across five
+# hardware backends — simulate, http (Shelly/Tasmota/ESPHome/Sonoff/custom
+# REST boards), gpio, serial (USB/RS-485) and modbus_tcp — each importing
+# its optional dependency lazily and degrading to a logged no-op so the
+# agent never crashes on missing hardware. Added best-effort LAN relay
+# discovery (discover_relays) whose candidates the agent reports in its
+# heartbeat for the dashboard's Door Relay setup wizard. MQTT now
+# auto-enables TLS when pointed at the public MQTTS port 8883 (system CA
+# bundle) and authenticates with the edge broker credentials, so
+# door-control traffic is encrypted in transit.
+#
 # 1.8.0 — per-finger hand tracking + fixed MQTT door control. Ported the
 # MediaPipe 21-point HandLandmarker into agent/hand_landmarks.py (bundled
 # hand_landmarker.task in the download zip) and wired it into the High-Value
@@ -55,4 +67,4 @@
 # NMS on the fallback path so a fallback can no longer inflate people counts,
 # and reports the verified status in every heartbeat so Admin -> System Health
 # shows the truth instead of an assumption.
-__version__ = "1.8.0"
+__version__ = "1.9.0"

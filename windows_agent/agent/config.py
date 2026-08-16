@@ -84,20 +84,51 @@ class AgentConfig:
     @classmethod
     def load(cls) -> "AgentConfig":
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        # 1) Prefer the per-user config in %APPDATA%/Vantag/config.json.
-        # 2) Fall back to a config.json shipped next to the agent package
-        #    (used by the pre-filled download bundle so it runs out-of-the-box).
-        candidates = [CONFIG_FILE]
+        # 1) The pre-filled config.json shipped NEXT TO the agent package is
+        #    regenerated on every download with the current api_key + MQTT
+        #    credentials, so it is authoritative. It used to lose to the
+        #    %APPDATA% cache, which meant re-downloading a new build silently
+        #    kept stale/empty MQTT credentials — the agent then fell back to
+        #    using the api_key as the broker password and got "MQTT connect
+        #    error rc=5" (not authorised) forever.
+        # 2) The %APPDATA% config only carries locally-tuned / runtime-updated
+        #    fields (door_control pushed from the dashboard wizard, scan_subnet,
+        #    inference overrides), so those are merged back on top.
         local_cfg = Path(__file__).resolve().parent.parent / "config.json"
-        candidates.append(local_cfg)
-        for path in candidates:
-            if path.exists():
-                try:
-                    raw = json.loads(path.read_text(encoding="utf-8"))
-                    cams = [CameraConfig(**c) for c in raw.pop("cameras", [])]
-                    return cls(**raw, cameras=cams)
-                except Exception as e:
-                    print(f"[Config] Failed to load config from {path}: {e}")
+
+        def _load(path: Path) -> Optional["AgentConfig"]:
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+                cams = [CameraConfig(**c) for c in raw.pop("cameras", [])]
+                return cls(**raw, cameras=cams)
+            except Exception as e:  # noqa: BLE001
+                print(f"[Config] Failed to load config from {path}: {e}")
+                return None
+
+        bundled = _load(local_cfg) if local_cfg.exists() else None
+        user = _load(CONFIG_FILE) if CONFIG_FILE.exists() else None
+
+        if bundled is not None and bundled.api_key:
+            if user is not None:
+                # Preserve fields that are only ever set locally or at runtime;
+                # the download bundle intentionally does not ship them.
+                for field in (
+                    "door_control",
+                    "scan_subnet",
+                    "inference_device",
+                    "inference_fps",
+                    "confidence_threshold",
+                    "event_cooldown_sec",
+                    "log_level",
+                ):
+                    value = getattr(user, field, None)
+                    if value:
+                        setattr(bundled, field, value)
+            return bundled
+
+        if user is not None:
+            return user
+
         return cls()
 
     def save(self) -> None:
