@@ -357,7 +357,7 @@ async def get_tenant_detail(
             for p in payments
         ],
         "cameras": [
-            {"id": c.id, "name": c.name, "is_active": c.is_active}
+            {"id": c.id, "name": c.name, "is_active": c.enabled, "conn_status": c.conn_status}
             for c in cameras
         ] if cameras else [],
     }

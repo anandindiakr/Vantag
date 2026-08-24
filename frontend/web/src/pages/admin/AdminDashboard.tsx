@@ -366,7 +366,14 @@ export default function AdminDashboard() {
     }
   };
 
-  const extendTrial = async (id: string, email: string, days: number = 90) => {
+  const extendTrial = async (id: string, email: string) => {
+    const input = window.prompt(`Extend trial for ${email} by how many days?`, '90');
+    if (input === null) return;
+    const days = parseInt(input, 10);
+    if (!Number.isFinite(days) || days < 1 || days > 3650) {
+      toast.error('Enter a valid number of days (1-3650)');
+      return;
+    }
     if (!confirm(`Extend trial for ${email} by ${days} days?`)) return;
     try {
       const res = await axios.post(`/api/admin/tenants/${id}/extend-trial`, { days }, { headers: authHeaders() });
