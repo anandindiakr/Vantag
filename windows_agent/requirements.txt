@@ -15,6 +15,10 @@ opencv-python-headless>=4.9.0
 numpy>=1.26.0
 requests>=2.31.0
 paho-mqtt>=1.6.1
+# 21-point per-finger hand tracking for the High-Value Counter detectors.
+# Imported lazily inside agent/hand_landmarks.py so the agent still runs if
+# this install fails on an unusual platform (falls back to bbox hand points).
+mediapipe>=0.10.14
 pystray>=0.19.5
 Pillow>=10.3.0
 pyinstaller>=6.6.0

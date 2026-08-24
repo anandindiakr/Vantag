@@ -11,10 +11,13 @@ Usage::
 from backend.inference.yolo_engine import Detection, YOLOEngine
 from backend.inference.trt_engine import TRTEngine
 from backend.inference.model_scheduler import ModelScheduler
+from backend.inference.hand_landmarks import HandDetection, HandLandmarkEngine
 
 __all__ = [
     "YOLOEngine",
     "TRTEngine",
     "ModelScheduler",
     "Detection",
+    "HandLandmarkEngine",
+    "HandDetection",
 ]

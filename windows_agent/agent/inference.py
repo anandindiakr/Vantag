@@ -16,6 +16,7 @@ affordable on a normal shop laptop.
 import json
 import logging
 import os
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -110,6 +111,10 @@ class YoloInference:
         self._session = None
         self._input_name = None
         self._img_size = 640
+        # The ONNX session is shared by all camera workers. Serializing the
+        # short session.run section keeps CPU thread pools bounded and avoids
+        # provider-specific races while capture/inference remains per-camera.
+        self._inference_lock = threading.RLock()
         self.device = device
         # Machine-readable record of what actually loaded, sent to the backend
         # in the heartbeat and shown on the admin panel. "unknown" until the
@@ -122,7 +127,13 @@ class YoloInference:
             "ultralytics": self._ultralytics_version(),
             "acquire_error": None,
             "error": None,
+            "provider": None,
+            "inference_count": 0,
+            "last_inference_ms": 0.0,
+            "avg_inference_ms": 0.0,
         }
+        self._inference_count = 0
+        self._total_inference_ms = 0.0
         self._load_model(model_path)
 
     def _load_model(self, model_path: Optional[str]):
@@ -164,17 +175,43 @@ class YoloInference:
                 if stale or not Path(model_path).exists():
                     self._acquire_model(model_path)
 
+            available = set(ort.get_available_providers())
             providers = ["CPUExecutionProvider"]
-            if self.device == "cuda":
+            if self.device == "cuda" and "CUDAExecutionProvider" in available:
                 providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-            elif self.device == "dml":
+            elif self.device == "dml" and "DmlExecutionProvider" in available:
                 providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
+            elif self.device in {"cuda", "dml"}:
+                log.warning(
+                    "Requested %s provider is unavailable (%s); using CPUExecutionProvider.",
+                    self.device,
+                    sorted(available),
+                )
 
             opts = ort.SessionOptions()
             opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            opts.intra_op_num_threads = 4
+            # One shared session serves all camera workers. A bounded pool
+            # prevents each store camera from multiplying CPU threads.
+            env_threads = os.getenv("VANTAG_ORT_INTRA_OP_THREADS")
+            try:
+                intra_threads = max(1, int(env_threads)) if env_threads else min(
+                    4, max(1, (os.cpu_count() or 2) // 2)
+                )
+            except ValueError:
+                intra_threads = min(4, max(1, (os.cpu_count() or 2) // 2))
+            opts.intra_op_num_threads = intra_threads
+            opts.inter_op_num_threads = 1
             self._session = ort.InferenceSession(model_path, sess_options=opts, providers=providers)
             self._input_name = self._session.get_inputs()[0].name
+            self.status["provider"] = self._session.get_providers()[0]
+            # Warm up ORT's graph/kernels once at startup. Without this, the
+            # first live frame absorbs graph allocation and looks like a
+            # dropped/late incident on CPU-only store machines.
+            try:
+                warmup = np.zeros((1, 3, self._img_size, self._img_size), dtype=np.float32)
+                self._session.run(None, {self._input_name: warmup})
+            except Exception as warmup_exc:  # noqa: BLE001
+                log.debug("ONNX warm-up skipped: %s", warmup_exc)
             self._verify_architecture(model_path)
             log.info(f"ONNX model loaded: {model_path} providers={providers}")
 
@@ -392,9 +429,20 @@ class YoloInference:
         try:
             h, w = frame_bgr.shape[:2]
             blob = self._preprocess(frame_bgr)
-            outputs = self._session.run(None, {self._input_name: blob})
+            with self._inference_lock:
+                outputs = self._session.run(None, {self._input_name: blob})
             boxes = self._postprocess(outputs[0], w, h, conf_threshold)
-            elapsed = (time.time() - t0) * 1000
+            elapsed = (time.perf_counter() - t0) * 1000.0
+            with self._inference_lock:
+                self._inference_count += 1
+                self._total_inference_ms += elapsed
+                self.status.update({
+                    "inference_count": self._inference_count,
+                    "last_inference_ms": round(elapsed, 2),
+                    "avg_inference_ms": round(
+                        self._total_inference_ms / self._inference_count, 2
+                    ),
+                })
             if boxes:
                 log.debug(f"Inference: {len(boxes)} detections in {elapsed:.1f}ms")
             return boxes
@@ -593,17 +641,36 @@ class YoloPoseInference(YoloInference):
                 if not Path(model_path).exists():
                     self._acquire_model(model_path)
 
+            available = set(ort.get_available_providers())
             providers = ["CPUExecutionProvider"]
-            if self.device == "cuda":
+            if self.device == "cuda" and "CUDAExecutionProvider" in available:
                 providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-            elif self.device == "dml":
+            elif self.device == "dml" and "DmlExecutionProvider" in available:
                 providers = ["DmlExecutionProvider", "CPUExecutionProvider"]
+            elif self.device in {"cuda", "dml"}:
+                log.warning(
+                    "Requested pose provider %s is unavailable (%s); using CPU.",
+                    self.device,
+                    sorted(available),
+                )
 
             opts = ort.SessionOptions()
             opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            opts.intra_op_num_threads = 4
+            env_threads = os.getenv("VANTAG_ORT_INTRA_OP_THREADS")
+            try:
+                opts.intra_op_num_threads = max(1, int(env_threads)) if env_threads else min(
+                    4, max(1, (os.cpu_count() or 2) // 2)
+                )
+            except ValueError:
+                opts.intra_op_num_threads = min(4, max(1, (os.cpu_count() or 2) // 2))
+            opts.inter_op_num_threads = 1
             self._session = ort.InferenceSession(model_path, sess_options=opts, providers=providers)
             self._input_name = self._session.get_inputs()[0].name
+            try:
+                warmup = np.zeros((1, 3, self._img_size, self._img_size), dtype=np.float32)
+                self._session.run(None, {self._input_name: warmup})
+            except Exception as warmup_exc:  # noqa: BLE001
+                log.debug("ONNX pose warm-up skipped: %s", warmup_exc)
             log.info(f"ONNX pose model loaded: {model_path} providers={providers}")
 
         except ImportError:
@@ -630,7 +697,8 @@ class YoloPoseInference(YoloInference):
             return []
         try:
             blob = self._preprocess(frame_bgr)
-            outputs = self._session.run(None, {self._input_name: blob})
+            with self._inference_lock:
+                outputs = self._session.run(None, {self._input_name: blob})
             return self._postprocess_pose(outputs[0], conf_threshold)
         except Exception as e:
             log.error(f"Pose inference error: {e}")
@@ -715,27 +783,33 @@ class ProductCountDetector:
     def __init__(self):
         self._model = None
         self._load_failed = False
+        # YOLO-World is shared by all camera workers. Ultralytics predictors
+        # keep mutable state, so never invoke the same model concurrently.
+        self._model_lock = threading.RLock()
 
     def _ensure_loaded(self):
         if self._model is not None or self._load_failed:
             return
-        try:
-            from ultralytics import YOLO
-            log.info(
-                "Loading YOLO-World (yolov8s-worldv2.pt) for shelf product "
-                "counting (first use only, ~30s)…"
-            )
-            m = YOLO("yolov8s-worldv2.pt")
-            m.set_classes(PRODUCT_PROMPT_CLASSES)
-            self._model = m
-            log.info("YOLO-World shelf product counter ready.")
-        except Exception as e:  # noqa: BLE001
-            log.warning(
-                f"YOLO-World unavailable ({e}) — Tier 2 product counting "
-                f"disabled for this session; shelf zones will fall back to "
-                f"the Tier 1 CV-only signal."
-            )
-            self._load_failed = True
+        with self._model_lock:
+            if self._model is not None or self._load_failed:
+                return
+            try:
+                from ultralytics import YOLO
+                log.info(
+                    "Loading YOLO-World (yolov8s-worldv2.pt) for shelf product "
+                    "counting (first use only, ~30s)…"
+                )
+                m = YOLO("yolov8s-worldv2.pt")
+                m.set_classes(PRODUCT_PROMPT_CLASSES)
+                self._model = m
+                log.info("YOLO-World shelf product counter ready.")
+            except Exception as e:  # noqa: BLE001
+                log.warning(
+                    f"YOLO-World unavailable ({e}) — Tier 2 product counting "
+                    f"disabled for this session; shelf zones will fall back to "
+                    f"the Tier 1 CV-only signal."
+                )
+                self._load_failed = True
 
     def count_products(self, crop: np.ndarray, conf_threshold: float = 0.15) -> Optional[dict]:
         """Run product detection on a shelf-zone crop.
@@ -749,7 +823,8 @@ class ProductCountDetector:
         if self._model is None:
             return None
         try:
-            results = self._model.predict(crop, conf=conf_threshold, verbose=False)
+            with self._model_lock:
+                results = self._model.predict(crop, conf=conf_threshold, verbose=False)
             if not results:
                 return {"count": 0, "mean_confidence": 0.0}
             boxes = results[0].boxes

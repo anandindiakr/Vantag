@@ -1,0 +1,36 @@
+name: Tests
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - 'windows_agent/**'
+      - 'tests/**'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'windows_agent/**'
+      - 'tests/**'
+
+jobs:
+  jewellery-detectors:
+    name: Jewellery / High-Value Counter detector tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test runner
+        run: pip install pytest
+
+      # Backend jewellery detectors (self-contained: numpy/cv2/shapely are
+      # stubbed inside the test module, so no ML stack is required here).
+      - name: Backend jewellery detectors
+        run: python -m pytest tests/backend/test_jewelry_detectors.py -q
+
+      # Edge-agent jewellery detectors (self-contained script, cv2/numpy stubbed).
+      - name: Edge-agent jewellery detectors
+        run: python windows_agent/test_jewelry.py

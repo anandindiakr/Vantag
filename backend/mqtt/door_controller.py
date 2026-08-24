@@ -33,11 +33,12 @@ GET  /api/doors/{store_id}/{door_id}/status
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Callable, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -227,6 +228,27 @@ class DoorController:
             state.value,
         )
 
+        # Fan the status out to the tenant's connected dashboards over the
+        # backend WebSocket (authenticated). The browser no longer connects to
+        # MQTT directly, keeping broker credentials out of the frontend bundle.
+        tenant_id = payload.get("tenant_id")
+        cb = _status_broadcast_ref
+        if cb is not None and tenant_id and _status_broadcast_loop is not None:
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    cb({
+                        "type": "door_state",
+                        "tenant_id": tenant_id,
+                        "payload": {
+                            "doorId": f"{store_id}:{door_id}",
+                            "state": state.value,
+                        },
+                    }),
+                    _status_broadcast_loop,
+                )
+            except Exception:  # noqa: BLE001 — never break status ingestion
+                logger.exception("Failed to broadcast door status to dashboards")
+
     @staticmethod
     def _key(store_id: str, door_id: str) -> str:
         return f"{store_id}/{door_id}"
@@ -238,12 +260,26 @@ class DoorController:
 
 
 _door_controller_ref: DoorController | None = None
-
+_status_broadcast_ref: Optional[Callable] = None
+_status_broadcast_loop: Optional[asyncio.AbstractEventLoop] = None
 
 def set_controller(controller: DoorController) -> None:
     """Inject the DoorController instance used by the static door_router."""
     global _door_controller_ref  # noqa: PLW0603
     _door_controller_ref = controller
+
+def set_status_broadcast(callback: Optional[Callable], loop=None) -> None:
+    """Register the async callable that fans door status out to dashboards.
+
+    Called from the app lifespan (async context) with the backend's WebSocket
+    broadcast so that ``door_state`` messages reach the right tenant's browser.
+    The paho MQTT network thread runs outside the event loop, so the loop is
+    captured here and the broadcast is scheduled with
+    ``asyncio.run_coroutine_threadsafe``.
+    """
+    global _status_broadcast_ref, _status_broadcast_loop  # noqa: PLW0603
+    _status_broadcast_ref = callback
+    _status_broadcast_loop = loop or asyncio.get_event_loop()
 
 
 def _get_controller() -> DoorController:

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import os
 import time
 import uuid
@@ -27,6 +28,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.database import get_session
@@ -148,6 +150,85 @@ def _normalized_inventory_zones(c) -> list[dict]:
     return out
 
 
+def _normalized_high_value_counter(c) -> dict:
+    """Return the camera's High-Value Counter (jewellery / luxury) polygons
+    with each polygon's vertices normalized to 0-1 fractions of the camera's
+    reference resolution.
+
+    The dashboard's point-and-click editor writes these into
+    ``analyzer_config`` under ``jewelry_handover`` / ``jewelry_tray`` /
+    ``grab_and_run`` (see zone_router.save_high_value_counter). The edge
+    agent decodes frames at whatever resolution the RTSP stream provides, so
+    absolute pixel polygons never line up — sending normalized fractions lets
+    the agent scale them per frame, exactly like the people-count / exclusion
+    / inventory helpers above.
+    """
+    ac = getattr(c, "analyzer_config", None) or {}
+    ref_w = float(getattr(c, "resolution_width", None) or 1920)
+    ref_h = float(getattr(c, "resolution_height", None) or 1080)
+
+    def norm_poly(points):
+        if not isinstance(points, list) or len(points) < 3:
+            return None
+        pts: list[tuple[float, float]] = []
+        for pt in points:
+            try:
+                x, y = float(pt[0]), float(pt[1])
+            except (TypeError, IndexError, ValueError):
+                continue
+            pts.append((x, y))
+        if len(pts) < 3:
+            return None
+        # Already normalized (legacy safety): every vertex within [0, 1].
+        if max(x for x, _ in pts) <= 1.0 and max(y for _, y in pts) <= 1.0:
+            return [[x, y] for x, y in pts]
+        return [
+            [max(0.0, min(1.0, x / ref_w)), max(0.0, min(1.0, y / ref_h))]
+            for x, y in pts
+        ]
+
+    handover = ac.get("jewelry_handover") or {}
+    tray_cfg = ac.get("jewelry_tray") or {}
+    grab = ac.get("grab_and_run") or {}
+
+    trays = []
+    for t in tray_cfg.get("trays") or []:
+        if not isinstance(t, dict):
+            continue
+        poly = norm_poly(t.get("polygon"))
+        if poly is not None:
+            trays.append({"label": str(t.get("label", "tray")), "polygon": poly})
+
+    return {
+        "jewelry_handover": {
+            "counter_polygon": norm_poly(handover.get("counter_polygon")),
+            "tray_polygon": norm_poly(handover.get("tray_polygon")),
+            "min_hand_inside_frames": handover.get("min_hand_inside_frames", 2),
+            "cooldown_seconds": handover.get("cooldown_seconds", 30.0),
+            "confidence_threshold": handover.get("confidence_threshold", 0.45),
+            "require_person_at_counter": handover.get("require_person_at_counter", True),
+        },
+        "jewelry_tray": {
+            "counter_polygon": norm_poly(tray_cfg.get("counter_polygon")),
+            "trays": trays,
+            "drop_ratio_threshold": tray_cfg.get("drop_ratio_threshold", 0.25),
+            "check_interval_seconds": tray_cfg.get("check_interval_seconds", 3.0),
+            "cooldown_seconds": tray_cfg.get("cooldown_seconds", 30.0),
+            "person_required": tray_cfg.get("person_required", True),
+            "confidence_threshold": tray_cfg.get("confidence_threshold", 0.45),
+        },
+        "grab_and_run": {
+            "case_polygon": norm_poly(grab.get("case_polygon")),
+            "exit_polygon": norm_poly(grab.get("exit_polygon")),
+            "approach_polygon": norm_poly(grab.get("approach_polygon")),
+            "max_window_seconds": grab.get("max_window_seconds", 8.0),
+            "min_exit_speed_px_s": grab.get("min_exit_speed_px_s", 120.0),
+            "cooldown_seconds": grab.get("cooldown_seconds", 30.0),
+            "confidence_threshold": grab.get("confidence_threshold", 0.45),
+        },
+    }
+
+
 def _detection_toggles(c) -> dict:
     """Return the camera's per-analytic enable flags for the edge agent.
 
@@ -220,24 +301,123 @@ def set_webhook_engine(engine) -> None:  # type: ignore[no-untyped-def]
 # cameras_router's /stream endpoint reads the latest one for that camera.
 #
 # Keyed by camera_id -> (jpeg_bytes, monotonic_timestamp, tenant_id).
-# In-memory only (per-process); fine for a single backend instance. If the
-# backend is ever scaled horizontally this should move to Redis.
+# This remains a development fallback only. Production runs multiple Uvicorn
+# workers, so the authoritative latest frame is stored in Redis below.
 _latest_edge_frames: dict[str, tuple[bytes, float, str]] = {}
 # Treat a frame as unavailable if older than this. Generous window (45s) so a
 # brief uplink hiccup on the store's network degrades to a slightly stale
 # preview instead of blanking the live tile entirely.
 _FRAME_STALE_SEC = 45.0
+_MAX_SNAPSHOT_BYTES = 2_000_000
+_MAX_FRAME_BYTES = 1_000_000
+_FRAME_REDIS_PREFIX = "vantag:live-frame:"
+_frame_redis_client = None
+_frame_redis_url = None
+
+
+def _get_frame_redis():
+    """Return a binary Redis client for the cross-worker frame relay.
+
+    The normal bootstrap Redis client uses ``decode_responses=True`` and is
+    deliberately kept separate because JPEG bytes must not be decoded as
+    UTF-8. A short socket timeout makes Redis failure degrade to the local
+    development cache instead of blocking camera/API requests.
+    """
+    global _frame_redis_client, _frame_redis_url  # noqa: PLW0603
+    redis_url = os.getenv("REDIS_URL", "")
+    if not redis_url:
+        return None
+    if _frame_redis_client is not None and _frame_redis_url == redis_url:
+        return _frame_redis_client
+    try:
+        import redis as _redis
+
+        _frame_redis_client = _redis.from_url(
+            redis_url,
+            decode_responses=False,
+            socket_connect_timeout=0.15,
+            socket_timeout=0.15,
+            health_check_interval=30,
+        )
+        _frame_redis_url = redis_url
+        return _frame_redis_client
+    except Exception:  # noqa: BLE001
+        _frame_redis_client = None
+        _frame_redis_url = None
+        return None
+
+
+def _frame_key(tenant_id: str, camera_id: str) -> str:
+    return f"{_FRAME_REDIS_PREFIX}{tenant_id}:{camera_id}"
+
+
+def _frame_ts_key(tenant_id: str, camera_id: str) -> str:
+    return f"{_frame_key(tenant_id, camera_id)}:ts"
+
+
+def _store_latest_edge_frame(tenant_id: str, camera_id: str, raw: bytes) -> None:
+    """Store a frame in shared Redis and the local fallback cache."""
+    now = time.time()
+    _latest_edge_frames[camera_id] = (raw, time.monotonic(), str(tenant_id))
+    redis_client = _get_frame_redis()
+    if redis_client is None:
+        return
+    try:
+        ttl = int(_FRAME_STALE_SEC + 5)
+        pipe = redis_client.pipeline(transaction=True)
+        pipe.setex(_frame_key(str(tenant_id), camera_id), ttl, raw)
+        pipe.setex(_frame_ts_key(str(tenant_id), camera_id), ttl, str(now).encode())
+        pipe.execute()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Shared frame relay unavailable; using local cache: %s", exc)
+
+
+def get_latest_edge_frame_age(tenant_id: str, camera_id: str) -> float | None:
+    """Return the age of a fresh frame, or None when no fresh frame exists."""
+    redis_client = _get_frame_redis()
+    if redis_client is not None:
+        try:
+            raw_ts = redis_client.get(_frame_ts_key(str(tenant_id), camera_id))
+            raw_frame = redis_client.get(_frame_key(str(tenant_id), camera_id))
+            if raw_ts is not None and raw_frame:
+                age = max(0.0, time.time() - float(raw_ts.decode()))
+                if age <= _FRAME_STALE_SEC:
+                    return age
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Shared frame age lookup failed: %s", exc)
+
+    entry = _latest_edge_frames.get(camera_id)
+    if entry is None or str(entry[2]) != str(tenant_id):
+        return None
+    age = max(0.0, time.monotonic() - entry[1])
+    return age if age <= _FRAME_STALE_SEC else None
+
+
+def _is_safe_storage_component(value: str) -> bool:
+    """Allow only a single path component for tenant/camera storage keys."""
+    text = str(value)
+    return bool(text) and text not in {".", ".."} and ".." not in text and "/" not in text and "\\" not in text
 
 
 def get_latest_edge_frame(tenant_id: str, camera_id: str) -> bytes | None:
-    """Return the most recent JPEG frame pushed by the Edge Agent for this
-    camera, or None if no frame has arrived recently (or it belongs to a
-    different tenant)."""
+    """Return the latest tenant-scoped fresh frame across all workers."""
+    redis_client = _get_frame_redis()
+    if redis_client is not None:
+        try:
+            raw_frame = redis_client.get(_frame_key(str(tenant_id), camera_id))
+            raw_ts = redis_client.get(_frame_ts_key(str(tenant_id), camera_id))
+            if raw_frame and raw_ts:
+                age = max(0.0, time.time() - float(raw_ts.decode()))
+                if age <= _FRAME_STALE_SEC:
+                    return raw_frame
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Shared frame lookup failed; using local cache: %s", exc)
+
     entry = _latest_edge_frames.get(camera_id)
     if entry is None:
         return None
     jpeg_bytes, ts, frame_tenant_id = entry
-    if frame_tenant_id != tenant_id:
+    if str(frame_tenant_id) != str(tenant_id):
         return None
     if (time.monotonic() - ts) > _FRAME_STALE_SEC:
         return None
@@ -250,13 +430,15 @@ def _save_edge_snapshot(tenant_id: str, camera_id: str, b64: str) -> str | None:
 
     Returns the public ``/api/snapshots/...`` URL, or None on failure.
     """
-    if not b64:
+    if not b64 or not _is_safe_storage_component(camera_id):
         return None
     try:
         # Strip an optional data-URI prefix ("data:image/jpeg;base64,....")
         if "," in b64 and b64.strip().lower().startswith("data:"):
             b64 = b64.split(",", 1)[1]
-        raw = base64.b64decode(b64)
+        raw = base64.b64decode(b64, validate=True)
+        if len(raw) > _MAX_SNAPSHOT_BYTES or not raw.startswith(b"\xff\xd8\xff"):
+            return None
         cam_dir = _SNAPSHOTS_ROOT / str(tenant_id) / str(camera_id)
         cam_dir.mkdir(parents=True, exist_ok=True)
         fname = f"{uuid.uuid4().hex}.jpg"
@@ -307,8 +489,13 @@ async def _emit_edge_event(event: dict, store_id: str) -> None:
     # 4) WebSocket broadcast to the dashboard
     try:
         if pipe._ws_broadcast:
+            tenant_id = event.get("tenant_id")
+            if not tenant_id:
+                logger.error("Refusing to broadcast edge event without tenant_id | incident=%s", event.get("incident_id"))
+                return
             await pipe._ws_broadcast({
                 "type":         "incident",
+                "tenant_id":    tenant_id,
                 "incident_id":  event["incident_id"],
                 "store_id":     store_id,
                 "camera_id":    event["camera_id"],
@@ -348,6 +535,13 @@ _bootstrap_tokens: dict[str, str] = {}  # token → tenant_id
 # process, so a plain dict is sufficient (mirrors _bootstrap_tokens). The agent
 # consumes the flag on its next heartbeat.
 _scan_requests: dict[str, bool] = {}  # tenant_id → scan_requested
+
+# In-memory per-tenant door-relay discovery state. The agent discovers relay
+# hardware on the store LAN (see windows_agent/agent/relay.py) and reports the
+# candidates in its heartbeat; the Door Relay setup wizard lists them as
+# plug-and-play options. Single uvicorn process, so a plain dict is sufficient.
+_relay_scan_requests: dict[str, bool] = {}  # tenant_id → relay scan requested
+_discovered_relays: dict[str, list] = {}    # tenant_id → relay candidates
 
 # ---------------------------------------------------------------------------
 # RTSP probe jobs — the cloud cannot reach private LAN IPs, so path probing
@@ -401,6 +595,26 @@ def request_camera_scan(tenant_id: str) -> None:
 def consume_camera_scan(tenant_id: str) -> bool:
     """Return True (and clear) if a scan was requested for this tenant."""
     return _scan_requests.pop(tenant_id, False)
+
+
+def request_relay_scan(tenant_id: str) -> None:
+    """Mark that the given tenant's agent should run a relay discovery scan."""
+    _relay_scan_requests[str(tenant_id)] = True
+
+
+def consume_relay_scan(tenant_id: str) -> bool:
+    """Return True (and clear) if a relay scan was requested for this tenant."""
+    return _relay_scan_requests.pop(str(tenant_id), False)
+
+
+def store_discovered_relays(tenant_id: str, relays: list) -> None:
+    """Cache the latest plug-and-play relay candidates reported by an agent."""
+    _discovered_relays[str(tenant_id)] = relays or []
+
+
+def get_discovered_relays(tenant_id: str) -> list:
+    """Return the latest relay candidates reported by this tenant's agent."""
+    return _discovered_relays.get(str(tenant_id), [])
 
 
 def _store_bootstrap_token(token: str, tenant_id: str) -> None:
@@ -469,6 +683,10 @@ class HeartbeatBody(BaseModel):
     # YOLOv8 graph). Keys: architecture, model, expected_model, is_preferred,
     # ultralytics_version, acquire_error.
     model_status: dict | None = None
+    pending_incidents: int | None = None  # durable agent outbox depth
+    # Plug-and-play door-relay candidates found on the store LAN by the agent
+    # (windows_agent/agent/relay.py). Listed by the Door Relay setup wizard.
+    discovered_relays: list[dict] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -497,6 +715,9 @@ def _record_person_counts(tenant_id: str, counts: dict[str, int]) -> None:
 class DetectionEventBody(BaseModel):
     camera_id: str
     event_type: str
+    # Stable ID generated by the edge agent. Replayed requests return the
+    # original event instead of creating a second incident.
+    event_id: str | None = None
     severity: str = "medium"
     confidence: float | None = None
     risk_score: float | None = None
@@ -535,11 +756,15 @@ async def post_people_count_snapshot(
     of what is being counted. One file per camera, overwritten in place.
     """
     b64 = body.snapshot_b64
+    if not _is_safe_storage_component(body.camera_id):
+        raise HTTPException(status_code=422, detail="Invalid camera_id")
+    if len(b64) > 2_800_000:
+        raise HTTPException(status_code=413, detail="Snapshot payload is too large")
     try:
         if "," in b64 and b64.strip().lower().startswith("data:"):
             b64 = b64.split(",", 1)[1]
-        raw = base64.b64decode(b64)
-        if len(raw) > 2_000_000:  # sanity cap: 2 MB
+        raw = base64.b64decode(b64, validate=True)
+        if len(raw) > _MAX_SNAPSHOT_BYTES or not raw.startswith(b"\xff\xd8\xff"):  # sanity cap: 2 MB
             raise HTTPException(status_code=413, detail="Snapshot too large")
         path = _count_snapshot_path(str(agent.tenant_id), body.camera_id)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -593,6 +818,7 @@ async def register_agent(
                 "people_count_zones": _normalized_people_count_zones(c),
                 "exclusion_zones": _normalized_exclusion_zones(c),
                 "inventory_zones": _normalized_inventory_zones(c),
+                "high_value_counter": _normalized_high_value_counter(c),
                 # Per-camera opt-in analytic toggles. Previously NOT sent at
                 # all, so the agent ran every behaviour heuristic (pose
                 # shoplifting, loitering, crowding, suspicious, fall) on every
@@ -682,12 +908,18 @@ async def heartbeat(
             logger.exception(
                 "Failed to record agent model status for agent %s", agent.id
             )
+    # Cache plug-and-play relay candidates discovered by the agent's LAN scan
+    # so the Door Relay setup wizard can offer one-click configuration.
+    if body.discovered_relays is not None:
+        store_discovered_relays(agent.tenant_id, body.discovered_relays)
     await session.commit()
     return {
         "ok": True,
         "server_time": now.isoformat(),
         "scan_requested": consume_camera_scan(agent.tenant_id),
+        "relay_scan_requested": consume_relay_scan(agent.tenant_id),
         "rtsp_probe_jobs": consume_rtsp_probes(agent.tenant_id),
+        "pending_incidents": body.pending_incidents,
     }
 
 
@@ -710,15 +942,19 @@ async def push_frame(
     and intentionally lightweight — no retries, no persistence.
     """
     b64 = body.frame_b64
-    if not b64:
+    if not b64 or not _is_safe_storage_component(body.camera_id):
+        return {"ok": False}
+    if len(b64) > 1_400_000:
         return {"ok": False}
     try:
         if "," in b64 and b64.strip().lower().startswith("data:"):
             b64 = b64.split(",", 1)[1]
-        raw = base64.b64decode(b64)
+        raw = base64.b64decode(b64, validate=True)
+        if len(raw) > _MAX_FRAME_BYTES or not raw.startswith(b"\xff\xd8\xff"):
+            return {"ok": False}
     except Exception:  # noqa: BLE001
         return {"ok": False}
-    _latest_edge_frames[body.camera_id] = (raw, time.monotonic(), agent.tenant_id)
+    _store_latest_edge_frame(str(agent.tenant_id), body.camera_id, raw)
     return {"ok": True}
 
 
@@ -878,7 +1114,36 @@ async def ingest_event(
     except Exception:
         camera = None
 
-    event_type = body.event_type.lower()
+    event_type = body.event_type.strip().lower()
+    if not event_type or len(event_type) > 50:
+        raise HTTPException(status_code=422, detail="event_type is invalid")
+    if body.snapshot_b64 and len(body.snapshot_b64) > 2_800_000:
+        raise HTTPException(status_code=413, detail="snapshot payload is too large")
+    if body.person_crop_b64 and len(body.person_crop_b64) > 2_800_000:
+        raise HTTPException(status_code=413, detail="person crop payload is too large")
+    event_id = (body.event_id or "").strip() or str(uuid.uuid4())
+    if len(event_id) > 36:
+        raise HTTPException(status_code=422, detail="event_id is too long")
+    if isinstance(body.metadata, dict):
+        try:
+            if len(json.dumps(body.metadata, separators=(",", ":"))) > 128_000:
+                raise HTTPException(status_code=413, detail="metadata is too large")
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="metadata must be JSON serializable")
+
+    # Idempotency: the edge client may retry after a timeout even though the
+    # first request already committed. Return the existing event for this
+    # tenant instead of running VLM, persistence, and alert dispatch twice.
+    existing_event = (
+        await session.execute(
+            select(DetectionEvent).where(
+                DetectionEvent.id == event_id,
+                DetectionEvent.tenant_id == agent.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing_event is not None:
+        return {"ok": True, "duplicate": True, "event_id": event_id}
 
     # A camera that the owner disabled entirely must not produce ANY
     # incidents — drop every event from it, regardless of type.
@@ -901,6 +1166,14 @@ async def ingest_event(
         "restricted_zone": (analyzer_config.get("restricted_zone") or {}).get("restricted_zones") or [],
         "queue_breach": (analyzer_config.get("queue_length") or {}).get("queue_zones") or [],
         "queue_length": (analyzer_config.get("queue_length") or {}).get("queue_zones") or [],
+        # High-Value Counter detectors only fire once their polygons are
+        # drawn (the editor writes jewelry_handover / jewelry_tray /
+        # grab_and_run into analyzer_config). Gating here mirrors the edge
+        # agent's own no-polygon → no-event behaviour, so a misconfigured
+        # camera can never produce a jewellery event server-side either.
+        "jewelry_handover": (analyzer_config.get("jewelry_handover") or {}).get("tray_polygon") or [],
+        "jewelry_tray": (analyzer_config.get("jewelry_tray") or {}).get("trays") or [],
+        "grab_and_run": (analyzer_config.get("grab_and_run") or {}).get("case_polygon") or [],
     }
     if event_type in configured_zones and not configured_zones[event_type]:
         logger.info(
@@ -1042,7 +1315,9 @@ async def ingest_event(
     if body.person_crop_b64 and staff_face_service.is_available():
         try:
             face_match = await asyncio.to_thread(
-                staff_face_service.match_face_b64, body.person_crop_b64
+                staff_face_service.match_face_b64,
+                body.person_crop_b64,
+                str(agent.tenant_id),
             )
         except Exception:  # noqa: BLE001
             logger.exception("Staff face matching failed for camera %s", body.camera_id)
@@ -1055,6 +1330,7 @@ async def ingest_event(
                 store_id=store_id,
                 confidence=face_match["similarity"],
                 snapshot_url=snapshot_url,
+                tenant_id=str(agent.tenant_id),
             )
         except Exception:  # noqa: BLE001
             logger.exception("record_match failed for entry %s", face_match["entry_id"])
@@ -1154,7 +1430,7 @@ async def ingest_event(
 
     # 3) Persist the audit row in the per-tenant detection_events table.
     event = DetectionEvent(
-        id=str(uuid.uuid4()),
+        id=event_id,
         tenant_id=agent.tenant_id,
         camera_id=body.camera_id,
         edge_agent_id=agent.id,
@@ -1168,7 +1444,25 @@ async def ingest_event(
         event_meta=body.metadata,
     )
     session.add(event)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Two retries can arrive concurrently. The database primary key is
+        # the final idempotency guard; only treat it as a duplicate when the
+        # conflicting ID belongs to this tenant. A collision with another
+        # tenant is rejected without exposing that tenant's event.
+        await session.rollback()
+        existing_event = (
+            await session.execute(
+                select(DetectionEvent).where(
+                    DetectionEvent.id == event_id,
+                    DetectionEvent.tenant_id == agent.tenant_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing_event is not None:
+            return {"ok": True, "duplicate": True, "event_id": event_id}
+        raise HTTPException(status_code=409, detail="event_id is already in use")
 
     # 4) Build the canonical incident dict and fan it into the live pipeline.
     description = (
@@ -1179,6 +1473,7 @@ async def ingest_event(
     incident = {
         "id": event.id,
         "incident_id": event.id,
+        "tenant_id": str(agent.tenant_id),
         "type": body.event_type,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "store_id": store_id,
@@ -1250,7 +1545,14 @@ async def get_config(
         stmt = stmt.where(CameraConfig.site_id == agent_site)
     result = await session.execute(stmt)
     cameras = result.scalars().all()
+
+    # Door-relay configuration (door_control) is tenant-scoped and edited via
+    # the relay setup wizard. The agent applies it to its MQTT relay driver.
+    tenant = await session.get(Tenant, agent.tenant_id)
+    door_control = (tenant.relay_settings or {}) if tenant else {}
+
     return {
+        "door_control": door_control,
         "cameras": [
             {
                 "camera_id": c.camera_id,
@@ -1262,6 +1564,7 @@ async def get_config(
                 "people_count_zones": _normalized_people_count_zones(c),
                 "exclusion_zones": _normalized_exclusion_zones(c),
                 "inventory_zones": _normalized_inventory_zones(c),
+                "high_value_counter": _normalized_high_value_counter(c),
                 # Per-camera opt-in analytic toggles. Previously NOT sent at
                 # all, so the agent ran every behaviour heuristic (pose
                 # shoplifting, loitering, crowding, suspicious, fall) on every
@@ -1298,6 +1601,17 @@ async def list_agents(
     now = datetime.now(timezone.utc)
     stale_threshold = timedelta(minutes=5)
 
+    model_status_by_agent: dict[str, dict] = {}
+    try:
+        from ..db import system_health_store as _sh_store
+
+        model_status_by_agent = {
+            str(row["agent_id"]): row
+            for row in _sh_store.list_agent_model_status(tenant_id)
+        }
+    except Exception:  # noqa: BLE001 — status panel must remain available
+        logger.exception("Failed to load agent model telemetry")
+
     items = []
     for a in agents:
         if a.last_heartbeat is not None:
@@ -1315,6 +1629,7 @@ async def list_agents(
             last_heartbeat_iso = None
             last_heartbeat_age_seconds = None
 
+        telemetry = model_status_by_agent.get(str(a.id))
         items.append({
             "agent_id": a.id,
             "device_type": a.device_type,
@@ -1325,6 +1640,9 @@ async def list_agents(
             "camera_count": a.camera_count,
             "capabilities": a.capabilities,
             "created_at": a.created_at.isoformat() if a.created_at else None,
+            "model_status": telemetry.get("status") if telemetry else None,
+            "model_status_age_seconds": telemetry.get("age_seconds") if telemetry else None,
+            "model_status_stale": telemetry.get("stale") if telemetry else True,
         })
 
     return {"agents": items, "total": len(items)}
@@ -1637,6 +1955,12 @@ def _build_agent_zip(config: dict, platform: str) -> bytes:
             )
         # Prefilled config.json (sits next to the package; loaded by config.load()).
         zf.writestr("config.json", json.dumps(config, indent=2))
+        # MediaPipe 21-point hand-landmark model for the High-Value Counter
+        # handover detector (agent/hand_landmarks.py resolves it relative to
+        # the agent package). Bundled so the agent needs no runtime download.
+        hand_task = _REPO_ROOT / "models" / "hand_landmarker.task"
+        if hand_task.exists():
+            zf.write(hand_task, "models/hand_landmarker.task")
         # Version stamp so users can tell which build they have.
         zf.writestr("VERSION.txt", f"Vantag Edge Agent v{_agent_version()}\n")
         # Launchers + readme.
@@ -1716,7 +2040,11 @@ async def download_agent(
         "agent_id": agent.id,
         "backend_url": backend_url,
         "mqtt_host": mqtt_host,
-        "mqtt_port": int(os.getenv("MQTT_PORT", "1883")),
+        "mqtt_port": int(os.getenv("MQTT_AGENT_PORT") or os.getenv("MQTT_PORT") or 1883),
+        # Broker credentials so the agent can authenticate (allow_anonymous
+        # is disabled). Env-overridable for rotation.
+        "mqtt_username": os.getenv("MQTT_EDGE_USERNAME", "vantag_edge"),
+        "mqtt_password": os.getenv("MQTT_EDGE_PASSWORD", "nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO"),
         "tenant_id": tenant_id,
         # NOTE: keys here MUST match windows_agent/agent/config.py::CameraConfig
         # fields (id, name, rtsp_url, location, ...). Any extra/renamed key makes

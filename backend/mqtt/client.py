@@ -87,6 +87,8 @@ class MQTTClient:
         client_id: str = "vantag-backend",
         username: Optional[str] = None,
         password: Optional[str] = None,
+        tls: bool = False,
+        tls_ca_cert: Optional[str] = None,
         keepalive: int = _DEFAULT_KEEPALIVE,
         backoff_max: float = _DEFAULT_BACKOFF_MAX,
     ) -> None:
@@ -94,6 +96,7 @@ class MQTTClient:
         self._port = port
         self._keepalive = keepalive
         self._backoff_max = backoff_max
+        self._tls = bool(tls)
 
         self._subscriptions: Dict[str, Callable[[str, dict], None]] = {}
         self._lock = threading.Lock()
@@ -104,6 +107,11 @@ class MQTTClient:
         self._client = paho.Client(client_id=client_id, protocol=paho.MQTTv311)
         if username:
             self._client.username_pw_set(username, password)
+        if self._tls:
+            # Use the platform CA bundle by default; a custom CA path can be
+            # supplied for private brokers. TLS failures are intentionally
+            # fatal to this client rather than silently downgrading.
+            self._client.tls_set(ca_certs=tls_ca_cert or None)
 
         # Wire paho callbacks.
         self._client.on_connect = self._on_connect

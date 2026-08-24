@@ -1,4 +1,38 @@
 """Vantag Windows Edge Agent"""
+# 1.9.0 — universal plug-and-play door relay + MQTT security. The relay
+# driver layer (agent/relay.py) now exposes one interface across five
+# hardware backends — simulate, http (Shelly/Tasmota/ESPHome/Sonoff/custom
+# REST boards), gpio, serial (USB/RS-485) and modbus_tcp — each importing
+# its optional dependency lazily and degrading to a logged no-op so the
+# agent never crashes on missing hardware. Added best-effort LAN relay
+# discovery (discover_relays) whose candidates the agent reports in its
+# heartbeat for the dashboard's Door Relay setup wizard. MQTT now
+# auto-enables TLS when pointed at the public MQTTS port 8883 (system CA
+# bundle) and authenticates with the edge broker credentials, so
+# door-control traffic is encrypted in transit.
+#
+# 1.8.0 — per-finger hand tracking + fixed MQTT door control. Ported the
+# MediaPipe 21-point HandLandmarker into agent/hand_landmarks.py (bundled
+# hand_landmarker.task in the download zip) and wired it into the High-Value
+# Counter handover detector, which now measures a reach from the real
+# fingertips with the bbox-proportional fallback intact. Also fixed door
+# control: the agent now subscribes to the canonical
+# vantag/stores/+/doors/+/command topic, actuates a configurable relay
+# (simulate/http/gpio) and publishes door status back, and the default
+# broker port is corrected to 1883.
+#
+# 1.7.0 — High-Value Counter detectors run on-box. Ported the three
+# jewellery / luxury-counter analyzers (jewelry_handover reach-in→withdraw,
+# jewelry_tray foreground-change-while-person-present, grab_and_run fast
+# case→exit traversal) into windows_agent/agent/jewelry.py and wired them
+# into DetectionAnalyzer. The backend's /api/edge/config now ships the
+# camera's normalized High-Value Counter polygons (serving counter, display
+# tray, display case, exit, approach) under "high_value_counter", and the
+# agent scales them to each frame. Each detector stays OFF until its polygons
+# are drawn, and all three fire as operator-review candidates alongside the
+# existing detectors — one camera keeps running every enabled analytic at
+# once on the same stream.
+#
 # 1.6.1 — shelf/inventory accuracy. The old detector compared a 32-bin
 # GRAYSCALE histogram of a coarse 2x3 grid, so it could not distinguish a
 # removed product from a shadow (both just shift grey levels), and a single
@@ -33,4 +67,4 @@
 # NMS on the fallback path so a fallback can no longer inflate people counts,
 # and reports the verified status in every heartbeat so Admin -> System Health
 # shows the truth instead of an assumption.
-__version__ = "1.6.1"
+__version__ = "1.9.0"

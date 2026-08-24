@@ -27,6 +27,7 @@ ultralytics>=8.2.0              # YOLOv8 detection + pose
 supervision>=0.20.0             # annotation utilities (ByteTrack, zones)
 onnxruntime>=1.18.0             # CPU/GPU ONNX inference (face recognition)
 insightface>=0.7.3              # face detection + ArcFace embeddings
+mediapipe>=0.10.14              # 21-point hand landmarks (High-Value Counter)
 
 # ---------------------------------------------------------------------------
 # Spatial & zone analysis

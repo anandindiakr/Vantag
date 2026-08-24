@@ -48,6 +48,15 @@ After each new deployment to a VPS or container environment:
    `RAZORPAY_WEBHOOK_SECRET_IN/SG/MY` via your deployment secrets manager.  
    Never hard-code these values.
 
+5. **MQTT broker credentials** — set strong, unique `MQTT_PASSWORD` and
+   `MQTT_EDGE_PASSWORD` in `.env` (do not leave the shipped default). The
+   broker requires authentication (`allow_anonymous false`) and stores
+   passwords hashed in `docker/mosquitto/passwd`. The MQTTS listener on
+   port 8883 is enabled in `docker/mosquitto.conf`; run
+   `sudo bash docker/enable_mqtts.sh` on the VPS to provision the Let's
+   Encrypt certs, restart the broker and verify TLS, then point agents at
+   port 8883 so door-control traffic is encrypted in transit.
+
 ---
 
 ## Reporting a Vulnerability

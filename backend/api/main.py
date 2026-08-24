@@ -24,6 +24,7 @@ Running
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -31,7 +32,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from ..middleware.tenant_middleware import require_active_tenant
 
@@ -49,10 +50,11 @@ from .reports_router import set_pipeline as reports_set_pipeline
 from .watchlist_router import router as watchlist_router
 from ..audio.intercom import router as audio_router
 from ..mqtt.client import MQTTClient
-from ..mqtt.door_controller import DoorController, door_router, set_controller
+from ..mqtt.door_controller import DoorController, door_router, set_controller, set_status_broadcast
 from ..pos.pos_router import router as pos_router
 from ..webhooks.webhook_engine import WebhookEngine
-from ..db.database import init_db
+from ..db.database import AsyncSessionLocal, init_db
+from ..db.models.tenant import Tenant
 from .auth_router import auth_router
 from .onboarding_router import onboarding_router
 from .tenants_router import tenants_router
@@ -61,6 +63,7 @@ from .manual_router import manual_router
 from .edge_router import set_pipeline as edge_set_pipeline
 from .edge_router import set_webhook_engine as edge_set_webhook_engine
 from .billing_router import billing_router
+from .relay_router import relay_router
 from .camera_probe_router import camera_probe_router
 from .demo_router import router as demo_router
 from .demo_router import set_pipeline as demo_set_pipeline
@@ -183,6 +186,29 @@ _mqtt_client: MQTTClient | None = None
 _door_controller: DoorController | None = None
 _app_start_time: float = time.monotonic()
 _alert_monitor_task = None
+_retention_task = None
+
+
+async def _run_snapshot_retention_loop() -> None:
+    """Run evidence cleanup periodically without blocking the event loop."""
+    from ..services.snapshot_retention import cleanup_snapshot_files
+    from sqlalchemy import select
+
+    while True:
+        try:
+            async with AsyncSessionLocal() as session:
+                rows = (await session.execute(select(Tenant.id, Tenant.plan_id))).all()
+                plans = {str(row[0]): str(row[1] or "") for row in rows}
+            result = await asyncio.to_thread(
+                cleanup_snapshot_files, _SNAPSHOTS_DIR, plans
+            )
+            if result.get("skipped"):
+                logger.warning("Snapshot retention skipped %d file(s)", result["skipped"])
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Snapshot retention cycle failed: %s", exc)
+        await asyncio.sleep(6 * 60 * 60)
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +219,7 @@ _alert_monitor_task = None
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Manage application-wide resource lifecycle."""
-    global _pipeline, _mqtt_client, _door_controller, _app_start_time, _alert_monitor_task  # noqa: PLW0603
+    global _pipeline, _mqtt_client, _door_controller, _app_start_time, _alert_monitor_task, _retention_task  # noqa: PLW0603
 
     logger.info("Vantag API starting up...")
 
@@ -216,6 +242,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # ------------------------------------------------------------------
     _door_controller = DoorController(_mqtt_client)
     set_controller(_door_controller)
+    set_status_broadcast(ws_manager.broadcast)
 
     # ------------------------------------------------------------------
     # 3. Inject pipeline into routers.
@@ -281,7 +308,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await init_db()
         logger.info("SaaS database tables initialized.")
     except Exception as exc:
+        if _IS_PROD:
+            raise
         logger.warning("DB init skipped (may already exist): %s", exc)
+
+    # Bound VPS disk usage for incident evidence. Start this only after the
+    # database bootstrap so the first cycle can read tenant plans immediately.
+    # The loop rereads plans every cycle, so upgrades/downgrades take effect
+    # without a redeploy.
+    try:
+        _retention_task = asyncio.create_task(
+            _run_snapshot_retention_loop(), name="snapshot-retention"
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Snapshot retention failed to start: %s", exc)
 
     # Start background alert monitor
     try:
@@ -306,6 +346,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             from ..services.alert_monitor import stop_alert_monitor
             await stop_alert_monitor(_alert_monitor_task)
         except Exception:  # noqa: BLE001
+            pass
+    if _retention_task:
+        _retention_task.cancel()
+        try:
+            await _retention_task
+        except asyncio.CancelledError:
             pass
     if _pipeline:
         await _pipeline.stop()
@@ -374,6 +420,7 @@ app.include_router(reports_router,    dependencies=_sub_gate)
 app.include_router(watchlist_router,  dependencies=_sub_gate)
 app.include_router(audio_router,      dependencies=_sub_gate)
 app.include_router(door_router,       dependencies=_sub_gate)
+app.include_router(relay_router,      dependencies=_sub_gate)
 app.include_router(pos_router,        dependencies=_sub_gate)
 app.include_router(auth_router)
 app.include_router(onboarding_router)
@@ -408,8 +455,8 @@ async def health_check() -> HealthResponse:
     """
     Returns API status, version, and uptime.
 
-    Used by load balancers and monitoring systems to verify the service
-    is alive and the pipeline has initialised successfully.
+    Used by load balancers and monitoring systems to verify the process is
+    alive. Use ``/health/ready`` for dependency-aware readiness.
     """
     uptime = time.monotonic() - _app_start_time
     return HealthResponse(
@@ -417,3 +464,61 @@ async def health_check() -> HealthResponse:
         version=app.version,
         uptime_seconds=round(uptime, 2),
     )
+
+
+@app.get("/health/ready", tags=["Health"], summary="Dependency-aware readiness check")
+async def readiness_check() -> dict:
+    """Return 200 only when the backend can serve authenticated traffic.
+
+    Liveness must remain lightweight, while deployment/load-balancer readiness
+    must catch the exact class of partial failures that previously produced a
+    healthy-looking container with unusable API traffic.
+    """
+    mqtt_required = os.getenv("MQTT_REQUIRED", "false").lower() in {"1", "true", "yes"}
+    checks: dict[str, bool] = {
+        "pipeline": bool(_pipeline and _pipeline.is_running),
+        "mqtt": bool(_mqtt_client and _mqtt_client.is_connected),
+    }
+    try:
+        from sqlalchemy import text
+        from ..db.database import engine
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        checks["database"] = True
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Readiness database probe failed: %s", exc)
+        checks["database"] = False
+
+    redis_url = os.getenv("REDIS_URL", "")
+    if redis_url:
+        try:
+            import redis
+            def _ping() -> bool:
+                client = redis.Redis.from_url(redis_url, socket_connect_timeout=1.0, socket_timeout=1.0)
+                try:
+                    return bool(client.ping())
+                finally:
+                    client.close()
+            checks["redis"] = bool(await asyncio.to_thread(_ping))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Readiness Redis probe failed: %s", exc)
+            checks["redis"] = False
+    else:
+        checks["redis"] = False
+
+    # MQTT is an optional door-control/notification dependency for camera
+    # monitoring. Do not keep a healthy API out of service merely because a
+    # broker is intentionally not configured; production can opt into strict
+    # broker readiness with MQTT_REQUIRED=true.
+    required_checks = ["pipeline", "database", "redis"]
+    if mqtt_required:
+        required_checks.append("mqtt")
+    ready = all(checks.get(name, False) for name in required_checks)
+    payload = {
+        "status": "ready" if ready else "not_ready",
+        "checks": checks,
+        "required_checks": required_checks,
+    }
+    if not ready:
+        raise HTTPException(status_code=503, detail=payload)
+    return payload

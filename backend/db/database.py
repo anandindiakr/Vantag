@@ -91,6 +91,23 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Apply numbered production migrations before the legacy additive
+        # compatibility statements below. Existing installations get a
+        # durable audit trail in schema_migrations; fresh databases remain
+        # compatible with SQLAlchemy create_all.
+        try:
+            from .migrations.runner import run_pending_migrations
+            applied = await run_pending_migrations(conn)
+            if applied:
+                import logging as _logging
+                _logging.getLogger(__name__).info("Applied migrations: %s", applied)
+        except Exception:
+            # Do not silently continue in production: a schema mismatch can
+            # invalidate authentication and data isolation guarantees.
+            if os.getenv("VANTAG_ENV", "").lower() in ("prod", "production"):
+                raise
+            import logging as _logging
+            _logging.getLogger(__name__).exception("Migration runner failed in development")
         # Idempotent, additive column migration for auth security fields.
         # Postgres supports ADD COLUMN IF NOT EXISTS; safe to run every boot.
         _stmts = (
@@ -100,7 +117,10 @@ async def init_db() -> None:
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS pw_reset_jti VARCHAR(64)",
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS pw_reset_expires_at TIMESTAMPTZ",
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 0",
+            "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS refresh_token_hash VARCHAR(128)",
+            "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS refresh_token_expires_at TIMESTAMPTZ",
             "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS alert_settings JSONB",
+            "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS relay_settings JSONB",
             "ALTER TABLE partners ADD COLUMN IF NOT EXISTS commission_rule_id VARCHAR(36) "
             "REFERENCES commission_rules(id) ON DELETE SET NULL",
             "ALTER TABLE tenant_users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ",
@@ -125,7 +145,12 @@ async def init_db() -> None:
             try:
                 await conn.exec_driver_sql(_sql)
             except Exception:  # noqa: BLE001
-                pass
+                # A production schema change must never be silently skipped;
+                # otherwise the app can boot with an apparently healthy API
+                # but missing auth/tenant columns. Development keeps the
+                # historical best-effort behaviour for disposable databases.
+                if os.getenv("VANTAG_ENV", "").lower() in ("prod", "production"):
+                    raise
 
     # Seed default commission rules (from the Vantag Partner Distribution
     # Playbook) once — admin can edit/replace these from the Partner Admin

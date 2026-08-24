@@ -28,6 +28,9 @@ const EVENT_TYPE_OPTIONS: Array<{ value: EventType | 'all'; label: string }> = [
   { value: 'loitering',         label: 'Loitering' },
   { value: 'face_match',        label: 'Face Match' },
   { value: 'tamper',            label: 'Camera Tamper' },
+  { value: 'jewelry_handover',  label: 'Case Hand Reach' },
+  { value: 'jewelry_tray',      label: 'Tray Change' },
+  { value: 'grab_and_run',      label: 'Grab & Run' },
 ];
 
 interface ZonePoint { x: number; y: number }

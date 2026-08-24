@@ -42,7 +42,7 @@ import uuid
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Deque, Dict, List, Optional
+from typing import Any, Callable, Deque, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -53,7 +53,12 @@ from ..analyzers.inventory_movement import InventoryMovementDetector, InventoryE
 from ..analyzers.restricted_zone import RestrictedZoneDetector, ZoneEntryEvent
 from ..analyzers.queue_length import QueueLengthAnalyzer, QueueEvent
 from ..analyzers.fall_detection import FallDetector, FallEvent
+from ..analyzers.jewelry_handover import JewelryHandoverDetector, HandoverEvent
+from ..analyzers.jewelry_tray import JewelryTrayDetector, TrayEvent
+from ..analyzers.grab_and_run import GrabAndRunDetector, GrabAndRunEvent
 from ..inference.yolo_engine import YOLOEngine, Detection
+from ..inference.model_scheduler import ModelScheduler
+from ..inference.hand_landmarks import HandLandmarkEngine
 from ..ingestion.camera_registry import CameraRegistry
 from ..ingestion.health_monitor import HealthMonitor
 from ..ingestion.stream_manager import StreamManager
@@ -71,6 +76,11 @@ _HEATMAP_ROWS = 10
 _HEATMAP_COLS = 10
 _RISK_DECAY_FACTOR = 0.95       # applied per second when no new events arrive
 _FRAME_SLEEP_NO_DATA = 0.01     # seconds to yield when no frame is available
+# Live snapshots and heatmaps are dashboard telemetry, not inference inputs.
+# Updating them on every RTSP frame wastes CPU (especially on 1080p cameras)
+# without improving the operator experience.
+_SNAPSHOT_MIN_INTERVAL = 0.5    # at most 2 encoded snapshots per second/camera
+_HEATMAP_MIN_INTERVAL = 0.5     # at most 2 heatmap updates per second/camera
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +101,10 @@ _EVENT_WEIGHTS: Dict[str, float] = {
     "restricted_zone": 30.0,
     "queue_length": 10.0,
     "fall_detection": 50.0,
+    # Jewellery counter analyzers
+    "jewelry_handover": 45.0,
+    "jewelry_tray": 25.0,
+    "grab_and_run": 60.0,
     "unknown": 5.0,
 }
 
@@ -161,6 +175,15 @@ class VantagPipeline:
         self.registry.load()
 
         global_cfg = self.registry.get_global()
+        # Native pipeline events must carry tenant identity before they reach
+        # shared WebSocket/in-memory stores. SaaS deployments provide this via
+        # config or VANTAG_TENANT_ID; edge-ingested events always use the
+        # authenticated EdgeAgent tenant directly.
+        self._tenant_id: str | None = (
+            str(global_cfg.get("tenant_id") or os.getenv("VANTAG_TENANT_ID"))
+            if (global_cfg.get("tenant_id") or os.getenv("VANTAG_TENANT_ID"))
+            else None
+        )
         self._window_seconds: int = int(global_cfg.get("risk_score_window_seconds", 60))
 
         # ---- Ingestion layer ----
@@ -180,10 +203,15 @@ class VantagPipeline:
             # any MQTT status (door locks, camera health, etc.) from ever
             # being reliably received. Make the client_id unique per
             # process so each worker keeps its own stable connection.
+            mqtt_tls = os.getenv("MQTT_TLS", "false").lower() in {"1", "true", "yes"}
             self._mqtt = MQTTClient(
-                broker=global_cfg.get("mqtt_broker", "localhost"),
-                port=int(global_cfg.get("mqtt_port", 1883)),
+                broker=os.getenv("MQTT_BROKER", global_cfg.get("mqtt_broker", "localhost")),
+                port=int(os.getenv("MQTT_PORT", global_cfg.get("mqtt_port", 1883))),
                 client_id=f"vantag-backend-{os.getpid()}",
+                username=os.getenv("MQTT_USERNAME") or None,
+                password=os.getenv("MQTT_PASSWORD") or None,
+                tls=mqtt_tls,
+                tls_ca_cert=os.getenv("MQTT_TLS_CA") or None,
             )
         self._mqtt_owned = mqtt_client is None  # we own it if we created it
 
@@ -197,8 +225,31 @@ class VantagPipeline:
         # ---- YOLO inference engines ----
         # One shared engine (per global config); per-camera engines can be added later.
         self._yolo_engine: Optional[YOLOEngine] = self._init_yolo(global_cfg)
+        # Pose engine (YOLO26n-pose) runs at a reduced FPS via ModelScheduler
+        # and enriches person detections with wrist/elbow keypoints for the
+        # fall detector and the High-Value Counter hand-reach detector.
+        self._pose_engine: Optional[YOLOEngine] = self._init_pose(global_cfg)
+        # Hand-landmark engine (MediaPipe HandLandmarker) for 21-point
+        # per-finger tracking in the High-Value Counter hand-reach detector.
+        self._hand_engine: HandLandmarkEngine = HandLandmarkEngine(
+            model_path=global_cfg.get("hand_landmarker_model_path", "") or "models/hand_landmarker.task",
+            max_hands=int(global_cfg.get("hand_max_hands", 2)),
+            min_confidence=float(global_cfg.get("hand_min_confidence", 0.5)),
+        )
+        self._scheduler = ModelScheduler(config={
+            "gpu_load_threshold": float(global_cfg.get("gpu_load_threshold", 0.80)),
+            "pose_fps_limit": int(global_cfg.get("pose_fps_limit", 3)),
+            "face_fps_limit": int(global_cfg.get("face_fps_limit", 2)),
+            "hand_fps_limit": int(global_cfg.get("hand_fps_limit", 3)),
+        })
 
         self._build_analyzers()
+
+        # CLAHE is comparatively expensive to construct. Keep one instance
+        # per pipeline and only use it for cameras that explicitly opt into
+        # low-light mode (the previous code enhanced every camera/frame even
+        # when low_light_mode was false).
+        self._clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
         # ---- Shared state (read by API routers) ----
         self.risk_scores: Dict[str, dict] = {}          # store_id → {score, event_counts, ...}
@@ -206,7 +257,9 @@ class VantagPipeline:
             lambda: deque(maxlen=_MAX_RECENT_EVENTS)
         )
         self.latest_snapshots: Dict[str, bytes] = {}    # camera_id → JPEG bytes
+        self._last_snapshot_at: Dict[str, float] = {}
         self.heatmaps: Dict[str, Dict[str, dict]] = {}  # store_id → {window → grid}
+        self._last_heatmap_at: Dict[str, float] = {}
         self.queue_status: Dict[str, dict] = {}         # lane_id → queue data
 
         # ---- Rolling event timestamps for risk scoring ----
@@ -229,7 +282,7 @@ class VantagPipeline:
     @staticmethod
     def _init_yolo(global_cfg: dict) -> Optional[YOLOEngine]:
         """Initialise the shared YOLO inference engine from global config."""
-        model_path = global_cfg.get("yolo_model_path", "")
+        model_path = global_cfg.get("yolo_model_path", "") or "models/yolo26n.pt"
         device = global_cfg.get("yolo_device", "cpu")
         conf = float(global_cfg.get("yolo_conf_threshold", 0.45))
         try:
@@ -238,6 +291,27 @@ class VantagPipeline:
             return engine
         except Exception as exc:  # noqa: BLE001
             logger.warning("YOLOEngine init failed (%s) – analyzers will run without detections.", exc)
+            return None
+
+    @staticmethod
+    def _init_pose(global_cfg: dict) -> Optional[YOLOEngine]:
+        """Initialise the shared pose-estimation engine from global config.
+
+        A missing pose model is non-fatal: the fall and hand-reach detectors
+        degrade gracefully to bounding-box heuristics.
+        """
+        model_path = global_cfg.get("pose_model_path", "") or "models/yolo26n-pose.pt"
+        device = global_cfg.get("yolo_device", "cpu")
+        conf = float(global_cfg.get("yolo_conf_threshold", 0.45))
+        if not os.path.isfile(model_path):
+            logger.info("Pose engine skipped (model file not found) | path=%s", model_path)
+            return None
+        try:
+            engine = YOLOEngine(model_path=model_path, device=device, conf_threshold=conf)
+            logger.info("Pose engine initialised | model=%s device=%s", model_path, device)
+            return engine
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Pose engine init failed (%s) – hand/fall detection will use bbox heuristics.", exc)
             return None
 
     # ------------------------------------------------------------------
@@ -257,6 +331,9 @@ class VantagPipeline:
             restricted_cfg = acfg.get("restricted_zone", {})
             queue_cfg = acfg.get("queue_length", {})
             fall_cfg = acfg.get("fall_detection", {})
+            handover_cfg = acfg.get("jewelry_handover", {})
+            tray_cfg = acfg.get("jewelry_tray", {})
+            grab_cfg = acfg.get("grab_and_run", {})
 
             self._analyzers[cam.id] = [
                 # Legacy (1-arg) analyzer wrapped for uniform interface
@@ -267,6 +344,10 @@ class VantagPipeline:
                 RestrictedZoneDetector(cam.id, restricted_cfg),
                 QueueLengthAnalyzer(cam.id, queue_cfg),
                 FallDetector(cam.id, fall_cfg),
+                # Jewellery counter analyzers (disabled unless zones configured)
+                JewelryHandoverDetector(cam.id, handover_cfg),
+                JewelryTrayDetector(cam.id, tray_cfg),
+                GrabAndRunDetector(cam.id, grab_cfg),
             ]
 
         logger.info("Analyzers built | cameras=%d", len(self._analyzers))
@@ -323,7 +404,12 @@ class VantagPipeline:
         try:
             from ..db import incident_store as _istore  # lazy import
             for sid in _istore.get_all_store_ids():
-                items, _, _ = _istore.query_incidents(sid, page=1, limit=500)
+                items, _, _ = _istore.query_incidents(
+                    sid,
+                    page=1,
+                    limit=500,
+                    tenant_id=self._tenant_id,
+                )
                 dq = self.recent_events[sid]
                 for item in items:   # already newest first
                     dq.append(item)
@@ -422,9 +508,28 @@ class VantagPipeline:
         detections: List[Detection] = []
         if self._yolo_engine is not None:
             try:
-                detections = self._yolo_engine.detect(enhanced)
+                # YOLO is CPU/GPU-bound and synchronous. Run it off the
+                # asyncio event loop so one slow model call cannot pause
+                # every other camera task, WebSocket, or API request.
+                detections = await asyncio.to_thread(
+                    self._yolo_engine.detect,
+                    enhanced,
+                )
             except Exception as exc:  # noqa: BLE001
                 logger.debug("YOLO inference error | camera=%s error=%s", camera_id, exc)
+
+        # 2b. Pose inference (rate-limited by ModelScheduler) — enrich person
+        # detections with wrist/elbow keypoints so the High-Value Counter
+        # hand-reach detector and the fall detector can use real pose geometry
+        # instead of bounding-box heuristics.
+        if detections and self._pose_engine is not None:
+            detections = await self._enrich_with_pose(enhanced, detections)
+
+        # 2c. Hand-landmark inference (rate-limited) — attach 21-point per-finger
+        # landmarks so the High-Value Counter detector can measure an actual
+        # fingertip dipping into the tray instead of a bounding-box guess.
+        if detections:
+            detections = await self._enrich_with_hands(enhanced, detections)
 
         # 3. Run analyzers – all expose analyze(frame, detections, timestamp) -> List.
         events: List[dict] = []
@@ -434,6 +539,8 @@ class VantagPipeline:
                 results = analyzer.analyze(enhanced, detections, timestamp)
                 for result in results:
                     ev = self._normalise_event(result, camera_id, store_id)
+                    if self._tenant_id:
+                        ev["tenant_id"] = self._tenant_id
                     events.append(ev)
             except Exception as exc:  # noqa: BLE001
                 logger.error(
@@ -454,23 +561,177 @@ class VantagPipeline:
                     )
                 self._recompute_risk(store_id)
 
-        # 4. Cache annotated snapshot.
-        annotated = self._annotate_frame(frame, events)
-        try:
-            _, jpeg_buf = cv2.imencode(
-                ".jpg", annotated,
-                [cv2.IMWRITE_JPEG_QUALITY, _SNAPSHOT_JPEG_QUALITY],
-            )
-            self.latest_snapshots[camera_id] = jpeg_buf.tobytes()
-        except Exception as exc:  # noqa: BLE001
-            logger.debug("Snapshot encoding failed | camera=%s error=%s", camera_id, exc)
+        # 4. Cache an annotated snapshot for the dashboard. Event frames are
+        # always captured immediately; ordinary live thumbnails are capped at
+        # two encodes/sec/camera so JPEG work cannot dominate inference.
+        now_mono = time.monotonic()
+        if (
+            events
+            or now_mono - self._last_snapshot_at.get(camera_id, 0.0)
+            >= _SNAPSHOT_MIN_INTERVAL
+        ):
+            annotated = self._annotate_frame(frame, events)
+            try:
+                ok, jpeg_buf = cv2.imencode(
+                    ".jpg", annotated,
+                    [cv2.IMWRITE_JPEG_QUALITY, _SNAPSHOT_JPEG_QUALITY],
+                )
+                if ok:
+                    self.latest_snapshots[camera_id] = jpeg_buf.tobytes()
+                    self._last_snapshot_at[camera_id] = now_mono
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Snapshot encoding failed | camera=%s error=%s", camera_id, exc)
 
-        # 5. Update heatmap (simple motion-based approximation).
-        self._update_heatmap(store_id, camera_id, frame)
+        # 5. Update heatmap (simple motion-based approximation). The grid is
+        # telemetry and does not need to run at detector FPS; throttling it
+        # avoids 200 Python cell updates per camera frame.
+        if now_mono - self._last_heatmap_at.get(camera_id, 0.0) >= _HEATMAP_MIN_INTERVAL:
+            self._update_heatmap(store_id, camera_id, frame)
+            self._last_heatmap_at[camera_id] = now_mono
 
         # 6. Broadcast events.
         for ev in events:
             await self._emit_event(ev, store_id)
+
+    # ------------------------------------------------------------------
+    # Pose enrichment
+    # ------------------------------------------------------------------
+
+    async def _enrich_with_pose(
+        self,
+        frame: np.ndarray,
+        detections: List[Detection],
+    ) -> List[Detection]:
+        """Run pose inference (rate-limited) and attach wrist keypoints.
+
+        Returns the original detections with ``keypoints`` populated on person
+        detections whose bbox overlaps a pose detection.  No-ops when the
+        scheduler suppresses the frame or the pose engine is unavailable.
+        """
+        if not self._scheduler.should_run_pose():
+            return detections
+        try:
+            pose_dets = await asyncio.to_thread(self._pose_engine.detect_pose, frame)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Pose inference error | error=%s", exc)
+            return detections
+        return self._merge_pose_keypoints(detections, pose_dets)
+
+    @staticmethod
+    def _bbox_iou(
+        a: Tuple[int, int, int, int],
+        b: Tuple[int, int, int, int],
+    ) -> float:
+        """Intersection-over-union of two ``(x1, y1, x2, y2)`` boxes."""
+        ix1 = max(a[0], b[0])
+        iy1 = max(a[1], b[1])
+        ix2 = min(a[2], b[2])
+        iy2 = min(a[3], b[3])
+        inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+        area_a = max(0, a[2] - a[0]) * max(0, a[3] - a[1])
+        area_b = max(0, b[2] - b[0]) * max(0, b[3] - b[1])
+        union = area_a + area_b - inter
+        return inter / union if union > 0 else 0.0
+
+    @classmethod
+    def _merge_pose_keypoints(
+        cls,
+        detections: List[Detection],
+        pose_detections: List[Detection],
+    ) -> List[Detection]:
+        """Attach pose keypoints to person detections by best bbox IoU.
+
+        The pose and detection engines run separate ByteTrack state, so their
+        ``track_id`` values are not comparable; bbox IoU is the reliable join
+        key for a single frame.
+        """
+        pose_persons = [
+            p for p in pose_detections
+            if p.class_name == "person" and p.keypoints
+        ]
+        if not pose_persons:
+            return detections
+
+        for det in detections:
+            if det.class_name != "person":
+                continue
+            best: Optional[Detection] = None
+            best_iou = 0.0
+            for pp in pose_persons:
+                iou = cls._bbox_iou(det.bbox, pp.bbox)
+                if iou > best_iou:
+                    best_iou = iou
+                    best = pp
+            if best is not None and best_iou >= 0.5:
+                det.keypoints = best.keypoints
+        return detections
+
+    # ------------------------------------------------------------------
+    # Hand-landmark enrichment (21-point per-finger tracking)
+    # ------------------------------------------------------------------
+
+    async def _enrich_with_hands(
+        self,
+        frame: np.ndarray,
+        detections: List[Detection],
+    ) -> List[Detection]:
+        """Run MediaPipe HandLandmarker (rate-limited) and attach fingertips.
+
+        Returns the original detections with ``hand_landmarks`` populated on the
+        person whose bbox contains each detected hand.
+        """
+        if not self._hand_engine.available:
+            return detections
+        if not self._scheduler.should_run_hands():
+            return detections
+        try:
+            hands = await asyncio.to_thread(self._hand_engine.detect_hands, frame)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Hand-landmark inference error | error=%s", exc)
+            return detections
+        if not hands:
+            return detections
+        return self._attach_hands(detections, hands)
+
+    @staticmethod
+    def _hand_inside_fraction(
+        hand_bbox: Tuple[int, int, int, int],
+        person_bbox: Tuple[int, int, int, int],
+    ) -> float:
+        """Fraction of the hand bbox area that lies inside the person bbox."""
+        hx1, hy1, hx2, hy2 = hand_bbox
+        px1, py1, px2, py2 = person_bbox
+        ix1 = max(hx1, px1)
+        iy1 = max(hy1, py1)
+        ix2 = min(hx2, px2)
+        iy2 = min(hy2, py2)
+        inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+        hand_area = max(0, hx2 - hx1) * max(0, hy2 - hy1)
+        return inter / hand_area if hand_area > 0 else 0.0
+
+    @classmethod
+    def _attach_hands(
+        cls,
+        detections: List[Detection],
+        hands: List[Any],
+    ) -> List[Detection]:
+        """Attach each hand's 21 landmarks to the best-matching person."""
+        for hand in hands:
+            hand_bbox = hand.bbox()
+            best: Optional[Detection] = None
+            best_overlap = 0.0
+            for det in detections:
+                if det.class_name != "person":
+                    continue
+                overlap = cls._hand_inside_fraction(hand_bbox, det.bbox)
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best = det
+            if best is not None and best_overlap >= 0.5:
+                if best.hand_landmarks is None:
+                    best.hand_landmarks = []
+                best.hand_landmarks.append(list(hand.landmarks))
+        return detections
 
     # ------------------------------------------------------------------
     # Risk scoring
@@ -522,6 +783,11 @@ class VantagPipeline:
 
     async def _emit_event(self, ev: dict, store_id: str) -> None:
         """Push an event to the in-memory log, WebSocket, MQTT, and SQLite."""
+        # Native events are tenant-tagged in the camera loop. Keep this
+        # defensive fallback for tests or future emitters so a configured
+        # single-tenant pipeline cannot accidentally drop its own identity.
+        if self._tenant_id and not ev.get("tenant_id"):
+            ev["tenant_id"] = self._tenant_id
         # Append to recent events. Newest-first convention (index 0 = most
         # recent) — matches _emit_edge_event()/demo_router._inject().
         self.recent_events[store_id].appendleft(ev)
@@ -534,7 +800,7 @@ class VantagPipeline:
             pass
 
         # WebSocket broadcast.
-        if self._ws_broadcast:
+        if self._ws_broadcast and ev.get("tenant_id"):
             try:
                 await self._ws_broadcast(ev)
             except Exception as exc:  # noqa: BLE001
@@ -743,6 +1009,80 @@ class VantagPipeline:
                 "snapshot_url": None,
             }
 
+        # ── JewelryHandoverDetector ─────────────────────────────────────────
+        if isinstance(raw, HandoverEvent):
+            return {
+                "incident_id": str(uuid.uuid4()),
+                "type": "jewelry_handover",
+                "camera_id": camera_id,
+                "store_id": store_id,
+                "severity": raw.severity.upper(),
+                "timestamp": raw.timestamp,
+                "description": (
+                    f"Hand reached into display case and withdrew "
+                    f"(track #{raw.person_track_id}, {raw.frames_inside} frames)"
+                ),
+                "metadata": {
+                    "event_subtype": raw.event_subtype,
+                    "person_track_id": raw.person_track_id,
+                    "confidence": raw.confidence,
+                    "bbox": list(raw.bbox),
+                    "frames_inside": raw.frames_inside,
+                },
+                "acknowledged": False,
+                "snapshot_url": None,
+            }
+
+        # ── JewelryTrayDetector ──────────────────────────────────────────────
+        if isinstance(raw, TrayEvent):
+            return {
+                "incident_id": str(uuid.uuid4()),
+                "type": "jewelry_tray",
+                "camera_id": camera_id,
+                "store_id": store_id,
+                "severity": raw.severity.upper(),
+                "timestamp": raw.timestamp,
+                "description": (
+                    f"Display tray '{raw.tray_label}' contents "
+                    f"{raw.change_type} ({raw.previous_fill:.2f} → {raw.current_fill:.2f})"
+                    + (", person present" if raw.person_present else "")
+                ),
+                "metadata": {
+                    "tray_label": raw.tray_label,
+                    "change_type": raw.change_type,
+                    "previous_fill": raw.previous_fill,
+                    "current_fill": raw.current_fill,
+                    "person_present": raw.person_present,
+                },
+                "acknowledged": False,
+                "snapshot_url": None,
+            }
+
+        # ── GrabAndRunDetector ───────────────────────────────────────────────
+        if isinstance(raw, GrabAndRunEvent):
+            return {
+                "incident_id": str(uuid.uuid4()),
+                "type": "grab_and_run",
+                "camera_id": camera_id,
+                "store_id": store_id,
+                "severity": raw.severity.upper(),
+                "timestamp": raw.timestamp,
+                "description": (
+                    f"Grab-and-run: fast case→exit movement "
+                    f"(track #{raw.person_track_id}, {raw.exit_speed_px_s:.0f} px/s "
+                    f"over {raw.travel_seconds}s)"
+                ),
+                "metadata": {
+                    "person_track_id": raw.person_track_id,
+                    "confidence": raw.confidence,
+                    "bbox": list(raw.bbox),
+                    "travel_seconds": raw.travel_seconds,
+                    "exit_speed_px_s": raw.exit_speed_px_s,
+                },
+                "acknowledged": False,
+                "snapshot_url": None,
+            }
+
         # ── Generic dict pass-through ────────────────────────────────────────
         if isinstance(raw, dict):
             raw.setdefault("incident_id", str(uuid.uuid4()))
@@ -767,19 +1107,19 @@ class VantagPipeline:
             "snapshot_url": None,
         }
 
-    @staticmethod
-    def _enhance_low_light(camera_id: str, frame: np.ndarray) -> np.ndarray:
-        """
-        Placeholder for LowLightEnhancer.
+    def _enhance_low_light(self, camera_id: str, frame: np.ndarray) -> np.ndarray:
+        """Enhance only cameras that explicitly enable low-light mode.
 
-        Currently applies CLAHE histogram equalisation on the L channel
-        of the LAB colour space as a lightweight substitute.
+        CLAHE is useful for dark scenes but is a full-frame CPU operation and
+        can make normal well-lit footage noisier. The old static helper ran it
+        unconditionally, so every normal camera paid this cost on every frame.
         """
         try:
+            if not self.registry.get_camera(camera_id).low_light_mode:
+                return frame
             lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
             l_ch, a_ch, b_ch = cv2.split(lab)
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-            l_eq = clahe.apply(l_ch)
+            l_eq = self._clahe.apply(l_ch)
             merged = cv2.merge([l_eq, a_ch, b_ch])
             return cv2.cvtColor(merged, cv2.COLOR_LAB2BGR)
         except Exception:  # noqa: BLE001

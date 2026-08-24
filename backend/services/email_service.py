@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import random
+import secrets
 import smtplib
 import string
 from email.mime.multipart import MIMEMultipart
@@ -40,8 +40,10 @@ def is_dev_mode() -> bool:
 
 
 def generate_otp(length: int = 6) -> str:
-    """Return a random numeric OTP string."""
-    return "".join(random.choices(string.digits, k=length))
+    """Return a cryptographically random numeric OTP string."""
+    if length < 1:
+        raise ValueError("OTP length must be positive")
+    return "".join(secrets.choice(string.digits) for _ in range(length))
 
 
 def _send_sync(to: str, subject: str, html: str, text: str) -> None:

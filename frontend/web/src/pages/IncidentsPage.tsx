@@ -10,6 +10,8 @@ import {
   Filter,
   Camera,
   X,
+  CheckCircle2,
+  ThumbsDown,
 } from 'lucide-react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -129,6 +131,9 @@ const EVENT_TYPE_LABELS: Record<EventType, string> = {
   loitering:          'Loitering',
   face_match:         'Face Match',
   tamper:             'Camera Tamper',
+  jewelry_handover:   'Case Hand Reach',
+  jewelry_tray:       'Tray Change',
+  grab_and_run:       'Grab & Run',
 };
 
 function SeverityBadge({ s }: { s: Severity }) {
@@ -157,6 +162,7 @@ export default function IncidentsPage() {
   const [downloadingId, setDownloadingId]   = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ url: string; personUrl?: string; personSecondsAgo?: number } | null>(null);
   const [purging, setPurging]         = useState(false);
+  const [labelingId, setLabelingId]   = useState<string | null>(null);
   const qc = useQueryClient();
 
   // Collect all store IDs so we can aggregate incidents across them
@@ -221,6 +227,21 @@ export default function IncidentsPage() {
       toast.error(`Failed to download report: ${(err as Error).message}`);
     } finally {
       setDownloadingId(null);
+    }
+  };
+
+  const handleFeedback = async (incident: Incident, verdict: 'confirmed' | 'false_positive') => {
+    setLabelingId(incident.id);
+    try {
+      await api.post('/system/ai-feedback', {
+        event_id: incident.id,
+        verdict,
+      });
+      toast.success(verdict === 'confirmed' ? 'Detection marked confirmed' : 'False positive recorded for AI tuning');
+    } catch (err) {
+      toast.error(`Could not save AI feedback: ${(err as Error).message}`);
+    } finally {
+      setLabelingId(null);
     }
   };
 
@@ -493,6 +514,27 @@ export default function IncidentsPage() {
                     )}
                     {inc.resolved && (
                       <span className="text-xs text-vantag-green">Resolved</span>
+                    )}
+                    {!inc.isDemo && (
+                      <div className="flex items-center gap-1 pt-1">
+                        <span className="text-[10px] text-slate-600 mr-1">AI review</span>
+                        <button
+                          onClick={() => handleFeedback(inc, 'confirmed')}
+                          disabled={labelingId === inc.id}
+                          title="Confirm this detection"
+                          className="inline-flex items-center gap-1 px-1.5 py-1 rounded text-[10px] text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 disabled:opacity-40"
+                        >
+                          <CheckCircle2 size={11} /> Confirm
+                        </button>
+                        <button
+                          onClick={() => handleFeedback(inc, 'false_positive')}
+                          disabled={labelingId === inc.id}
+                          title="Mark as false positive"
+                          className="inline-flex items-center gap-1 px-1.5 py-1 rounded text-[10px] text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40"
+                        >
+                          <ThumbsDown size={11} /> False positive
+                        </button>
+                      </div>
                     )}
                   </div>
 

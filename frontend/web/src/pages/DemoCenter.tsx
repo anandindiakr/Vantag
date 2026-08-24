@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   ShoppingCart, AlertTriangle, Shield, Package,
   Users, Clock, Eye, Camera, Zap, Trash2,
-  CheckCircle, Loader2, PlayCircle,
+  CheckCircle, Loader2, PlayCircle, Gem, Hand,
 } from 'lucide-react';
 import clsx from 'clsx';
 import axios from 'axios';
@@ -28,6 +28,7 @@ interface EventCard {
   color:       string;
   bgColor:     string;
   defaultSev:  string;
+  defaultCam?: string;   // override the auto-assigned demo camera
 }
 
 // ── Event card definitions ────────────────────────────────────────────────────
@@ -113,6 +114,39 @@ const EVENTS: EventCard[] = [
     bgColor:     'bg-gray-500/10 border-gray-500/30',
     defaultSev:  'high',
   },
+  {
+    key:         'jewelry_handover',
+    label:       'Case Hand Reach',
+    icon:        <Hand size={28} />,
+    description: 'A hand crosses into the display case / tray and withdraws — the counter analogue of a shelf sweep.',
+    realTrigger: 'Reach a hand into the display tray, hold it inside, then pull it back out.',
+    color:       'text-amber-300',
+    bgColor:     'bg-amber-500/10 border-amber-500/30',
+    defaultSev:  'high',
+    defaultCam:  'cam-03',
+  },
+  {
+    key:         'jewelry_tray',
+    label:       'Tray Change',
+    icon:        <Gem size={28} />,
+    description: 'Display-tray contents change while a person is at the counter (no shelves required).',
+    realTrigger: 'Remove or shift an item on the display tray while standing at the counter.',
+    color:       'text-yellow-300',
+    bgColor:     'bg-yellow-500/10 border-yellow-500/30',
+    defaultSev:  'high',
+    defaultCam:  'cam-03',
+  },
+  {
+    key:         'grab_and_run',
+    label:       'Grab & Run',
+    icon:        <Zap size={28} />,
+    description: 'Fast case-to-exit movement — the classic snatch-and-flee sequence.',
+    realTrigger: 'Move quickly from the display case to the exit within a few seconds.',
+    color:       'text-red-400',
+    bgColor:     'bg-red-500/10 border-red-500/30',
+    defaultSev:  'critical',
+    defaultCam:  'cam-03',
+  },
 ];
 
 const CAMERAS = ['cam-01', 'cam-03', 'cam-04'];
@@ -134,14 +168,15 @@ const authHeader = () => ({
 
 export default function DemoCenter() {
   const [cameraSelections, setCameraSelections] = useState<Record<string, string>>(
-    Object.fromEntries(EVENTS.map((e, i) => [e.key, CAMERAS[i % CAMERAS.length]]))
+    Object.fromEntries(EVENTS.map((e, i) => [e.key, e.defaultCam ?? CAMERAS[i % CAMERAS.length]]))
   );
   const [severitySelections, setSeveritySelections] = useState<Record<string, string>>(
     Object.fromEntries(EVENTS.map((e) => [e.key, e.defaultSev]))
   );
-  const [firing, setFiring]       = useState<Record<string, boolean>>({});
-  const [firingAll, setFiringAll] = useState(false);
-  const [clearing, setClearing]   = useState(false);
+  const [firing, setFiring]         = useState<Record<string, boolean>>({});
+  const [firingAll, setFiringAll]   = useState(false);
+  const [firingJewelry, setFiringJewelry] = useState(false);
+  const [clearing, setClearing]     = useState(false);
   const [firedLog, setFiredLog]   = useState<FiredEvent[]>([]);
 
   // ── Fire single event ───────────────────────────────────────────────────────
@@ -186,6 +221,25 @@ export default function DemoCenter() {
       toast.error('Failed to fire sequence — is the backend running?');
     } finally {
       setFiringAll(false);
+    }
+  };
+
+  // ── Fire jewellery-counter theft scenario (vision-only, no POS) ─────────────
+
+  const fireJewelry = async () => {
+    setFiringJewelry(true);
+    try {
+      const { data } = await axios.post('/api/demo/trigger-jewelry', {}, authHeader());
+      const newEntries: FiredEvent[] = (data.events ?? []).map((e: FiredEvent) => ({
+        ...e,
+        firedAt: new Date().toLocaleTimeString(),
+      }));
+      setFiredLog((prev) => [...newEntries, ...prev]);
+      toast.success(`${data.fired} jewellery theft signals fired — handover → tray → inventory → grab-and-run!`);
+    } catch {
+      toast.error('Failed to fire jewellery scenario — is the backend running?');
+    } finally {
+      setFiringJewelry(false);
     }
   };
 
@@ -242,6 +296,37 @@ export default function DemoCenter() {
             {firingAll ? 'Firing All…' : 'Fire All Events — Full Demo'}
           </button>
         </div>
+      </div>
+
+      {/* High-Value Counter theft scenario */}
+      <div className="bg-amber-950/30 border border-amber-600/40 rounded-xl p-5 flex flex-col md:flex-row md:items-center gap-4">
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className="flex items-center justify-center w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-500/30">
+            <Gem size={22} className="text-amber-300" />
+          </span>
+          <div>
+            <h2 className="font-semibold text-amber-200 text-sm">High-Value Counter Theft</h2>
+            <p className="text-xs text-amber-200/60">Jewellery · Watches · Luxury goods — no shelves, no POS required.</p>
+          </div>
+        </div>
+        <p className="text-xs text-amber-100/70 leading-relaxed flex-1">
+          Fires the four vision-only detectors in story order on <span className="font-mono">cam-03</span>:
+          <span className="text-amber-100 font-medium"> hand reach-in</span> →
+          <span className="text-amber-100 font-medium"> tray change</span> →
+          <span className="text-amber-100 font-medium"> item count drop</span> →
+          <span className="text-amber-100 font-medium"> grab-and-run to exit</span>.
+          Setup: draw counter, tray, case and exit zones on the counter camera.
+        </p>
+        <button
+          onClick={fireJewelry}
+          disabled={firingJewelry}
+          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold text-sm transition-colors disabled:opacity-60 shadow-lg shadow-amber-900/30 flex-shrink-0"
+        >
+          {firingJewelry
+            ? <Loader2 size={15} className="animate-spin" />
+            : <Gem size={15} />}
+          {firingJewelry ? 'Firing…' : 'Fire High-Value Counter Demo'}
+        </button>
       </div>
 
       {/* How to use callout */}

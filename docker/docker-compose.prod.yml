@@ -32,6 +32,8 @@ volumes:
     driver: local
   vantag-data:
     driver: local
+  redis-data:
+    driver: local
 
 services:
 
@@ -72,17 +74,43 @@ services:
     ports:
       - "1883:1883"
       - "9001:9001"
+      - "8883:8883"
+    environment:
+      # Mirrors the broker credentials so the healthcheck always uses the
+      # same username/password as the backend, and keeps working after the
+      # operator rotates MQTT_PASSWORD in .env (the old healthcheck had the
+      # default password hardcoded and went red after rotation).
+      MQTT_USERNAME: ${MQTT_USERNAME:-vantag_backend}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO}
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
+      - /opt/vantag/mqtt-certs:/mosquitto/certs:ro
       - mosquitto-data:/mosquitto/data
       - mosquitto-logs:/mosquitto/log
     networks:
       - vantag-prod
     healthcheck:
-      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "health", "-m", "ping", "-q", "0"]
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -t health -m ping -q 0 -u \"$${MQTT_USERNAME}\" -P \"$${MQTT_PASSWORD}\""]
       interval: 15s
       timeout: 5s
       retries: 3
+
+  # ── Shared Redis relay (cross-worker live frames + short-lived tokens) ────
+  redis:
+    image: redis:7-alpine
+    container_name: vantag-redis-prod
+    restart: unless-stopped
+    command: redis-server --appendonly yes --save 60 1000
+    volumes:
+      - redis-data:/data
+    networks:
+      - vantag-prod
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   # ── Vantag backend (FastAPI) ──────────────────────────────────────────────
   vantag-backend:
@@ -105,7 +133,19 @@ services:
       VANTAG_JWT_SECRET:    ${VANTAG_JWT_SECRET}
       VANTAG_FACE_KEY:      ${VANTAG_FACE_KEY}
       MQTT_BROKER:          mosquitto
-      MQTT_PORT:            1883
+      MQTT_PORT:            ${MQTT_PORT:-1883}
+      MQTT_TLS:             ${MQTT_TLS:-false}
+      MQTT_TLS_CA:          ${MQTT_TLS_CA:-}
+      # Public port baked into downloaded edge-agent configs. Leave empty to
+      # match MQTT_PORT; set to 8883 to ship MQTTS to store-LAN agents while
+      # the backend keeps its private-Docker connection on 1883.
+      MQTT_AGENT_PORT:      ${MQTT_AGENT_PORT:-8883}
+      MQTT_USERNAME:        ${MQTT_USERNAME:-vantag_backend}
+      MQTT_PASSWORD:        ${MQTT_PASSWORD:-nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO}
+      MQTT_EDGE_USERNAME:   ${MQTT_EDGE_USERNAME:-vantag_edge}
+      MQTT_EDGE_PASSWORD:   ${MQTT_EDGE_PASSWORD:-nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO}
+      MQTT_REQUIRED:        ${MQTT_REQUIRED:-false}
+      REDIS_URL:            redis://redis:6379/0
       VANTAG_SMTP_HOST:     ${VANTAG_SMTP_HOST:-smtp.gmail.com}
       VANTAG_SMTP_PORT:     ${VANTAG_SMTP_PORT:-587}
       VANTAG_SMTP_USER:     ${VANTAG_SMTP_USER}
@@ -135,6 +175,8 @@ services:
       postgres:
         condition: service_healthy
       mosquitto:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - vantag-prod

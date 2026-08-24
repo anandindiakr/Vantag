@@ -41,7 +41,7 @@ build_and_start() {
 
 # Health is checked two independent ways:
 #  1. the compose healthcheck status reported by docker
-#  2. a real HTTP call to /health from INSIDE the container
+#  2. a real dependency-aware HTTP call to /health/ready from INSIDE the container
 # It is deliberately NOT checked through the host's nginx: this VPS hosts
 # multiple apps, so https://localhost hits a different vhost and returns 404,
 # which previously caused false rollbacks of a perfectly healthy backend.
@@ -56,16 +56,99 @@ check_health() {
   done
 
   for i in $(seq 1 15); do
-    http_code=$(docker exec "$CONTAINER" curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health || echo "000")
+    http_code=$(docker exec "$CONTAINER" curl -s -o /dev/null -w "%{http_code}" http://localhost:8800/health/ready || echo "000")
     [ "$http_code" = "200" ] && break
     sleep 6
   done
 
-  echo "Health result: container status=$status /health HTTP=$http_code"
+  echo "Health result: container status=$status /health/ready HTTP=$http_code"
   [ "$status" = "healthy" ] && [ "$http_code" = "200" ]
 }
 
-if build_and_start && check_health; then
+# Nginx resolves the Docker service name when its worker starts. Recreating
+# vantag-backend changes that container IP, so leaving nginx untouched can
+# leave it pointing at the old IP and return 502 for every /api request even
+# though the backend's own healthcheck is green. Restart nginx after the
+# backend is healthy so its upstream is resolved against the new container.
+refresh_nginx_upstream() {
+  echo "Refreshing nginx backend upstream after container replacement..."
+  docker compose -f "$COMPOSE_FILE" restart nginx
+
+  local nginx_status="starting" i
+  for i in $(seq 1 20); do
+    nginx_status=$(docker inspect --format='{{.State.Health.Status}}' vantag-nginx 2>/dev/null || echo "starting")
+    [ "$nginx_status" = "healthy" ] && break
+    sleep 3
+  done
+
+  docker exec vantag-nginx nginx -t
+  docker exec vantag-nginx wget -q -O /dev/null http://vantag-backend:8800/health
+  echo "Nginx upstream refresh successful (status=$nginx_status)."
+}
+
+# Mosquitto config + password file are bind-mounted, so changing them in the
+# repo does not take effect until the broker restarts. Restart it AFTER the
+# backend is healthy so the backend (already running with credentials) keeps
+# its MQTT connection across the auth switch.
+restart_mosquitto() {
+  echo "Restarting Mosquitto to reload authentication config..."
+  docker compose -f "$COMPOSE_FILE" restart mosquitto
+
+  local mq_status="starting" i
+  for i in $(seq 1 20); do
+    mq_status=$(docker inspect --format='{{.State.Health.Status}}' vantag-mosquitto-prod 2>/dev/null || echo "starting")
+    [ "$mq_status" = "healthy" ] && break
+    sleep 3
+  done
+  echo "Mosquitto restart status=$mq_status"
+  if [ "$mq_status" != "healthy" ]; then
+    echo "WARNING: Mosquitto did not become healthy — inspect docker logs vantag-mosquitto-prod"
+  fi
+}
+
+# The committed mosquitto.conf declares a TLS listener on 8883, so the broker
+# will not start unless certs exist at /opt/vantag/mqtt-certs. Provision them
+# BEFORE the backend is recreated: the backend depends on a healthy broker, so
+# missing certs would otherwise take the whole platform down (this happened on
+# the first MQTTS rollout — mosquitto went to Error and blocked the backend).
+provision_mqtt_certs() {
+  echo "Provisioning MQTT TLS certs for the broker..."
+  local as_root=""
+  [ "$(id -u)" -eq 0 ] || as_root="sudo -n"
+
+  if $as_root bash docker/enable_mqtts.sh; then
+    echo "MQTT TLS certs provisioned."
+    return 0
+  fi
+
+  # enable_mqtts.sh failed (e.g. certbot has not issued a cert yet). Keep the
+  # platform up with a temporary self-signed cert instead of leaving the broker
+  # — and therefore the backend — down. Agents must not trust this cert; it
+  # only holds the line until certbot issues the real one.
+  echo "WARNING: MQTT TLS provisioning failed — writing a temporary self-signed cert so the broker can start."
+  local dir="/opt/vantag/mqtt-certs"
+  local domain="${MQTT_DOMAIN:-retail-vantag.com}"
+  if ! $as_root mkdir -p "$dir"; then
+    echo "ERROR: cannot create ${dir} — Mosquitto will not start. Check deploy user permissions."
+    return 0
+  fi
+  if [ ! -s "$dir/fullchain.pem" ] || [ ! -s "$dir/privkey.pem" ]; then
+    if ! $as_root openssl req -x509 -nodes -newkey rsa:2048 -days 30 \
+        -keyout "$dir/privkey.pem" -out "$dir/fullchain.pem" \
+        -subj "/CN=${domain}" >/dev/null 2>&1; then
+      echo "ERROR: could not generate fallback cert — Mosquitto will not start."
+      return 0
+    fi
+  fi
+  $as_root chown -R 1883:1883 "$dir" 2>/dev/null || true
+  $as_root chmod 640 "$dir/fullchain.pem" "$dir/privkey.pem" 2>/dev/null || true
+  echo "Temporary MQTT cert present at ${dir}. Run docker/enable_mqtts.sh once certbot issues the real certificate."
+}
+
+provision_mqtt_certs
+
+if build_and_start && check_health && refresh_nginx_upstream; then
+  restart_mosquitto
   echo "Backend deploy successful and healthy."
   docker image prune -f
   exit 0
@@ -74,7 +157,8 @@ fi
 echo "Backend unhealthy — rolling back to $PREV_SHA"
 git reset --hard "$PREV_SHA"
 build_and_start
-if check_health; then
+if check_health && refresh_nginx_upstream; then
+  restart_mosquitto
   echo "Rolled back to previous version and it is healthy."
 else
   echo "WARNING: rollback target is ALSO unhealthy — backend needs manual attention."

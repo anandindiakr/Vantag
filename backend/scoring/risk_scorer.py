@@ -37,6 +37,9 @@ _DEFAULT_WEIGHTS: Dict[str, float] = {
     "staff_alert": 12.0,
     "tamper": 35.0,
     "pos_anomaly": 20.0,
+    "jewelry_handover": 45.0,
+    "jewelry_tray": 25.0,
+    "grab_and_run": 60.0,
 }
 
 # Map event *class names* → canonical event_type keys.
@@ -50,6 +53,9 @@ _EVENT_TYPE_MAP: Dict[str, str] = {
     "StaffAlertEvent": "staff_alert",
     "TamperEvent": "tamper",
     "PosAnomalyEvent": "pos_anomaly",
+    "HandoverEvent": "jewelry_handover",
+    "TrayEvent": "jewelry_tray",
+    "GrabAndRunEvent": "grab_and_run",
 }
 
 _DEFAULTS: Dict = {

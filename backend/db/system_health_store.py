@@ -82,6 +82,14 @@ def init_db() -> None:
                 updated_ts    REAL NOT NULL,
                 PRIMARY KEY (tenant_id, agent_id)
             );
+            CREATE TABLE IF NOT EXISTS ai_feedback (
+                event_id      TEXT PRIMARY KEY,
+                tenant_id     TEXT NOT NULL,
+                verdict       TEXT NOT NULL,
+                note          TEXT NOT NULL DEFAULT '',
+                created_ts    REAL NOT NULL,
+                updated_ts    REAL NOT NULL
+            );
             """
         )
     logger.info("System-health store ready at %s", _DB_PATH)
@@ -176,6 +184,66 @@ def record_agent_model_status(
             """,
             (tenant_id, agent_id, agent_version, json.dumps(status), now),
         )
+
+
+def record_ai_feedback(
+    tenant_id: str,
+    event_id: str,
+    verdict: str,
+    note: str = "",
+) -> dict[str, Any]:
+    """Store an operator label for an AI event.
+
+    These labels are the safe foundation for model improvement: they make
+    false positives measurable and provide reviewed examples for an offline
+    evaluation/retraining job. They never change model thresholds implicitly.
+    """
+    now = time.time()
+    conn = _get_conn()
+    with _lock, conn:
+        conn.execute(
+            """
+            INSERT INTO ai_feedback
+                (event_id, tenant_id, verdict, note, created_ts, updated_ts)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(event_id) DO UPDATE SET
+                tenant_id = excluded.tenant_id,
+                verdict = excluded.verdict,
+                note = excluded.note,
+                updated_ts = excluded.updated_ts
+            """,
+            (event_id, tenant_id, verdict, note[:1000], now, now),
+        )
+        row = conn.execute(
+            "SELECT event_id, tenant_id, verdict, note, updated_ts "
+            "FROM ai_feedback WHERE event_id = ? AND tenant_id = ?",
+            (event_id, tenant_id),
+        ).fetchone()
+    return dict(row) if row else {}
+
+
+def ai_quality_summary(tenant_id: str) -> dict[str, Any]:
+    """Return reviewed-event counts and a transparent quality proxy."""
+    conn = _get_conn()
+    with _lock:
+        rows = conn.execute(
+            "SELECT verdict, COUNT(*) AS count FROM ai_feedback "
+            "WHERE tenant_id = ? GROUP BY verdict",
+            (tenant_id,),
+        ).fetchall()
+    counts = {str(row["verdict"]): int(row["count"]) for row in rows}
+    confirmed = counts.get("confirmed", 0)
+    false_positive = counts.get("false_positive", 0)
+    reviewed = confirmed + false_positive
+    return {
+        "confirmed": confirmed,
+        "false_positive": false_positive,
+        "uncertain": counts.get("uncertain", 0),
+        "reviewed": sum(counts.values()),
+        "quality_proxy": round(confirmed / reviewed, 4) if reviewed else None,
+        "false_positive_rate": round(false_positive / reviewed, 4) if reviewed else None,
+        "measured_from": "operator_reviewed_events",
+    }
 
 
 def list_agent_model_status(tenant_id: Optional[str] = None) -> list[dict[str, Any]]:

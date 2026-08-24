@@ -65,6 +65,7 @@ export default function Register() {
     try {
       const { data } = await axios.post('/api/auth/register', { ...form, language: resolvedLanguage });
       localStorage.setItem('vantag_token', data.access_token);
+      localStorage.setItem('vantag_refresh_token', data.refresh_token);
       localStorage.setItem('vantag_tenant', JSON.stringify({ id: data.tenant_id, plan: data.plan_id, step: 1 }));
       toast.success('Account created! Please verify your email.');
       nav('/verify-email', { state: { email: form.email } });

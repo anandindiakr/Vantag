@@ -51,6 +51,11 @@ RUN pip install --no-cache-dir torch torchvision \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# mediapipe pulls opencv-contrib-python, which collides with the project's
+# opencv-python-headless (two packages both ship cv2/). Force the headless
+# build back so the container keeps a single, GUI-free cv2.
+RUN pip install --no-cache-dir --force-reinstall "opencv-python-headless>=4.9.0"
+
 # ---------------------------------------------------------------------------
 # Application source
 # ---------------------------------------------------------------------------

@@ -13,9 +13,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
-    from jose import JWTError, jwt
-except ImportError:
-    from jwt import decode as jwt_decode, exceptions as JWTError
+    from jose import jwt
+except ImportError as exc:
+    raise RuntimeError(
+        "python-jose is required for JWT authentication. "
+        "Install it with: pip install 'python-jose[cryptography]>=3.3.0'"
+    ) from exc
 
 # DB imports are safe here — database.py does NOT import from middleware
 from ..db.database import AsyncSessionLocal, get_session

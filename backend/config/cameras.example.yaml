@@ -4,9 +4,17 @@ global:
   reconnect_backoff_max: 64
   frame_buffer_size: 30
   risk_score_window_seconds: 60
-  yolo_model_path: models/yolov8n.pt
+  yolo_model_path: models/yolo26n.pt
+  pose_model_path: models/yolo26n-pose.pt
   yolo_device: cpu
   yolo_conf_threshold: 0.25
+  pose_fps_limit: 3
+  gpu_load_threshold: 0.8
+  face_fps_limit: 2
+  hand_landmarker_model_path: models/hand_landmarker.task
+  hand_fps_limit: 3
+  hand_max_hands: 2
+  hand_min_confidence: 0.5
   product_classes:
   - bottle
   - cup
@@ -118,6 +126,79 @@ cameras:
       aspect_ratio_threshold: 1.4
       cooldown_seconds: 45
       alert_severity: critical
+    # ── Jewellery counter scene (no shelves required) ────────────────────────
+    # Draw polygons in the camera's reference resolution (e.g. 1920x1080).
+    # All three detectors are OFF until their polygons are configured.
+    jewelry_handover:
+      counter_polygon:
+      - - 400
+        - 300
+      - - 1500
+        - 300
+      - - 1500
+        - 900
+      - - 400
+        - 900
+      tray_polygon:
+      - - 700
+        - 320
+      - - 1200
+        - 320
+      - - 1200
+        - 620
+      - - 700
+        - 620
+      min_hand_inside_frames: 2
+      cooldown_seconds: 30
+      require_person_at_counter: true
+    jewelry_tray:
+      counter_polygon:
+      - - 400
+        - 300
+      - - 1500
+        - 300
+      - - 1500
+        - 900
+      - - 400
+        - 900
+      trays:
+      - label: Main display case
+        polygon:
+        - - 700
+          - 320
+        - - 1200
+          - 320
+        - - 1200
+          - 620
+        - - 700
+          - 620
+      drop_ratio_threshold: 0.25
+      check_interval_seconds: 3.0
+      cooldown_seconds: 30
+      person_required: true
+    grab_and_run:
+      case_polygon:
+      - - 700
+        - 300
+      - - 1200
+        - 300
+      - - 1200
+        - 620
+      - - 700
+        - 620
+      exit_polygon:
+      - - 1600
+        - 400
+      - - 1920
+        - 400
+      - - 1920
+        - 1080
+      - - 1600
+        - 1080
+      approach_polygon: []
+      max_window_seconds: 8.0
+      min_exit_speed_px_s: 120.0
+      cooldown_seconds: 30
 - id: cam-03
   name: Camera – Zone C (Dahua)
   rtsp_url: rtsp://<USER>:<PASS>@<HOST>:554/cam/realmonitor?channel=1&subtype=0

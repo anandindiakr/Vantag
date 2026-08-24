@@ -32,7 +32,7 @@ from sqlalchemy.orm import selectinload
 from ..middleware.tenant_middleware import get_current_user_id
 from ..db.database import get_session
 from ..db.models.camera import CameraConfig
-from ..db.models.site import Site, slugify_site
+from ..db.models.site import Site, derive_legacy_store_id, slugify_site
 
 from .models import (
     HeatmapCell,
@@ -72,6 +72,39 @@ def _get_pipeline():  # noqa: ANN202
             detail="Inference pipeline is not yet initialised.",
         )
     return _pipeline
+
+
+async def _assert_store_access(
+    session: AsyncSession,
+    tenant_id: str | None,
+    store_id: str,
+) -> None:
+    """Ensure a store belongs to the authenticated tenant before reading it."""
+    if not tenant_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    site = (
+        await session.execute(
+            select(Site.id).where(
+                Site.tenant_id == tenant_id,
+                (Site.slug == store_id) | (Site.id == store_id),
+            )
+        )
+    ).first()
+    if site:
+        return
+
+    # Legacy stores are derived from camera location text until a real Site is
+    # assigned. Resolve that fallback against this tenant's cameras only.
+    locations = (
+        await session.execute(
+            select(CameraConfig.location).where(CameraConfig.tenant_id == tenant_id)
+        )
+    ).scalars().all()
+    if any(derive_legacy_store_id(location) == store_id for location in locations):
+        return
+
+    raise HTTPException(status_code=404, detail=f"Store '{store_id}' not found.")
 
 
 # ---------------------------------------------------------------------------
@@ -163,10 +196,17 @@ async def list_stores(
     risk_scores: dict = {}
     recent_events: dict = {}
     if _pipeline is not None:
-        risk_scores = getattr(_pipeline, "risk_scores", {}) or {}
+        pipeline_tenant = getattr(_pipeline, "_tenant_id", None)
+        # Risk/heatmap state is process-local and keyed only by store_id. Use
+        # it only when the pipeline explicitly belongs to this tenant; an
+        # unscoped pipeline must not become a cross-tenant side channel.
+        if pipeline_tenant and str(pipeline_tenant) == str(tenant_id):
+            risk_scores = getattr(_pipeline, "risk_scores", {}) or {}
         recent_events = getattr(_pipeline, "recent_events", {}) or {}
-        for store_id in risk_scores:
-            store_camera_map.setdefault(store_id, [])
+        # Never expose pipeline-only store keys here: the in-memory pipeline
+        # may contain events from another tenant or from a previous config.
+        # A store is visible only when it is backed by this tenant's Site or
+        # CameraConfig rows.
 
     stores: List[StoreResponse] = []
     for store_id, cams in store_camera_map.items():
@@ -176,7 +216,10 @@ async def list_stores(
         active = sum(
             1 for cam in cams if (getattr(cam, "conn_status", "") or "").lower() == "online"
         )
-        last_events = recent_events.get(store_id, [])
+        last_events = [
+            event for event in recent_events.get(store_id, [])
+            if event.get("tenant_id") == str(tenant_id)
+        ]
         last_event_at = (
             (last_events[0].get("timestamp") or last_events[0].get("occurred_at"))
             if last_events else None
@@ -464,10 +507,11 @@ async def get_store(
     user: dict = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_session),
 ) -> StoreResponse:
-    """Return detail for a single store, derived from the tenant camera table."""
+    """Return detail for a single store owned by the current tenant."""
     tenant_id = user.get("tenant_id")
     if not tenant_id:
         raise HTTPException(status_code=400, detail="No tenant in session")
+    await _assert_store_access(session, str(tenant_id), store_id)
 
     try:
         rows = (
@@ -478,19 +522,15 @@ async def get_store(
     except Exception:  # noqa: BLE001
         rows = []
 
-    cameras = []
-    for cam in rows:
-        location = cam.location or ""
-        prefix = location.split("\u2013")[0].split("-")[0].strip() if location else ""
-        cam_store_id = (prefix or "auto-detected").lower().replace(" ", "_")
-        if cam_store_id == store_id:
-            cameras.append(cam)
+    cameras = [cam for cam in rows if cam.effective_store_id == store_id]
 
     # Live risk/events only exist when an on-box pipeline is running.
     risk_data = None
     recent_events: dict = {}
     if _pipeline is not None:
-        risk_data = getattr(_pipeline, "risk_scores", {}).get(store_id)
+        pipeline_tenant = getattr(_pipeline, "_tenant_id", None)
+        if pipeline_tenant and str(pipeline_tenant) == str(tenant_id):
+            risk_data = getattr(_pipeline, "risk_scores", {}).get(store_id)
         recent_events = getattr(_pipeline, "recent_events", {}) or {}
 
     if risk_data is None and not cameras:
@@ -507,7 +547,10 @@ async def get_store(
         (c.location for c in cameras if getattr(c, "location", None)),
         store_id.replace("_", " ").title(),
     )
-    last_events = recent_events.get(store_id, [])
+    last_events = [
+        event for event in recent_events.get(store_id, [])
+        if event.get("tenant_id") == str(tenant_id)
+    ]
     last_event_at = (
         (last_events[0].get("timestamp") or last_events[0].get("occurred_at"))
         if last_events else None
@@ -535,8 +578,13 @@ async def get_store(
     response_model=RiskScoreResponse,
     summary="Get current risk score snapshot",
 )
-async def get_risk(store_id: str) -> RiskScoreResponse:
-    """Return the current risk score and event counts for a store."""
+async def get_risk(
+    store_id: str,
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
+) -> RiskScoreResponse:
+    """Return the current risk score and event counts for an owned store."""
+    await _assert_store_access(session, user.get("tenant_id"), store_id)
     # Analytics (risk scoring) only exist when an on-box pipeline is running.
     # On the multi-tenant SaaS backend there is no pipeline, so return a clean
     # zero score rather than a 503.
@@ -552,15 +600,14 @@ async def get_risk(store_id: str) -> RiskScoreResponse:
 
     pipeline = _pipeline
 
-    # Validate store exists
-    all_stores = _get_store_ids(pipeline)
-    if store_id not in all_stores:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Store '{store_id}' not found.",
-        )
-
-    risk_data = pipeline.risk_scores.get(store_id)
+    # Store ownership was checked above. Do not validate against the
+    # pipeline's global camera registry, which is not tenant-scoped.
+    pipeline_tenant = getattr(pipeline, "_tenant_id", None)
+    risk_data = (
+        pipeline.risk_scores.get(store_id)
+        if pipeline_tenant and str(pipeline_tenant) == str(user.get("tenant_id"))
+        else None
+    )
 
     # No events yet — return a clean zero score (not an error)
     if risk_data is None:
@@ -601,8 +648,11 @@ async def get_risk(store_id: str) -> RiskScoreResponse:
 async def get_heatmap(
     store_id: str,
     window: str = Query("hourly", description="Aggregation window: 'hourly' or 'daily'."),
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
 ) -> HeatmapResponse:
-    """Return normalised heatmap grid data for a store."""
+    """Return normalised heatmap grid data for an owned store."""
+    await _assert_store_access(session, user.get("tenant_id"), store_id)
     # Heatmaps are produced by the on-box pipeline. Return an empty grid on the
     # SaaS backend instead of raising 503.
     if _pipeline is None:
@@ -616,7 +666,12 @@ async def get_heatmap(
         )
 
     pipeline = _pipeline
-    heatmap_store = pipeline.heatmaps.get(store_id, {})
+    pipeline_tenant = getattr(pipeline, "_tenant_id", None)
+    heatmap_store = (
+        pipeline.heatmaps.get(store_id, {})
+        if pipeline_tenant and str(pipeline_tenant) == str(user.get("tenant_id"))
+        else {}
+    )
     raw_grid = heatmap_store.get(window, {})
 
     grid_rows: int = int(raw_grid.get("rows", 10))
@@ -666,8 +721,11 @@ async def list_incidents(
     page: int = Query(1, ge=1, description="Page number (1-based)."),
     limit: int = Query(20, ge=1, le=200, description="Items per page."),
     event_type: Optional[str] = Query(None, description="Filter by event type (e.g. inventory_movement)."),
+    user: dict = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_session),
 ) -> IncidentListResponse:
-    """Return a paginated list of incidents for a store, newest first."""
+    """Return a paginated incident list for an owned store, newest first."""
+    await _assert_store_access(session, user.get("tenant_id"), store_id)
     # Incident history is held in the on-box pipeline's in-memory buffer. On the
     # SaaS backend there is none yet — return an empty page rather than 503.
     if _pipeline is None:
@@ -682,7 +740,14 @@ async def list_incidents(
     # demo_router._inject) and SQLite hydration on startup preserve this
     # convention. Do NOT reverse here — doing so previously put the oldest
     # entries first, burying brand-new incidents on the last page.
-    all_incidents: List[dict] = list(pipeline.recent_events.get(store_id, []))
+    # The in-memory buffer is shared by all tenants in an on-box process.
+    # Filter by the authenticated tenant before applying pagination; edge
+    # events always carry this claim from the authenticated agent.
+    tenant_id = str(user.get("tenant_id"))
+    all_incidents: List[dict] = [
+        raw for raw in pipeline.recent_events.get(store_id, [])
+        if raw.get("tenant_id") == tenant_id
+    ]
 
     # Server-side event_type filter — applied before pagination so page counts are correct.
     if event_type and event_type != "all":

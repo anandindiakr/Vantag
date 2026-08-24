@@ -38,6 +38,12 @@ class CameraConfig:
     # agent — previously configured but never delivered here, so it had no
     # effect at all.
     inventory_zones: list[dict] = field(default_factory=list)
+    # High-Value Counter (jewellery / luxury goods) scene profile, delivered
+    # by the backend's /api/edge/config response as "high_value_counter".
+    # Structure: {"jewelry_handover": {...}, "jewelry_tray": {...},
+    # "grab_and_run": {...}} with polygon vertices normalized to 0-1
+    # fractions of the camera's reference resolution.
+    high_value_counter: dict = field(default_factory=dict)
     # Per-camera opt-in analytic toggles, delivered by the backend's
     # /api/edge/config response as "detections". Keys: shoplifting,
     # loitering, suspicious_behavior, crowding, fall_detected,
@@ -54,10 +60,17 @@ class AgentConfig:
     agent_id: str = ""
     backend_url: str = "https://retail-vantag.com"
     mqtt_host: str = "retail-vantag.com"
-    mqtt_port: int = 8883               # public MQTTS (TLS) port on the broker
+    # The production Mosquitto broker listens on 1883 (plain TCP) and 9001
+    # (WebSocket). Use 8883 only when a TLS listener has been configured on
+    # the broker; the agent auto-enables TLS when the port is 8883.
+    mqtt_port: int = 1883
     mqtt_username: str = "vantag_edge"  # shared edge broker user
     mqtt_password: str = ""             # shared edge broker password (falls back to api_key)
     tenant_id: str = ""
+    # Door / access-control relay configuration. Structure:
+    #   {"relay_type": "simulate"|"http"|"gpio", "http_url": "...", "gpio_pin": 17}
+    # "simulate" (default) logs and reports status without physical hardware.
+    door_control: dict = field(default_factory=dict)
     cameras: List[CameraConfig] = field(default_factory=list)
     inference_device: str = "cpu"       # "cpu" | "cuda" | "dml"
     inference_fps: int = 5              # target inference FPS per camera
@@ -71,20 +84,51 @@ class AgentConfig:
     @classmethod
     def load(cls) -> "AgentConfig":
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        # 1) Prefer the per-user config in %APPDATA%/Vantag/config.json.
-        # 2) Fall back to a config.json shipped next to the agent package
-        #    (used by the pre-filled download bundle so it runs out-of-the-box).
-        candidates = [CONFIG_FILE]
+        # 1) The pre-filled config.json shipped NEXT TO the agent package is
+        #    regenerated on every download with the current api_key + MQTT
+        #    credentials, so it is authoritative. It used to lose to the
+        #    %APPDATA% cache, which meant re-downloading a new build silently
+        #    kept stale/empty MQTT credentials — the agent then fell back to
+        #    using the api_key as the broker password and got "MQTT connect
+        #    error rc=5" (not authorised) forever.
+        # 2) The %APPDATA% config only carries locally-tuned / runtime-updated
+        #    fields (door_control pushed from the dashboard wizard, scan_subnet,
+        #    inference overrides), so those are merged back on top.
         local_cfg = Path(__file__).resolve().parent.parent / "config.json"
-        candidates.append(local_cfg)
-        for path in candidates:
-            if path.exists():
-                try:
-                    raw = json.loads(path.read_text(encoding="utf-8"))
-                    cams = [CameraConfig(**c) for c in raw.pop("cameras", [])]
-                    return cls(**raw, cameras=cams)
-                except Exception as e:
-                    print(f"[Config] Failed to load config from {path}: {e}")
+
+        def _load(path: Path) -> Optional["AgentConfig"]:
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+                cams = [CameraConfig(**c) for c in raw.pop("cameras", [])]
+                return cls(**raw, cameras=cams)
+            except Exception as e:  # noqa: BLE001
+                print(f"[Config] Failed to load config from {path}: {e}")
+                return None
+
+        bundled = _load(local_cfg) if local_cfg.exists() else None
+        user = _load(CONFIG_FILE) if CONFIG_FILE.exists() else None
+
+        if bundled is not None and bundled.api_key:
+            if user is not None:
+                # Preserve fields that are only ever set locally or at runtime;
+                # the download bundle intentionally does not ship them.
+                for field in (
+                    "door_control",
+                    "scan_subnet",
+                    "inference_device",
+                    "inference_fps",
+                    "confidence_threshold",
+                    "event_cooldown_sec",
+                    "log_level",
+                ):
+                    value = getattr(user, field, None)
+                    if value:
+                        setattr(bundled, field, value)
+            return bundled
+
+        if user is not None:
+            return user
+
         return cls()
 
     def save(self) -> None:

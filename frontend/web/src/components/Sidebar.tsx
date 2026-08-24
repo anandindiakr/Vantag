@@ -8,7 +8,7 @@ import {
   ShieldCheck,
   Wifi,
   WifiOff,
-  Radio,
+  Lock,
   Zap,
   PenTool,
   Download,
@@ -21,6 +21,8 @@ import {
   UserCheck,
   Store as StoreIcon,
   Wand2,
+  MonitorPlay,
+  Gem,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useVantagStore } from '../store/useVantagStore';
@@ -41,11 +43,14 @@ const navItems: NavItem[] = [
   { label: 'Cameras',      to: '/cameras',      icon: <Camera size={20} /> },
   { label: 'Manage Cameras', to: '/cameras/manage', icon: <Settings2 size={20} /> },
   { label: 'Stores',       to: '/stores',       icon: <StoreIcon size={20} /> },
+  { label: 'Live Wall',    to: '/wall',         icon: <MonitorPlay size={20} /> },
   { label: 'Incidents',    to: '/incidents',    icon: <AlertTriangle size={20} /> },
   { label: 'Watchlist',    to: '/watchlist',    icon: <Users size={20} /> },
   { label: 'Staff Faces',  to: '/staff-faces',  icon: <UserCheck size={20} /> },
   { label: 'People Count', to: '/people-count', icon: <Users size={20} /> },
   { label: 'Zone Editor',  to: '/zone-editor',  icon: <PenTool size={20} />, dividerBefore: true },
+  { label: 'High-Value Counter', to: '/high-value-counter', icon: <Gem size={20} /> },
+  { label: 'Door Relay', to: '/relay-setup', icon: <Lock size={20} /> },
   { label: 'Demo Center',  to: '/demo',         icon: <Zap size={20} /> },
   { label: 'Health Check', to: '/health-check', icon: <HeartPulse size={20} />, dividerBefore: true },
   { label: 'Install Edge Agent', to: '/download', icon: <Download size={20} />, dividerBefore: true },
@@ -58,7 +63,6 @@ export default function Sidebar() {
   const navigate      = useNavigate();
   const region        = useRegion();
   const wsConnected   = useVantagStore((s) => s.wsConnected);
-  const mqttConnected = useVantagStore((s) => s.mqttConnected);
   const stores        = useVantagStore((s) => s.stores);
   const isSuperAdmin  = useVantagStore((s) => s.isSuperAdmin);
   const setIsSuperAdmin = useVantagStore((s) => s.setIsSuperAdmin);
@@ -163,24 +167,6 @@ export default function Sidebar() {
             )}
           >
             {wsConnected ? 'LIVE' : 'OFF'}
-          </span>
-        </div>
-
-        {/* MQTT */}
-        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-800/60">
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <Radio size={14} className={mqttConnected ? 'text-vantag-green' : 'text-slate-500'} />
-            <span>MQTT</span>
-          </div>
-          <span
-            className={clsx(
-              'text-xs font-medium px-1.5 py-0.5 rounded',
-              mqttConnected
-                ? 'text-vantag-green bg-vantag-green/10'
-                : 'text-slate-500 bg-slate-700/50'
-            )}
-          >
-            {mqttConnected ? 'LIVE' : 'OFF'}
           </span>
         </div>
 

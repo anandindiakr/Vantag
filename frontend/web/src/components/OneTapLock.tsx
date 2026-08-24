@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Lock, Unlock, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
-import { useMQTT } from '../hooks/useMQTT';
+import toast from 'react-hot-toast';
+import { api } from '../hooks/useApi';
 import { useVantagStore, DoorState } from '../store/useVantagStore';
 
 interface OneTapLockProps {
@@ -11,29 +12,38 @@ interface OneTapLockProps {
 }
 
 export default function OneTapLock({ storeId, doorId, doorLabel }: OneTapLockProps) {
-  const [loading, setLoading]   = useState(false);
-  const { publishDoorCommand }  = useMQTT();
+  const [loading, setLoading] = useState(false);
 
-  // Compose the combined key used in the store
-  const storeKey   = `${storeId}:${doorId}`;
-  const doorState  = useVantagStore((s) => s.doorStates[storeKey] ?? 'unknown') as DoorState;
+  // Combined key used in the store. Real state arrives via the authenticated
+  // WebSocket (door_state messages); we set it optimistically on success.
+  const storeKey = `${storeId}:${doorId}`;
+  const doorState = useVantagStore((s) => s.doorStates[storeKey] ?? 'unknown') as DoorState;
 
-  const isLocked   = doorState === 'locked';
+  const isLocked = doorState === 'locked';
   const isUnlocked = doorState === 'unlocked';
-  const isUnknown  = doorState === 'unknown';
+  const isUnknown = doorState === 'unknown';
 
   const handleToggle = useCallback(async () => {
     if (loading) return;
     setLoading(true);
     try {
       const action = isLocked ? 'unlock' : 'lock';
-      publishDoorCommand(storeId, doorId, action);
-      // Simulate brief loading indicator (actual state update comes via MQTT)
-      await new Promise<void>((res) => setTimeout(res, 800));
+      // Commands go through the backend REST API (single authority) which
+      // publishes the canonical MQTT door command; the physical relay is
+      // actuated by the on-site edge agent.
+      await api.post(`/doors/${encodeURIComponent(storeId)}/${encodeURIComponent(doorId)}/${action}`, {
+        action,
+      });
+      useVantagStore.getState().setDoorState(storeKey, action === 'lock' ? 'locked' : 'unlocked');
+      toast.success(`Door ${doorId} ${action} command sent`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to send door command',
+      );
     } finally {
       setLoading(false);
     }
-  }, [loading, isLocked, publishDoorCommand, storeId, doorId]);
+  }, [loading, isLocked, storeId, doorId, storeKey]);
 
   return (
     <div className="flex flex-col items-center gap-3 bg-vantag-card border border-slate-700/60 rounded-xl p-4 w-36">

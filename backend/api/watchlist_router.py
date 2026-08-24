@@ -27,7 +27,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+
+from ..middleware.tenant_middleware import get_current_user_id
 
 from .models import (
     AlertLevel,
@@ -109,6 +111,13 @@ def _flush_matches() -> None:
         logger.error("Failed to flush match events | error=%s", exc)
 
 
+def _tenant_id(user: dict) -> str:
+    tenant_id = str(user.get("tenant_id") or "").strip()
+    if not tenant_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+    return tenant_id
+
+
 def _entry_to_model(entry: dict) -> WatchlistEntryResponse:
     return WatchlistEntryResponse(
         entry_id=entry["entry_id"],
@@ -149,6 +158,7 @@ def record_match(
     store_id: str,
     confidence: float,
     snapshot_url: Optional[str] = None,
+    tenant_id: Optional[str] = None,
 ) -> Optional[WatchlistMatchEvent]:
     """
     Called by the pipeline when a face match is detected.
@@ -158,14 +168,13 @@ def record_match(
     is unknown.
     """
     entry = _entries.get(entry_id)
-    if entry is None:
-        logger.warning(
-            "record_match: unknown entry_id=%s", entry_id
-        )
+    if entry is None or (tenant_id is not None and entry.get("tenant_id") != str(tenant_id)):
+        logger.warning("record_match: unknown or cross-tenant entry_id=%s", entry_id)
         return None
 
     match = {
         "match_id": str(uuid.uuid4()),
+        "tenant_id": entry.get("tenant_id"),
         "entry_id": entry_id,
         "entry_name": entry["name"],
         "alert_level": entry["alert_level"],
@@ -205,9 +214,12 @@ def record_match(
     response_model=WatchlistListResponse,
     summary="List all watchlist entries",
 )
-async def list_entries() -> WatchlistListResponse:
-    """Return all watchlist entries without face embeddings."""
-    models = [_entry_to_model(e) for e in _entries.values()]
+async def list_entries(
+    user: dict = Depends(get_current_user_id),
+) -> WatchlistListResponse:
+    """Return only the authenticated tenant's watchlist entries."""
+    tenant_id = _tenant_id(user)
+    models = [_entry_to_model(e) for e in _entries.values() if e.get("tenant_id") == tenant_id]
     models.sort(key=lambda e: e.created_at, reverse=True)
     return WatchlistListResponse(entries=models, total=len(models))
 
@@ -228,6 +240,7 @@ async def add_entry(
     alert_level: AlertLevel = Form(AlertLevel.MEDIUM, description="Alert severity level."),
     notes: Optional[str] = Form(None, description="Operator notes."),
     face_image: UploadFile = File(..., description="Reference face JPEG/PNG image."),
+    user: dict = Depends(get_current_user_id),
 ) -> WatchlistEntryResponse:
     """
     Add a new entry to the watchlist.
@@ -236,24 +249,32 @@ async def add_entry(
     compute the embedding on its next watchlist reload cycle.
     """
     _ensure_dir()
+    tenant_id = _tenant_id(user)
 
     # Validate content type loosely.
     content_type = face_image.content_type or ""
-    if not (content_type.startswith("image/") or face_image.filename.lower().endswith((".jpg", ".jpeg", ".png"))):
+    filename = (face_image.filename or "").lower()
+    if not (content_type.startswith("image/") or filename.endswith((".jpg", ".jpeg", ".png"))):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="face_image must be a JPEG or PNG image.",
         )
 
     entry_id = str(uuid.uuid4())
-    ext = ".jpg" if "jpeg" in content_type or "jpg" in (face_image.filename or "") else ".png"
+    ext = ".jpg" if "jpeg" in content_type or "jpg" in filename or "jpeg" in filename else ".png"
     img_filename = f"{entry_id}{ext}"
-    img_path = _WATCHLIST_DIR / img_filename
+    tenant_dir = _WATCHLIST_DIR / tenant_id
+    tenant_dir.mkdir(parents=True, exist_ok=True)
+    img_path = tenant_dir / img_filename
 
     try:
-        contents = await face_image.read()
+        contents = await face_image.read(2_000_001)
+        if len(contents) > 2_000_000:
+            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Face image is too large")
         with img_path.open("wb") as fh:
             fh.write(contents)
+    except HTTPException:
+        raise
     except OSError as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -261,10 +282,11 @@ async def add_entry(
         ) from exc
 
     now = datetime.now(tz=timezone.utc).isoformat()
-    image_url = f"/api/snapshots/watchlist/{img_filename}"
+    image_url = f"/api/snapshots/watchlist/{tenant_id}/{img_filename}"
 
     entry = {
         "entry_id": entry_id,
+        "tenant_id": tenant_id,
         "name": name,
         "alert_level": alert_level.value,
         "notes": notes,
@@ -289,10 +311,14 @@ async def add_entry(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove a watchlist entry",
 )
-async def remove_entry(entry_id: str) -> None:
-    """Remove an entry from the watchlist and delete the associated face image."""
+async def remove_entry(
+    entry_id: str,
+    user: dict = Depends(get_current_user_id),
+) -> None:
+    """Remove an entry from the authenticated tenant's watchlist."""
+    tenant_id = _tenant_id(user)
     entry = _entries.get(entry_id)
-    if entry is None:
+    if entry is None or entry.get("tenant_id") != tenant_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Watchlist entry '{entry_id}' not found.",
@@ -325,13 +351,19 @@ async def remove_entry(entry_id: str) -> None:
 )
 async def list_matches(
     limit: int = Query(50, ge=1, le=500, description="Maximum number of matches to return."),
+    user: dict = Depends(get_current_user_id),
 ) -> WatchlistMatchesResponse:
     """
     Return the most recent watchlist face-match events.
 
     Results are ordered newest-first.
     """
-    recent = list(reversed(_matches[-limit:]))
+    tenant_id = _tenant_id(user)
+    tenant_matches = [
+        raw for raw in _matches
+        if raw.get("tenant_id") == tenant_id
+    ]
+    recent = list(reversed(tenant_matches[-limit:]))
     models: List[WatchlistMatchEvent] = []
     for raw in recent:
         try:
@@ -339,4 +371,4 @@ async def list_matches(
         except Exception as exc:  # noqa: BLE001
             logger.debug("Skipping malformed match entry | error=%s", exc)
             continue
-    return WatchlistMatchesResponse(matches=models, total=len(_matches))
+    return WatchlistMatchesResponse(matches=models, total=len(tenant_matches))

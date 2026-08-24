@@ -61,6 +61,9 @@ VERIFIABLE_EVENT_TYPES = {
     "suspicious_behaviour",
     "fall_detected",
     "inventory_movement",
+    "jewelry_handover",
+    "jewelry_tray",
+    "grab_and_run",
 }
 
 _PROMPTS: dict[str, str] = {
@@ -114,6 +117,35 @@ _PROMPTS: dict[str, str] = {
         "plausibly show a shelf/display with a noticeable gap, missing product, "
         "or disturbed arrangement? A fully and neatly stocked area, or an "
         "unclear/low-quality frame, should be answered as NOT matching."
+    ),
+    "jewelry_handover": (
+        "This still image was flagged by an automated high-value-counter "
+        "security camera as a possible JEWELRY HANDOVER (a person's hand "
+        "reached into the display tray/area and withdrew, a motion that can "
+        "indicate passing or pocketing a piece during a counter sale). Does "
+        "the image plausibly show a hand over or inside the display area in a "
+        "reach-and-withdraw motion, rather than an ordinary gesture, pointing, "
+        "or a hand resting near the counter? An unclear or empty frame should "
+        "be answered as NOT matching."
+    ),
+    "jewelry_tray": (
+        "This still image was flagged by an automated high-value-counter "
+        "security camera as a possible JEWELRY TRAY CHANGE (the visible "
+        "contents of a display tray/area changed while a person was at the "
+        "counter, which can indicate an item was removed or swapped). Does the "
+        "image plausibly show the tray/display area with a disturbed "
+        "arrangement, a gap, or an item being handled, while a person is "
+        "present? A neatly arranged tray or an unclear/low-quality frame "
+        "should be answered as NOT matching."
+    ),
+    "grab_and_run": (
+        "This still image was flagged by an automated high-value-counter "
+        "security camera as a possible GRAB-AND-RUN (a person moved rapidly "
+        "from the display case/area toward the exit in a short window, which "
+        "can indicate a snatch-and-flee). Does the image plausibly show a "
+        "person in fast motion near the display or exit, consistent with "
+        "fleeing, rather than normal walking or browsing? An unclear or empty "
+        "frame should be answered as NOT matching."
     ),
 }
 _PROMPTS["suspicious_behaviour"] = _PROMPTS["suspicious_behavior"]

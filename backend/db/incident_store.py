@@ -54,6 +54,7 @@ def init_db() -> None:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS incidents (
                 incident_id   TEXT PRIMARY KEY,
+                tenant_id     TEXT,
                 store_id      TEXT NOT NULL,
                 camera_id     TEXT,
                 event_type    TEXT,
@@ -69,6 +70,14 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_store_time
                 ON incidents(store_id, occurred_at DESC);
         """)
+        # Upgrade databases created before tenant_id was introduced.
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(incidents)").fetchall()}
+        if "tenant_id" not in columns:
+            conn.execute("ALTER TABLE incidents ADD COLUMN tenant_id TEXT")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tenant_store_time "
+            "ON incidents(tenant_id, store_id, occurred_at DESC)"
+        )
     logger.info("SQLite incident store initialised | path=%s", _DB_PATH)
 
 
@@ -82,6 +91,7 @@ def insert_incident(event: Dict[str, Any]) -> None:
     if not incident_id:
         return  # nothing to persist
 
+    tenant_id   = event.get("tenant_id")
     store_id    = event.get("store_id", "")
     camera_id   = event.get("camera_id", "")
     event_type  = event.get("type") or event.get("event_type", "")
@@ -99,12 +109,12 @@ def insert_incident(event: Dict[str, Any]) -> None:
         conn.execute(
             """
             INSERT OR IGNORE INTO incidents
-                (incident_id, store_id, camera_id, event_type, severity,
+                (incident_id, tenant_id, store_id, camera_id, event_type, severity,
                  description, occurred_at, snapshot_url, acknowledged,
                  is_demo, metadata)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (incident_id, store_id, camera_id, event_type, severity,
+            (incident_id, tenant_id, store_id, camera_id, event_type, severity,
              description, occurred_at, snapshot_url, acknowledged,
              is_demo, metadata_str),
         )
@@ -115,6 +125,7 @@ def query_incidents(
     page: int = 1,
     limit: int = 50,
     event_type: Optional[str] = None,
+    tenant_id: Optional[str] = None,
 ) -> Tuple[List[Dict[str, Any]], int, int]:
     """
     Return paginated incidents for a store, newest first.
@@ -127,6 +138,9 @@ def query_incidents(
 
     base_where = "store_id = ?"
     params: list = [store_id]
+    if tenant_id:
+        base_where += " AND tenant_id = ?"
+        params.append(tenant_id)
     if event_type:
         base_where += " AND event_type = ?"
         params.append(event_type)
@@ -139,7 +153,7 @@ def query_incidents(
 
     rows = conn.execute(
         f"""
-        SELECT incident_id, store_id, camera_id, event_type, severity,
+        SELECT incident_id, tenant_id, store_id, camera_id, event_type, severity,
                description, occurred_at, snapshot_url, acknowledged,
                is_demo, metadata, created_at
         FROM incidents
@@ -167,18 +181,18 @@ def query_incidents(
     return items, total, pages
 
 
-def get_incident(incident_id: str) -> Optional[Dict[str, Any]]:
+def get_incident(incident_id: str, tenant_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Return a single incident by id (canonical keys), or None."""
     conn = _get_conn()
     row = conn.execute(
         """
-        SELECT incident_id, store_id, camera_id, event_type, severity,
+        SELECT incident_id, tenant_id, store_id, camera_id, event_type, severity,
                description, occurred_at, snapshot_url, acknowledged,
                is_demo, metadata, created_at
         FROM incidents
         WHERE incident_id = ?
-        """,
-        (incident_id,),
+        """ + (" AND tenant_id = ?" if tenant_id else ""),
+        (incident_id, tenant_id) if tenant_id else (incident_id,),
     ).fetchone()
     if row is None:
         return None
@@ -194,7 +208,7 @@ def get_incident(incident_id: str) -> Optional[Dict[str, Any]]:
     return d
 
 
-def delete_demo() -> int:
+def delete_demo(tenant_id: Optional[str] = None) -> int:
     """
     Delete ALL demo incidents from SQLite.
 
@@ -204,9 +218,15 @@ def delete_demo() -> int:
     """
     conn = _get_conn()
     with _lock, conn:
-        cursor = conn.execute(
-            "DELETE FROM incidents WHERE is_demo = 1 OR incident_id LIKE 'demo-%'"
-        )
+        if tenant_id:
+            cursor = conn.execute(
+                "DELETE FROM incidents WHERE tenant_id = ? AND (is_demo = 1 OR incident_id LIKE 'demo-%')",
+                (tenant_id,),
+            )
+        else:
+            cursor = conn.execute(
+                "DELETE FROM incidents WHERE is_demo = 1 OR incident_id LIKE 'demo-%'"
+            )
         deleted = cursor.rowcount
     if deleted:
         logger.info("Deleted %d demo incident(s) from SQLite", deleted)

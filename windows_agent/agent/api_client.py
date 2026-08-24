@@ -3,10 +3,14 @@ HTTP client for posting events and heartbeats to Vantag backend.
 Uses requests with retry logic and connection pooling.
 """
 import logging
+import os
 import time
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlsplit, urlunsplit
 import requests
+
+from .outbox import IncidentOutbox
 from requests.adapters import HTTPAdapter, Retry
 
 log = logging.getLogger("vantag.api")
@@ -76,6 +80,8 @@ class VantagApiClient:
         self.api_key = api_key
         self._session = _build_session(self.base_url)
         self._session.headers["X-API-Key"] = api_key
+        outbox_dir = Path(os.environ.get("APPDATA", Path.home())) / "Vantag"
+        self._outbox = IncidentOutbox(outbox_dir / "incident_outbox.db")
 
     def register(self, device_type: str = "windows") -> dict:
         """Register this agent with the backend and get full config."""
@@ -93,8 +99,8 @@ class VantagApiClient:
         resp.raise_for_status()
         return resp.json()
 
-    def post_event(self, event: dict) -> bool:
-        """Post a detection event. Returns True on success."""
+    def _post_event_once(self, event: dict) -> bool:
+        """Send once without enqueuing; used by the outbox flusher."""
         try:
             resp = self._session.post(
                 f"{self.base_url}/api/edge/events",
@@ -104,8 +110,34 @@ class VantagApiClient:
             resp.raise_for_status()
             return True
         except Exception as e:
-            log.warning(f"post_event failed: {e}")
+            log.debug(f"post_event attempt failed: {e}")
             return False
+
+    def post_event(self, event: dict) -> bool:
+        """Post a detection event, durably queueing it if the cloud is offline."""
+        if self._post_event_once(event):
+            return True
+        try:
+            self._outbox.enqueue(event)
+            log.warning("post_event queued for retry (pending=%d)", self._outbox.pending_count())
+        except Exception as e:  # noqa: BLE001
+            log.error("Could not queue incident for retry: %s", e)
+        return False
+
+    def flush_outbox(self, limit: int = 20) -> int:
+        """Retry due incidents; return the number acknowledged by the server."""
+        try:
+            return self._outbox.flush(self._post_event_once, limit=limit)
+        except Exception as e:  # noqa: BLE001
+            log.warning("incident outbox flush failed: %s", e)
+            return 0
+
+    @property
+    def pending_incidents(self) -> int:
+        try:
+            return self._outbox.pending_count()
+        except Exception:
+            return 0
 
     def post_count_snapshot(self, camera_id: str, count: int, snapshot_b64: str) -> bool:
         """Upload an annotated people-count snapshot (best-effort)."""

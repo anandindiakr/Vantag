@@ -24,7 +24,11 @@ from backend.analyzers.facial_recognition import (
     FacialRecognitionAnalyzer,
     WatchlistMatchEvent,
 )
+from backend.analyzers.grab_and_run import GrabAndRunDetector, GrabAndRunEvent
 from backend.analyzers.heatmap_tracker import HeatmapTracker
+from backend.analyzers.jewelry_handover import HandoverEvent, JewelryHandoverDetector
+from backend.analyzers.jewelry_scene import JewelryScene
+from backend.analyzers.jewelry_tray import JewelryTrayDetector, TrayEvent
 from backend.analyzers.product_sweeping import ProductSweepingDetector, SweepingEvent
 from backend.analyzers.queue_detector import QueueDetector, QueueEvent
 from backend.analyzers.slip_fall_detector import AccidentEvent, SlipFallDetector
@@ -58,4 +62,12 @@ __all__ = [
     # Tamper detection
     "TamperDetector",
     "TamperEvent",
+    # Jewellery counter detection
+    "JewelryScene",
+    "JewelryHandoverDetector",
+    "HandoverEvent",
+    "JewelryTrayDetector",
+    "TrayEvent",
+    "GrabAndRunDetector",
+    "GrabAndRunEvent",
 ]

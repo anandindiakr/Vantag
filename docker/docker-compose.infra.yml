@@ -36,7 +36,7 @@ services:
       - mosquitto-logs:/mosquitto/log
     networks: [vantag-net]
     healthcheck:
-      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "vantag/health", "-m", "ping", "-q", "0"]
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "vantag/health", "-m", "ping", "-q", "0", "-u", "vantag_backend", "-P", "nKZapdpNOpBnNrS8DMTDp_7IRa32IcDO"]
       interval: 10s
       timeout: 5s
       retries: 5

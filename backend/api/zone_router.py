@@ -63,6 +63,30 @@ class ZoneConfigResponse(BaseModel):
     zones:      ZoneConfig
 
 
+class HighValueCounterConfig(BaseModel):
+    """The jewellery / luxury-counter polygons (vision-only, no shelves/POS).
+
+    Maps 1:1 to the three jewellery analyzers in the pipeline:
+      * counter_polygon  -> jewelry_handover.counter_polygon + jewelry_tray.counter_polygon
+      * tray_polygon     -> jewelry_handover.tray_polygon + jewelry_tray.trays[0]
+      * case_polygon     -> grab_and_run.case_polygon
+      * exit_polygon     -> grab_and_run.exit_polygon
+      * approach_polygon -> grab_and_run.approach_polygon (optional)
+    """
+    counter_polygon:  list[list[int]] | None = None
+    tray_polygon:     list[list[int]] | None = None
+    case_polygon:     list[list[int]] | None = None
+    exit_polygon:     list[list[int]] | None = None
+    approach_polygon: list[list[int]] | None = None
+
+
+class HighValueCounterResponse(BaseModel):
+    camera_id:   str
+    camera_name: str
+    resolution:  dict[str, int]
+    zones:       HighValueCounterConfig
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -174,6 +198,52 @@ def _build_response(row: CameraConfig) -> ZoneConfigResponse:
     )
 
 
+def _norm_poly(v: Any) -> list[list[int]] | None:
+    """Return *v* as a valid polygon (≥3 points) or None."""
+    if not isinstance(v, list) or len(v) < 3:
+        return None
+    try:
+        pts = [[int(p[0]), int(p[1])] for p in v]
+    except (TypeError, IndexError, ValueError):
+        return None
+    return pts if len(pts) >= 3 else None
+
+
+def _parse_hvc(ac: dict[str, Any]) -> HighValueCounterConfig:
+    """Extract the High-Value Counter polygons from analyzer_config."""
+    ac = ac or {}
+    handover = ac.get("jewelry_handover") or {}
+    tray_cfg = ac.get("jewelry_tray") or {}
+    grab = ac.get("grab_and_run") or {}
+
+    tray_polygon = _norm_poly(handover.get("tray_polygon"))
+    if tray_polygon is None:
+        trays = tray_cfg.get("trays") or []
+        if trays:
+            tray_polygon = _norm_poly((trays[0] or {}).get("polygon"))
+
+    return HighValueCounterConfig(
+        counter_polygon=_norm_poly(handover.get("counter_polygon"))
+        or _norm_poly(tray_cfg.get("counter_polygon")),
+        tray_polygon=tray_polygon,
+        case_polygon=_norm_poly(grab.get("case_polygon")),
+        exit_polygon=_norm_poly(grab.get("exit_polygon")),
+        approach_polygon=_norm_poly(grab.get("approach_polygon")),
+    )
+
+
+def _build_hvc_response(row: CameraConfig) -> HighValueCounterResponse:
+    return HighValueCounterResponse(
+        camera_id=row.camera_id,
+        camera_name=row.name or row.camera_id,
+        resolution={
+            "width":  getattr(row, "resolution_width", None) or 1920,
+            "height": getattr(row, "resolution_height", None) or 1080,
+        },
+        zones=_parse_hvc(row.analyzer_config or {}),
+    )
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 
@@ -277,3 +347,94 @@ async def save_zones(
     await session.refresh(row)
 
     return _build_response(row)
+
+
+@router.get(
+    "/cameras/{cam_id}/high-value-counter",
+    response_model=HighValueCounterResponse,
+    summary="Get High-Value Counter polygons for a camera",
+)
+async def get_high_value_counter(
+    cam_id: str,
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> HighValueCounterResponse:
+    row = await _find_camera(session, user.get("tenant_id"), cam_id)
+    return _build_hvc_response(row)
+
+
+@router.put(
+    "/cameras/{cam_id}/high-value-counter",
+    response_model=HighValueCounterResponse,
+    summary="Save High-Value Counter polygons for a camera",
+    description=(
+        "Writes the jewellery / luxury-counter polygons to the camera's "
+        "analyzer_config (jewelry_handover / jewelry_tray / grab_and_run). "
+        "Takes effect on the next detection cycle."
+    ),
+)
+async def save_high_value_counter(
+    cam_id: str,
+    body:   HighValueCounterConfig,
+    user:   dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> HighValueCounterResponse:
+    row = await _find_camera(session, user.get("tenant_id"), cam_id)
+
+    ac: dict[str, Any] = dict(row.analyzer_config or {})
+
+    # -- jewelry_handover: counter + tray (reach-in/withdraw) --
+    handover = dict(ac.get("jewelry_handover") or {})
+    for key, val in (
+        ("counter_polygon", body.counter_polygon),
+        ("tray_polygon", body.tray_polygon),
+    ):
+        if val:
+            handover[key] = val
+        else:
+            handover.pop(key, None)
+    ac["jewelry_handover"] = handover
+
+    # -- jewelry_tray: counter (person gate) + trays[] (tray change) --
+    tray_cfg = dict(ac.get("jewelry_tray") or {})
+    if body.counter_polygon:
+        tray_cfg["counter_polygon"] = body.counter_polygon
+    else:
+        tray_cfg.pop("counter_polygon", None)
+    if body.tray_polygon:
+        tray_cfg["trays"] = [{"label": "Display tray", "polygon": body.tray_polygon}]
+    else:
+        tray_cfg.pop("trays", None)
+    ac["jewelry_tray"] = tray_cfg
+
+    # -- grab_and_run: case + exit (+ optional approach) --
+    grab = dict(ac.get("grab_and_run") or {})
+    for key, val in (
+        ("case_polygon", body.case_polygon),
+        ("exit_polygon", body.exit_polygon),
+        ("approach_polygon", body.approach_polygon),
+    ):
+        if val:
+            grab[key] = val
+        else:
+            grab.pop(key, None)
+    ac["grab_and_run"] = grab
+
+    row.analyzer_config = ac
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+
+    # Best-effort in-memory apply for on-box (self-hosted) pipelines, mirroring
+    # cameras_router.update_sensitivity / update_zones.
+    try:
+        from .cameras_router import _get_pipeline  # noqa: PLC0415
+        _pipeline = _get_pipeline()
+        if _pipeline is not None:
+            cam = _pipeline.registry.get_camera(cam_id)
+            cam.analyzer_config = dict(getattr(cam, "analyzer_config", None) or {})
+            cam.analyzer_config.update(ac)
+    except Exception:  # noqa: BLE001
+        pass
+
+    return _build_hvc_response(row)

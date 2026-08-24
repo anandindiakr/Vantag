@@ -128,11 +128,21 @@ def _reload_if_stale() -> None:
         img_path = Path(entry.get("image_path") or "")
         if not img_path.exists():
             # Container path may differ from host path recorded at upload
-            # time — fall back to the canonical directory layout.
-            for ext in (".jpg", ".png", ".jpeg"):
-                candidate = _WATCHLIST_DIR / f"{entry_id}{ext}"
-                if candidate.exists():
-                    img_path = candidate
+            # time — fall back to tenant-scoped canonical storage first.
+            tenant_id = str(entry.get("tenant_id") or "")
+            search_dirs = [_WATCHLIST_DIR / tenant_id] if tenant_id else []
+            # Legacy entries were stored directly under watchlist/. They are
+            # retained for migration, but are not eligible for tenant-scoped
+            # live matching unless they have an owner.
+            if not tenant_id:
+                search_dirs.append(_WATCHLIST_DIR)
+            for directory in search_dirs:
+                for ext in (".jpg", ".png", ".jpeg"):
+                    candidate = directory / f"{entry_id}{ext}"
+                    if candidate.exists():
+                        img_path = candidate
+                        break
+                if img_path.exists():
                     break
         if not img_path.exists():
             logger.warning(
@@ -154,6 +164,7 @@ def _reload_if_stale() -> None:
             continue
         new_embeddings.append((entry_id, emb))
         new_meta[entry_id] = {
+            "tenant_id": str(entry.get("tenant_id") or ""),
             "name": entry.get("name") or "Unknown",
             "alert_level": (entry.get("alert_level") or "medium").lower(),
         }
@@ -167,9 +178,11 @@ def _reload_if_stale() -> None:
     )
 
 
-def match_face_b64(image_b64: str) -> Optional[dict]:
+def match_face_b64(image_b64: str, tenant_id: Optional[str] = None) -> Optional[dict]:
     """
     Match the largest face in a base64 JPEG against enrolled watchlist faces.
+    When ``tenant_id`` is supplied, only that tenant's enrollments are
+    considered; legacy ownerless records are excluded.
 
     Returns ``{"entry_id", "name", "alert_level", "similarity"}`` for the
     best match at or above the threshold, else ``None``.
@@ -177,8 +190,14 @@ def match_face_b64(image_b64: str) -> Optional[dict]:
     """
     with _lock:
         _reload_if_stale()
-        embeddings = list(_embeddings)
         meta = dict(_entry_meta)
+        requested_tenant = str(tenant_id) if tenant_id is not None else None
+        embeddings = [
+            (entry_id, embedding)
+            for entry_id, embedding in _embeddings
+            if requested_tenant is None
+            or meta.get(entry_id, {}).get("tenant_id") == requested_tenant
+        ]
     if not embeddings:
         return None
     app = _get_app()

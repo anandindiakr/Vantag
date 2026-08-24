@@ -29,7 +29,7 @@ from ..middleware.tenant_middleware import get_current_user_id as get_current_us
 _pipeline = None   # type: ignore[assignment]
 
 # Snapshot storage (same root that main.py already mounts as /snapshots/*)
-_SNAPSHOTS_DIR = Path(__file__).resolve().parent.parent / "snapshots"
+_SNAPSHOTS_DIR = Path(__file__).resolve().parent.parent.parent / "snapshots"
 _DEMO_SNAPS_DIR = _SNAPSHOTS_DIR / "demo"
 
 
@@ -50,6 +50,10 @@ _EVENT_WEIGHTS: dict[str, int] = {
     "loitering":          15,
     "inventory_movement": 10,
     "queue_breach":       10,
+    # Jewellery-counter detectors (vision-only — no POS / no shelves required)
+    "jewelry_handover":   45,
+    "jewelry_tray":       25,
+    "grab_and_run":       60,
 }
 
 # ── Camera → store mapping ────────────────────────────────────────────────────
@@ -77,7 +81,32 @@ _DESCRIPTIONS: dict[str, str] = {
     "loitering":          "Individual stationary beyond configured dwell threshold in monitored zone.",
     "face_match":         "Positive watchlist match detected. Elevated alert level — review immediately.",
     "tamper":             "Camera tamper event detected: sudden scene change or possible occlusion of lens.",
+    "jewelry_handover":   "Hand reached into the display case and withdrew. Review footage to confirm whether an item was taken.",
+    "jewelry_tray":       "Display tray contents changed while a person was at the counter. Review footage to confirm item removal.",
+    "grab_and_run":       "Fast case-to-exit movement detected — possible grab-and-run. Review exit footage immediately.",
 }
+
+# ── Jewellery-counter theft scenario (vision-only, no POS) ─────────────────────
+# Fired in story order so a demo tells the whole theft chain: hand reaches in,
+# the tray changes, the item count drops, and the suspect flees to the exit.
+_JEWELRY_SEQUENCE: list[tuple[str, str, str, str]] = [
+    (
+        "jewelry_handover", "cam-03", "high",
+        "Hand reached into the display case and withdrew. Review footage to confirm whether an item was taken.",
+    ),
+    (
+        "jewelry_tray", "cam-03", "high",
+        "Display tray contents changed while the person remained at the counter. Possible item removed from the tray.",
+    ),
+    (
+        "inventory_movement", "cam-03", "medium",
+        "Item count dropped in the monitored display-case zone. No authorised staff present in the vicinity at the time.",
+    ),
+    (
+        "grab_and_run", "cam-03", "critical",
+        "Fast case-to-exit movement detected — the person moved from the counter to the exit unusually quickly.",
+    ),
+]
 
 
 def _zone_description(event_type: str, zone_name: str, zone_label: str, camera_id: str, bbox: list) -> str:
@@ -170,22 +199,36 @@ class TriggerResponse(BaseModel):
     snapshot_url: Optional[str] = None
 
 
-def _save_snapshot(incident_id: str, snapshot_b64: str) -> Optional[str]:
-    """Decode base64 canvas image and save to disk. Returns static URL or None."""
-    if not snapshot_b64:
+def _save_snapshot(
+    incident_id: str,
+    snapshot_b64: str,
+    tenant_id: str,
+) -> Optional[str]:
+    """Save a bounded demo snapshot inside the authenticated tenant's folder."""
+    if not snapshot_b64 or not tenant_id:
         return None
     try:
-        _DEMO_SNAPS_DIR.mkdir(parents=True, exist_ok=True)
-        raw       = snapshot_b64.split(",", 1)[-1]
-        img_bytes = base64.b64decode(raw)
-        img_path  = _DEMO_SNAPS_DIR / f"{incident_id}.jpg"
+        raw = snapshot_b64.split(",", 1)[-1]
+        img_bytes = base64.b64decode(raw, validate=True)
+        if len(img_bytes) > 2_000_000 or not img_bytes.startswith(b"\xff\xd8\xff"):
+            return None
+        tenant_dir = _DEMO_SNAPS_DIR / tenant_id
+        tenant_dir.mkdir(parents=True, exist_ok=True)
+        img_path = tenant_dir / f"{incident_id}.jpg"
         img_path.write_bytes(img_bytes)
-        return f"/api/snapshots/demo/{incident_id}.jpg"
+        return f"/api/snapshots/demo/{tenant_id}__{incident_id}.jpg"
     except Exception:  # noqa: BLE001
         return None
 
 
-def _build_event(req: TriggerRequest, incident_id: str, snapshot_url: Optional[str] = None) -> dict:
+def _build_event(
+    req: TriggerRequest,
+    incident_id: str,
+    snapshot_url: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+    description: Optional[str] = None,
+    scenario: Optional[str] = None,
+) -> dict:
     """
     Build a canonical event dict.
 
@@ -202,18 +245,31 @@ def _build_event(req: TriggerRequest, incident_id: str, snapshot_url: Optional[s
     severity    = req.severity.lower()
     now_iso     = datetime.now(timezone.utc).isoformat()
 
-    if req.zone_name:
-        description = _zone_description(
+    if description:
+        text = description
+    elif req.zone_name:
+        text = _zone_description(
             event_type, req.zone_name,
             req.zone_label or "Zone",
             camera_id, req.zone_bbox
         )
     else:
-        description = _DESCRIPTIONS.get(event_type, f"Demo event: {event_type}")
+        text = _DESCRIPTIONS.get(event_type, f"Demo event: {event_type}")
+
+    metadata: dict = {}
+    if req.zone_name:
+        metadata.update({
+            "zone_name":  req.zone_name,
+            "zone_label": req.zone_label,
+            "zone_bbox":  req.zone_bbox,
+        })
+    if scenario:
+        metadata["scenario"] = scenario
 
     return {
         # ── canonical keys (match real pipeline) ──
         "incident_id":  incident_id,
+        "tenant_id":    tenant_id,
         "type":         event_type,         # ← was "event_type"
         "timestamp":    now_iso,            # ← was "occurred_at"
         # ── additional fields ──
@@ -222,16 +278,12 @@ def _build_event(req: TriggerRequest, incident_id: str, snapshot_url: Optional[s
         "camera_id":    camera_id,
         "camera_name":  f"Camera — {_STORE_NAMES.get(store_id, store_id)} (Demo)",
         "severity":     severity,
-        "risk_score":   _EVENT_WEIGHTS.get(event_type, 10) * 2,
-        "description":  description,
+        "risk_score":   min(100, _EVENT_WEIGHTS.get(event_type, 10) * 2),
+        "description":  text,
         "acknowledged": False,
         "is_demo":      True,
         "snapshot_url": snapshot_url,
-        "metadata":     {
-            "zone_name":  req.zone_name,
-            "zone_label": req.zone_label,
-            "zone_bbox":  req.zone_bbox,
-        } if req.zone_name else {},
+        "metadata":     metadata,
     }
 
 
@@ -265,6 +317,7 @@ async def _inject(event: dict) -> None:
         try:
             await _pipeline._ws_broadcast({
                 "type":         "incident",
+                "tenant_id":    event.get("tenant_id"),
                 "incident_id":  event["incident_id"],
                 "store_id":     store_id,
                 "camera_id":    event["camera_id"],
@@ -288,7 +341,7 @@ async def _inject(event: dict) -> None:
 )
 async def trigger_event(
     req: TriggerRequest,
-    _: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ) -> TriggerResponse:
     if req.event_type not in _EVENT_WEIGHTS:
         raise HTTPException(
@@ -298,8 +351,12 @@ async def trigger_event(
         )
 
     incident_id  = f"demo-{uuid.uuid4().hex[:8]}"
-    snapshot_url = _save_snapshot(incident_id, req.snapshot_b64)
-    event        = _build_event(req, incident_id, snapshot_url)
+    snapshot_url = _save_snapshot(
+        incident_id,
+        req.snapshot_b64,
+        str(user.get("tenant_id")),
+    )
+    event        = _build_event(req, incident_id, snapshot_url, str(user.get("tenant_id")))
 
     await _inject(event)
     return TriggerResponse(
@@ -318,7 +375,7 @@ async def trigger_event(
     summary="Fire ALL demo incidents in sequence",
 )
 async def trigger_sequence(
-    _: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ) -> dict:
     sequence = [
         TriggerRequest(event_type="shoplifting",        camera_id="cam-03", severity="high"),
@@ -334,7 +391,7 @@ async def trigger_sequence(
     fired = []
     for req in sequence:
         incident_id = f"demo-{uuid.uuid4().hex[:8]}"
-        event       = _build_event(req, incident_id)
+        event       = _build_event(req, incident_id, tenant_id=str(user.get("tenant_id")))
         await _inject(event)
         fired.append({
             "event_type":  event["type"],
@@ -346,6 +403,53 @@ async def trigger_sequence(
         await asyncio.sleep(0.3)
 
     return {"fired": len(fired), "events": fired}
+
+
+@router.post(
+    "/trigger-jewelry",
+    summary="Fire the jewellery-counter theft scenario (all four detectors, no POS)",
+)
+async def trigger_jewelry(
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """
+    Run the four vision-only jewellery theft signals in story order.
+
+    No POS integration and no shelf zones are required — this is the counter
+    scenario for a jewellery shop where staff hand items across a display
+    case instead of stocking shelves.
+    """
+    fired = []
+    for event_type, camera_id, severity, description in _JEWELRY_SEQUENCE:
+        req = TriggerRequest(
+            event_type=event_type,
+            camera_id=camera_id,
+            severity=severity,
+        )
+        incident_id = f"demo-{uuid.uuid4().hex[:8]}"
+        event = _build_event(
+            req,
+            incident_id,
+            tenant_id=str(user.get("tenant_id")),
+            description=description,
+            scenario="jewelry_counter",
+        )
+        await _inject(event)
+        fired.append({
+            "event_type":  event["type"],
+            "camera_id":   event["camera_id"],
+            "store_id":    event["store_id"],
+            "severity":    event["severity"],
+            "incident_id": event["incident_id"],
+            "description": event["description"],
+        })
+        await asyncio.sleep(0.4)
+
+    return {
+        "scenario": "jewelry_counter",
+        "fired":    len(fired),
+        "events":   fired,
+    }
 
 
 def _is_demo_event(e: dict) -> bool:
@@ -360,14 +464,18 @@ def _is_demo_event(e: dict) -> bool:
     summary="Clear all demo incidents",
 )
 async def clear_demo_events(
-    _: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ) -> dict:
     # 1. Remove from in-memory deques (live Incidents page reads these).
     mem_cleared = 0
     if _pipeline is not None:
         for store_id, dq in _pipeline.recent_events.items():
             before  = len(dq)
-            to_keep = [e for e in dq if not _is_demo_event(e)]
+            tenant_id = str(user.get("tenant_id"))
+            to_keep = [
+                e for e in dq
+                if not (_is_demo_event(e) and e.get("tenant_id") == tenant_id)
+            ]
             dq.clear()
             for e in to_keep:
                 dq.append(e)
@@ -377,17 +485,25 @@ async def clear_demo_events(
     db_cleared = 0
     try:
         from ..db import incident_store as _istore  # type: ignore[import]
-        db_cleared = await asyncio.to_thread(_istore.delete_demo)
+        db_cleared = await asyncio.to_thread(
+            _istore.delete_demo, str(user.get("tenant_id"))
+        )
     except Exception:  # noqa: BLE001
         pass
 
     # 3. Remove demo snapshot images from disk.
     snaps_cleared = 0
     try:
-        if _DEMO_SNAPS_DIR.exists():
-            for f in _DEMO_SNAPS_DIR.glob("*.jpg"):
+        tenant_id = str(user.get("tenant_id"))
+        tenant_dir = _DEMO_SNAPS_DIR / tenant_id
+        if tenant_dir.exists():
+            for f in tenant_dir.glob("*.jpg"):
                 f.unlink(missing_ok=True)
                 snaps_cleared += 1
+            try:
+                tenant_dir.rmdir()
+            except OSError:
+                pass
     except Exception:  # noqa: BLE001
         pass
 
