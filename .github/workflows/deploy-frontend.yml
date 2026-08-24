@@ -82,7 +82,19 @@ jobs:
 
             FAILED=0
             for DOMAIN in retailnazar.com retail-vantag.com retailbantay.com retailpantau.com jagajaga.my; do
-              HTTP_CODE=$(curl -s -o /tmp/health_body.html -w "%{http_code}" -H "Host: $DOMAIN" -k https://localhost/ || echo "000")
+              # --resolve pins the connection to localhost while keeping the
+              # real domain as SNI + Host. Plain "curl -H Host: ... https://localhost/"
+              # hits nginx's DEFAULT vhost (SNI=localhost), which on this shared
+              # VPS is a different app whose upstream can be down -> false 502
+              # and an unnecessary rollback even though every real vhost is fine.
+              HTTP_CODE="000"
+              for ATTEMPT in 1 2 3 4 5; do
+                HTTP_CODE=$(curl -s -o /tmp/health_body.html -w "%{http_code}" --resolve "$DOMAIN:443:127.0.0.1" -k "https://$DOMAIN/" || echo "000")
+                if [ "$HTTP_CODE" = "200" ]; then
+                  break
+                fi
+                sleep 4
+              done
               if [ "$HTTP_CODE" != "200" ] || ! grep -qiE "<!doctype html|<html" /tmp/health_body.html; then
                 echo "Health check FAILED for $DOMAIN (HTTP $HTTP_CODE)"
                 FAILED=1
