@@ -11,6 +11,7 @@ import {
   Network, ShieldAlert, CheckCircle, XCircle,
   RefreshCw, Download, Search, Ban, Play, Trash2,
   ChevronRight, Activity, Globe, Bell, Handshake,
+  CalendarPlus,
 } from 'lucide-react';
 import SystemHealthTab from './SystemHealthTab';
 
@@ -56,7 +57,7 @@ function timeAgo(iso: string | null): string {
   if (!iso) return 'Never';
   const then = new Date(iso).getTime();
   const diffMs = Date.now() - then;
-  if (diffMs < 0) return 'Just now';
+  if (diffMs < 0) return new Date(iso).toLocaleDateString();
   const mins = Math.floor(diffMs / 60000);
   if (mins < 1) return 'Just now';
   if (mins < 60) return `${mins}m ago`;
@@ -271,24 +272,38 @@ export default function AdminDashboard() {
       const { data } = await axios.get(`/api/admin/tenants?${params}`, { headers: authHeaders() });
       setTenants(data.tenants || []);
       setTenantTotal(data.total || 0);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Failed to load tenants');
     } finally {
       setLoading(false);
     }
   }, [tenantSearch, tenantStatus]);
 
   const fetchPayments = useCallback(async () => {
-    const { data } = await axios.get('/api/admin/payments', { headers: authHeaders() });
-    setPayments(data.payments || []);
+    try {
+      const { data } = await axios.get('/api/admin/payments', { headers: authHeaders() });
+      setPayments(data.payments || []);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Failed to load payments');
+    }
   }, []);
 
   const fetchIncidents = useCallback(async () => {
-    const { data } = await axios.get('/api/admin/incidents', { headers: authHeaders() });
-    setIncidents(data.incidents || []);
+    try {
+      const { data } = await axios.get('/api/admin/incidents', { headers: authHeaders() });
+      setIncidents(data.incidents || []);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Failed to load incidents');
+    }
   }, []);
 
   const fetchAlerts = useCallback(async () => {
-    const { data } = await axios.get('/api/admin/alerts', { headers: authHeaders() });
-    setAlerts(data.alerts || []);
+    try {
+      const { data } = await axios.get('/api/admin/alerts', { headers: authHeaders() });
+      setAlerts(data.alerts || []);
+    } catch {
+      // Alerts are best-effort — the badge just shows fewer.
+    }
   }, []);
 
   useEffect(() => {
@@ -310,40 +325,73 @@ export default function AdminDashboard() {
   // ── Tenant actions ─────────────────────────────────────────────────────
 
   const openDetail = async (id: string) => {
-    const { data } = await axios.get(`/api/admin/tenants/${id}`, { headers: authHeaders() });
-    setDetailTenant(data);
-    setDetailOpen(true);
+    try {
+      const { data } = await axios.get(`/api/admin/tenants/${id}`, { headers: authHeaders() });
+      setDetailTenant(data);
+      setDetailOpen(true);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Failed to load tenant detail');
+    }
   };
 
   const suspendTenant = async (id: string, name: string) => {
     if (!confirm(`Suspend ${name}?`)) return;
-    await axios.post(`/api/admin/tenants/${id}/suspend`, {}, { headers: authHeaders() });
-    toast.success(`${name} suspended`);
-    fetchTenants();
+    try {
+      await axios.post(`/api/admin/tenants/${id}/suspend`, {}, { headers: authHeaders() });
+      toast.success(`${name} suspended`);
+      fetchTenants();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Suspend failed');
+    }
   };
 
   const resumeTenant = async (id: string, name: string) => {
-    await axios.post(`/api/admin/tenants/${id}/resume`, {}, { headers: authHeaders() });
-    toast.success(`${name} resumed`);
-    fetchTenants();
+    try {
+      await axios.post(`/api/admin/tenants/${id}/resume`, {}, { headers: authHeaders() });
+      toast.success(`${name} resumed`);
+      fetchTenants();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Resume failed');
+    }
   };
 
   const deleteTenant = async (id: string, name: string) => {
     if (!confirm(`Soft-delete ${name}? This can be undone by re-setting status.`)) return;
-    await axios.delete(`/api/admin/tenants/${id}`, { headers: authHeaders() });
-    toast.success(`${name} deleted`);
-    fetchTenants();
+    try {
+      await axios.delete(`/api/admin/tenants/${id}`, { headers: authHeaders() });
+      toast.success(`${name} deleted`);
+      fetchTenants();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Delete failed');
+    }
+  };
+
+  const extendTrial = async (id: string, email: string, days: number = 90) => {
+    if (!confirm(`Extend trial for ${email} by ${days} days?`)) return;
+    try {
+      const res = await axios.post(`/api/admin/tenants/${id}/extend-trial`, { days }, { headers: authHeaders() });
+      toast.success(`${email}: trial extended to ${new Date(res.data.trial_ends_at).toLocaleDateString()}`);
+      fetchStats();
+      fetchTenants();
+      if (detailTenant?.id === id) openDetail(id);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Extend trial failed');
+    }
   };
 
   const acknowledgeAlert = async (id: string) => {
-    await axios.post(`/api/admin/alerts/${id}/acknowledge`, {}, { headers: authHeaders() });
-    toast.success('Alert acknowledged');
-    fetchAlerts();
+    try {
+      await axios.post(`/api/admin/alerts/${id}/acknowledge`, {}, { headers: authHeaders() });
+      toast.success('Alert acknowledged');
+      fetchAlerts();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Acknowledge failed');
+    }
   };
 
   // ── Tabs config ────────────────────────────────────────────────────────
 
-  const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+  const tabs: { key: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { key: 'overview',      label: 'Overview',     icon: <LayoutDashboard size={16} /> },
     { key: 'tenants',       label: 'Tenants',       icon: <Users size={16} /> },
     { key: 'payments',      label: 'Payments',      icon: <CreditCard size={16} /> },
@@ -351,7 +399,7 @@ export default function AdminDashboard() {
     { key: 'alerts',        label: 'Alerts',        icon: <Bell size={16} />, badge: alerts.length },
     { key: 'architecture',  label: 'Architecture',  icon: <Network size={16} /> },
     { key: 'health',        label: 'System Health', icon: <Activity size={16} /> },
-  ] as any;
+  ];
 
   // ── Render ─────────────────────────────────────────────────────────────
 
@@ -398,9 +446,9 @@ export default function AdminDashboard() {
               >
                 {t.icon}
                 {t.label}
-                {(t as any).badge > 0 && (
+                {t.badge != null && t.badge > 0 && (
                   <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                    {(t as any).badge}
+                    {t.badge}
                   </span>
                 )}
               </button>
@@ -575,6 +623,11 @@ export default function AdminDashboard() {
                                 title="Resume"
                               ><Play size={14} /></button>
                             )}
+                            <button
+                              onClick={() => extendTrial(t.id, t.owner_email || t.name)}
+                              className="p-1.5 rounded hover:bg-emerald-500/20 text-white/40 hover:text-emerald-400 transition-colors"
+                              title="Extend trial +90 days"
+                            ><CalendarPlus size={14} /></button>
                             <button
                               onClick={() => deleteTenant(t.id, t.name)}
                               className="p-1.5 rounded hover:bg-red-500/20 text-white/40 hover:text-red-400 transition-colors"
@@ -751,6 +804,22 @@ export default function AdminDashboard() {
                     <p className="font-semibold mt-0.5">{v}</p>
                   </div>
                 ))}
+              </div>
+              <div className="bg-white/5 border border-emerald-500/20 rounded-lg p-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] text-white/30 uppercase tracking-wider">Trial ends</p>
+                  <p className="font-semibold mt-0.5">
+                    {detailTenant.trial_ends_at
+                      ? new Date(detailTenant.trial_ends_at).toLocaleDateString()
+                      : '—'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => extendTrial(detailTenant.id, detailTenant.email)}
+                  className="flex items-center gap-2 px-3 py-2 text-xs bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 rounded-lg transition-all whitespace-nowrap"
+                >
+                  <CalendarPlus size={14} /> Extend +90 days
+                </button>
               </div>
               <div>
                 <h3 className="font-bold mb-2">Users ({detailTenant.users?.length})</h3>
