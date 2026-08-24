@@ -367,6 +367,135 @@ async def get_tenant_detail(
 # Tenant suspend / resume / delete
 # ────────────────────────────────────────────────────────────────────────────
 
+class ExtendTrialRequest(BaseModel):
+    days: int
+
+
+@admin_router.post("/tenants/{tenant_id}/extend-trial", summary="Extend a tenant's trial by N days")
+async def extend_tenant_trial(
+    tenant_id: str,
+    body: ExtendTrialRequest,
+    admin: dict = Depends(require_super_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Extend trial_ends_at from now (or existing date, whichever is later).
+
+    Useful for demos / enterprise pilots. Audited.
+    """
+    tenant = (await session.execute(
+        select(Tenant).where(Tenant.id == tenant_id)
+    )).scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    now = datetime.now(timezone.utc)
+    base = tenant.trial_ends_at if tenant.trial_ends_at and tenant.trial_ends_at > now else now
+    previous = tenant.trial_ends_at.isoformat() if tenant.trial_ends_at else None
+    tenant.trial_ends_at = base + timedelta(days=max(1, body.days))
+    tenant.status = "trial"
+    await session.flush()
+
+    await _audit(
+        session,
+        admin,
+        action="extend_trial",
+        target_type="tenant",
+        target_id=tenant_id,
+        detail=f"Extended trial from {previous} to {tenant.trial_ends_at.isoformat()} (+{body.days} days)",
+    )
+    await session.commit()
+
+    return {
+        "tenant_id": tenant.id,
+        "email": tenant.email,
+        "status": tenant.status,
+        "trial_ends_at": tenant.trial_ends_at.isoformat(),
+        "extended_by_days": body.days,
+    }
+
+
+@admin_router.get("/tenants/by-email/{email}", summary="Find tenant by owner email")
+async def get_tenant_by_email(
+    email: EmailStr,
+    admin: dict = Depends(require_super_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Resolve a user's email to their tenant + owner user IDs."""
+    # A user may be owner/admin/viewer; return the first active match.
+    user = (await session.execute(
+        select(TenantUser).where(TenantUser.email.ilike(str(email)))
+    )).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="No user with that email")
+
+    tenant = (await session.execute(
+        select(Tenant).where(Tenant.id == user.tenant_id)
+    )).scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    return {
+        "tenant_id": tenant.id,
+        "tenant_name": tenant.name,
+        "tenant_email": tenant.email,
+        "status": tenant.status,
+        "trial_ends_at": tenant.trial_ends_at.isoformat() if tenant.trial_ends_at else None,
+        "user_id": user.id,
+        "user_email": user.email,
+        "user_role": user.role,
+    }
+
+
+@admin_router.post("/extend-trial-by-email", summary="Extend a tenant's trial by owner email")
+async def extend_trial_by_email(
+    email: EmailStr = Query(..., description="Owner email address"),
+    days: int = Query(90, ge=1, le=365, description="Days to extend"),
+    admin: dict = Depends(require_super_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Convenience endpoint: lookup tenant by email and extend trial in one call."""
+    user = (await session.execute(
+        select(TenantUser).where(TenantUser.email.ilike(str(email)))
+    )).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="No user with that email")
+
+    tenant = (await session.execute(
+        select(Tenant).where(Tenant.id == user.tenant_id)
+    )).scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+
+    now = datetime.now(timezone.utc)
+    base = tenant.trial_ends_at if tenant.trial_ends_at and tenant.trial_ends_at > now else now
+    previous = tenant.trial_ends_at.isoformat() if tenant.trial_ends_at else None
+    tenant.trial_ends_at = base + timedelta(days=days)
+    tenant.status = "trial"
+    await session.flush()
+
+    await _audit(
+        session,
+        admin,
+        action="extend_trial_by_email",
+        target_type="tenant",
+        target_id=tenant.id,
+        detail=f"Extended trial for {email} from {previous} to {tenant.trial_ends_at.isoformat()} (+{days} days)",
+    )
+    await session.commit()
+
+    return {
+        "tenant_id": tenant.id,
+        "email": tenant.email,
+        "status": tenant.status,
+        "trial_ends_at": tenant.trial_ends_at.isoformat(),
+        "extended_by_days": days,
+    }
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Tenant suspend / resume / delete
+# ────────────────────────────────────────────────────────────────────────────
+
 @admin_router.post("/tenants/{tenant_id}/suspend", summary="Suspend a tenant")
 async def suspend_tenant(
     tenant_id: str,
