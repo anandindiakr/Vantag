@@ -204,6 +204,13 @@ services:
     depends_on:
       vantag-backend:
         condition: service_healthy
+      # nginx.conf proxies /ws to the "mosquitto" hostname; nginx resolves
+      # upstreams only at config-load time, so if mosquitto is down when
+      # nginx starts it dies with "host not found in upstream" and
+      # crash-loops (this took down all /api traffic on 2026-09-17 when a
+      # neighbouring app install stopped the broker). Enforce ordering.
+      mosquitto:
+        condition: service_healthy
     networks:
       - vantag-prod
     healthcheck:

@@ -8,6 +8,7 @@ Queries bypass the tenant middleware and operate cross-tenant.
 
 Mounted at: /api/admin
 """
+
 from __future__ import annotations
 
 import os
@@ -392,7 +393,13 @@ async def extend_tenant_trial(
     base = tenant.trial_ends_at if tenant.trial_ends_at and tenant.trial_ends_at > now else now
     previous = tenant.trial_ends_at.isoformat() if tenant.trial_ends_at else None
     tenant.trial_ends_at = base + timedelta(days=max(1, body.days))
-    tenant.status = "trial"
+    # Re-activate trial access for expired/suspended tenants — but NEVER
+    # demote a paying ("active") tenant to trial status. For an active tenant
+    # the extended date is inert anyway: require_active_tenant short-circuits
+    # on status == "active" and ignores trial_ends_at entirely, so their paid
+    # access must keep flowing through the subscription, not a countdown.
+    if tenant.status != "active":
+        tenant.status = "trial"
     await session.flush()
 
     await _audit(
@@ -401,7 +408,7 @@ async def extend_tenant_trial(
         action="extend_trial",
         target_type="tenant",
         target_id=tenant_id,
-        detail=f"Extended trial from {previous} to {tenant.trial_ends_at.isoformat()} (+{body.days} days)",
+        detail=f"Extended trial from {previous} to {tenant.trial_ends_at.isoformat()} (+{body.days} days; status={'kept active' if tenant.status == 'active' else 'trial'})",
     )
     await session.commit()
 
@@ -470,7 +477,9 @@ async def extend_trial_by_email(
     base = tenant.trial_ends_at if tenant.trial_ends_at and tenant.trial_ends_at > now else now
     previous = tenant.trial_ends_at.isoformat() if tenant.trial_ends_at else None
     tenant.trial_ends_at = base + timedelta(days=days)
-    tenant.status = "trial"
+    # Same rule as extend_tenant_trial: never demote a paying tenant.
+    if tenant.status != "active":
+        tenant.status = "trial"
     await session.flush()
 
     await _audit(
