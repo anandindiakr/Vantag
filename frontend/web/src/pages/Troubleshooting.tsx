@@ -205,7 +205,7 @@ const sections: Section[] = [
     content: (
       <>
         <p className="text-slate-400 text-xs mb-3">
-          All AI detections run inside the Edge Agent on your store PC using the YOLOv8 model. Here is what each function does and how to adjust it.
+          All AI detections run inside the Edge Agent on your store PC using the Ultralytics YOLO26 model, with ByteTrack multi-object tracking for people counting. Here is what each function does and how to adjust it.
         </p>
 
         <div className="space-y-4">

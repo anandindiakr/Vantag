@@ -198,7 +198,7 @@ function ArchitectureTab() {
   │  [IP Camera] ─┐               │       │   Dashboard / Web / App  │
   │  [IP Camera] ─┤               │       │           ▲              │
   │  [IP Camera] ─┼─▶ Edge Agent ─┼──TLS──┼──▶ FastAPI + PostgreSQL  │
-  │  [IP Camera] ─┘   (YOLOv8)    │       │           │              │
+  │  [IP Camera] ─┘   (YOLO26)    │       │           │              │
   │                               │       │      Mosquitto MQTT      │
   │  Video stays LOCAL            │       │                          │
   │  Only events + snapshots      │       │  Razorpay · Let's Encrypt│
@@ -210,7 +210,8 @@ function ArchitectureTab() {
         <div className="bg-white/5 border border-white/10 rounded-xl p-5">
           <h3 className="font-bold mb-3 text-violet-400">Edge Stack</h3>
           <ul className="space-y-1.5 text-white/60">
-            <li>• YOLOv8 — object detection (ONNX / TensorRT)</li>
+            <li>• Ultralytics YOLO26 — object & person detection (ONNX, CPU-first)</li>
+            <li>• ByteTrack — multi-object tracking (people counting)</li>
             <li>• Python Edge Agent (Windows / Linux / Android)</li>
             <li>• RTSP camera ingestion via OpenCV</li>
             <li>• Local event buffering, TLS egress</li>

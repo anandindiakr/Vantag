@@ -97,7 +97,7 @@ function printReport(data: PeopleCountsResponse | undefined) {
     <h2>Hourly footfall peaks (last 24h)</h2>
     <table><thead><tr><th>Hour</th><th>Peak occupancy</th></tr></thead>
     <tbody>${peakRows || '<tr><td colspan="2">No history yet</td></tr>'}</tbody></table>
-    <div class="footer">Counts are produced by YOLO person detection on the Edge Agent. Overlapping camera views may double-count.</div>
+    <div class="footer">Counts are produced by Ultralytics YOLO26 person detection with ByteTrack tracking on the Edge Agent. Overlapping camera views may double-count.</div>
     <script>
       // Wait for snapshot images to load (or fail) before printing.
       window.onload = function () {
@@ -144,7 +144,7 @@ export default function PeopleCountPage() {
             People Count
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Live person counts per camera, detected by the Edge Agent (YOLO). Updates with every agent heartbeat (~30s).
+            Live person counts per camera, detected by the Edge Agent (Ultralytics YOLO26 + ByteTrack). Updates with every agent heartbeat (~30s).
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -326,8 +326,8 @@ export default function PeopleCountPage() {
 
       {/* Accuracy note */}
       <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/40 text-xs text-slate-400 leading-relaxed">
-        <strong className="text-slate-300">Accuracy note:</strong> counts come from YOLO person detection
-        on each camera frame. Overlapping camera views may count the same person twice — position cameras
+        <strong className="text-slate-300">Accuracy note:</strong> counts come from Ultralytics YOLO26 person detection
+        with ByteTrack tracking on each camera frame. Overlapping camera views may count the same person twice — position cameras
         to cover distinct areas, or use the entrance camera alone for exact footfall. Typical accuracy for a
         clear overhead/angled view is 90–95%.
       </div>

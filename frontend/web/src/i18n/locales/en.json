@@ -29,7 +29,7 @@
   "features": {
     "title": "Everything Your Store Needs",
     "subtitle": "From theft detection to queue management — Vantag covers every corner of your store.",
-    "theft": { "title": "Theft Detection", "desc": "Spot product sweeping, rapid removal, and shoplifting in real time with YOLOv8 AI." },
+    "theft": { "title": "Theft Detection", "desc": "Spot product sweeping, rapid removal, and shoplifting in real time with Ultralytics YOLO26 AI." },
     "inventory": { "title": "Inventory Monitoring", "desc": "Track shelf stock levels automatically. Get alerted when items run low or are moved without staff present." },
     "loitering": { "title": "Loitering Alerts", "desc": "Detect individuals who linger beyond safe dwell times in sensitive zones." },
     "fall": { "title": "Fall Detection", "desc": "Pose AI identifies potential falls and sends immediate emergency alerts." },
