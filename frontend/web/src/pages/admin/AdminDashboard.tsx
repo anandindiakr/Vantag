@@ -211,7 +211,8 @@ function ArchitectureTab() {
           <h3 className="font-bold mb-3 text-violet-400">Edge Stack</h3>
           <ul className="space-y-1.5 text-white/60">
             <li>• Ultralytics YOLO26 — object & person detection (ONNX, CPU-first)</li>
-            <li>• ByteTrack — multi-object tracking (people counting)</li>
+            <li>• BoT-SORT &amp; ByteTrack — multi-object tracking (Kalman filter, people counting)</li>
+            <li>• VisionAI (Ultralytics VisualAISearch) — semantic evidence search (optional)</li>
             <li>• Python Edge Agent (Windows / Linux / Android)</li>
             <li>• RTSP camera ingestion via OpenCV</li>
             <li>• Local event buffering, TLS egress</li>

@@ -24,3 +24,10 @@ Pillow>=10.3.0
 pyinstaller>=6.6.0
 psutil>=5.9.8
 schedule>=1.2.2
+# ── Optional: VisionAI visual evidence search ───────────────────────────
+# ultralytics.solutions.VisualAISearch needs OpenCLIP (embeddings) and FAISS
+# (vector index). Uncomment these on machines where the feature is wanted;
+# agent/vision_ai.py is fail-open without them, so the agent runs fine either
+# way. torch CPU builds pull these in cleanly on Windows.
+# open-clip-torch>=2.24.0
+# faiss-cpu>=1.8.0

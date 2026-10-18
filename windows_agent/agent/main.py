@@ -456,6 +456,20 @@ def start_monitoring():
                     arch, model_status.get("acquire_error") or "unknown",
                 )
         from . import __version__ as _agent_ver
+        # VisionAI (Ultralytics VisualAISearch) status — lazy: reporting only
+        # checks whether the optional deps are importable, it does NOT load the
+        # ~400 MB CLIP model (that happens on first actual search call).
+        visionai_status = {}
+        try:
+            from .vision_ai import VisionAISearcher
+            if not hasattr(send_heartbeat, "_visionai"):
+                from .config import CONFIG_DIR as _cfg_dir
+                send_heartbeat._visionai = VisionAISearcher(str(_cfg_dir / "visionai_index"))
+            visionai_status = send_heartbeat._visionai.status
+        except Exception:  # noqa: BLE001 — telemetry must never break heartbeat
+            visionai_status = {}
+        if visionai_status.get("deps_installed"):
+            log.info("VisionAI: VisualAISearch deps present (%s)", "ready" if visionai_status.get("available") else "lazy — builds on first search")
         flushed = _api.flush_outbox(limit=20)
         if flushed:
             log.info("Delivered %d queued incident(s); %d remain", flushed, _api.pending_incidents)
@@ -468,6 +482,7 @@ def start_monitoring():
             "memory_percent": psutil.virtual_memory().percent,
             "agent_version": _agent_ver,
             "model_status": model_status,
+            "visionai_status": visionai_status,
             "pending_incidents": _api.pending_incidents,
             "discovered_relays": _discovered_relays,
         })

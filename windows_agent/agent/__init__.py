@@ -1,4 +1,17 @@
 """Vantag Windows Edge Agent"""
+# 1.10.0 — BoT-SORT + VisionAI. The people-count tracker (agent/tracker.py)
+# now pairs ByteTrack's two-tier confidence association with a real 8-state
+# Kalman-filter motion model (agent/kalman_filter.py, pure numpy — the
+# BoT-SORT motion component from Aharon et al. 2022), replacing the 2-frame
+# velocity heuristic. Tracks predict forward while unmatched, so a person
+# briefly hidden or re-entering within max_age re-attaches to the SAME id
+# instead of spawning a duplicate — the honest source of the last
+# double-counting. Also adds agent/vision_ai.py: a fail-open wrapper around
+# ultralytics.solutions.VisualAISearch (OpenCLIP + FAISS) for semantic
+# evidence search; optional deps (open-clip-torch, faiss-cpu) are commented
+# in requirements.txt so the agent never breaks on machines without them,
+# and the heartbeat now reports visionai_status for System Health.
+#
 # 1.9.0 — universal plug-and-play door relay + MQTT security. The relay
 # driver layer (agent/relay.py) now exposes one interface across five
 # hardware backends — simulate, http (Shelly/Tasmota/ESPHome/Sonoff/custom
@@ -67,4 +80,4 @@
 # NMS on the fallback path so a fallback can no longer inflate people counts,
 # and reports the verified status in every heartbeat so Admin -> System Health
 # shows the truth instead of an assumption.
-__version__ = "1.9.0"
+__version__ = "1.10.0"
