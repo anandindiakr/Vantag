@@ -1,4 +1,15 @@
 """Vantag Windows Edge Agent"""
+# 1.11.1 — Inventory evidence now shows the FULL picture. Previously the
+# alert snapshot drew only the single highest-scoring changed cell, which
+# read as "the yellow box is in the wrong place" whenever a shadow or
+# settling movement scored a neighbouring cell higher than the slot that
+# truly changed. Evidence now draws the complete zone outline (thin, dim),
+# EVERY cell that measured a change (thin yellow), and the strongest cell
+# (thick yellow) — plus all changed-cell bboxes in event metadata. Also
+# honest note on limits: cell localisation is slot-level (grid cells of
+# ~60-120 px), not pixel-exact per product; Tier 3 VLM verification is
+# what semantically confirms which product moved.
+#
 # 1.11.0 — Tier 2 shelf product counting ACTUALLY works. Honest admission:
 # the YOLO-World product counter shipped earlier never ran on ANY store
 # machine — set_classes() requires the git-only `clip` package, which was
@@ -97,4 +108,4 @@
 # NMS on the fallback path so a fallback can no longer inflate people counts,
 # and reports the verified status in every heartbeat so Admin -> System Health
 # shows the truth instead of an assumption.
-__version__ = "1.11.0"
+__version__ = "1.11.1"

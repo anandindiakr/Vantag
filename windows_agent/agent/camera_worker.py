@@ -1244,18 +1244,32 @@ class DetectionAnalyzer:
                 except Exception as e:  # noqa: BLE001
                     log.warning(f"Tier 2 product count enrichment failed (non-fatal): {e}")
 
-            # Draw the changed cell (yellow box + zone label) on
-            # the alert snapshot so the Incident evidence image
-            # actually shows the zone that triggered the alert —
-            # mirrors the annotated-snapshot pattern already used
-            # for people-count evidence.
+            # Evidence annotation — three layers so the operator can always
+            # see WHERE the change was measured:
+            #  1. The FULL zone outline (thin, dimmer) — without it, a bare
+            #     cell box floating in the frame reads as "wrong place" when
+            #     the operator thinks of the zone as one block.
+            #  2. EVERY cell that measured a change this pass (thin) — the
+            #     "best" cell is only the strongest histogram signal; a
+            #     shadow or settling movement often scores a neighbouring
+            #     cell higher than the slot that truly changed, so show all
+            #     candidates instead of pretending pixel-level certainty.
+            #  3. The primary (highest-scoring) cell, thick, with the label.
             annotated = frame.copy()
+            cv2.rectangle(annotated, (zx1, zy1), (zx2, zy2), (0, 120, 160), 1)
+            for cand in candidates:
+                bx1, by1, bx2, by2 = cand["bbox"]
+                cv2.rectangle(annotated, (bx1, by1), (bx2, by2), (0, 200, 255), 1)
             cv2.rectangle(annotated, (cx1, cy1), (cx2, cy2), (0, 200, 255), 3)
             cv2.putText(
                 annotated, zone.get("label") or "Shelf zone",
                 (cx1 + 4, max(14, cy1 - 8)),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 200, 255), 2, cv2.LINE_AA,
             )
+            # All changed cells (pixel bboxes on the agent frame) so the
+            # backend/UI can show the full extent of the change, not just
+            # the single strongest one.
+            extra_metadata["changed_cells"] = [list(c["bbox"]) for c in candidates]
 
             evt = self._emit(
                 "inventory_movement",
