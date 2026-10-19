@@ -1470,6 +1470,23 @@ async def ingest_event(
         if isinstance(body.metadata, dict)
         else None
     ) or f"{body.event_type.replace('_', ' ').title()} detected on {body.camera_id}"
+    # Tier 2: when the edge agent's YOLO-World product counter actually ran
+    # on the shelf crops, put its numbers IN the description so operators see
+    # "6 → 5 products" at a glance instead of a generic "Inventory Movement
+    # detected". Counts are absent when the agent's Tier 2 module was
+    # unavailable (older agent, load failure) — then the generic text stays.
+    if event_type == "inventory_movement" and isinstance(body.metadata, dict):
+        b_count = body.metadata.get("baseline_product_count")
+        c_count = body.metadata.get("current_product_count")
+        if isinstance(b_count, int) and isinstance(c_count, int):
+            zone_label = body.metadata.get("zone_label") or "shelf zone"
+            delta = c_count - b_count
+            direction = "removed" if delta < 0 else ("added" if delta > 0 else "changed")
+            description = (
+                f"Inventory change in '{zone_label}': {b_count} → {c_count} "
+                f"products ({abs(delta)} item(s) {direction}, detected by "
+                f"YOLO-World product counting)"
+            )
     incident = {
         "id": event.id,
         "incident_id": event.id,
@@ -1961,6 +1978,13 @@ def _build_agent_zip(config: dict, platform: str) -> bytes:
         hand_task = _REPO_ROOT / "models" / "hand_landmarker.task"
         if hand_task.exists():
             zf.write(hand_task, "models/hand_landmarker.task")
+        # Pre-baked CLIP text embeddings for the Tier 2 shelf product
+        # counter (agent/inference.py ProductCountDetector). Without this
+        # file YOLO-World cannot run its custom vocabulary on the store
+        # machine (set_classes() would need the git-only `clip` package).
+        prompt_asset = pkg / "assets" / "yolo_world_product_prompts.npy"
+        if prompt_asset.exists():
+            zf.write(prompt_asset, "agent/assets/yolo_world_product_prompts.npy")
         # Version stamp so users can tell which build they have.
         zf.writestr("VERSION.txt", f"Vantag Edge Agent v{_agent_version()}\n")
         # Launchers + readme.

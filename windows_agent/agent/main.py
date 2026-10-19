@@ -470,6 +470,20 @@ def start_monitoring():
             visionai_status = {}
         if visionai_status.get("deps_installed"):
             log.info("VisionAI: VisualAISearch deps present (%s)", "ready" if visionai_status.get("available") else "lazy — builds on first search")
+        # Tier 2 shelf product-counter status. Lazy like the model itself:
+        # "idle" until the first shelf event loads YOLO-World, then
+        # "ready"/"failed" — so the dashboard can state plainly whether
+        # product counting is actually live on this machine.
+        product_count_status = {}
+        try:
+            product_count_status = dict(_product_count_detector.status)
+        except Exception:  # noqa: BLE001 — telemetry must never break heartbeat
+            product_count_status = {}
+        if product_count_status.get("state") == "failed":
+            log.warning(
+                "Tier 2 product counting FAILED on this machine: %s",
+                product_count_status.get("error"),
+            )
         flushed = _api.flush_outbox(limit=20)
         if flushed:
             log.info("Delivered %d queued incident(s); %d remain", flushed, _api.pending_incidents)
@@ -483,6 +497,7 @@ def start_monitoring():
             "agent_version": _agent_ver,
             "model_status": model_status,
             "visionai_status": visionai_status,
+            "product_count_status": product_count_status,
             "pending_incidents": _api.pending_incidents,
             "discovered_relays": _discovered_relays,
         })

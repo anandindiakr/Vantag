@@ -767,6 +767,27 @@ PRODUCT_PROMPT_CLASSES = [
     "packaged product", "bottle", "box", "can", "jar", "carton", "package",
 ]
 
+# CLIP ViT-B/32 text embeddings for PRODUCT_PROMPT_CLASSES, pre-baked with
+# ultralytics' own text encoder (see bake script in repo history: tokenize
+# with truncate=True -> encode_text -> L2-normalised -> reshape (1, N, 512)).
+#
+# WHY: WorldModel.set_classes() needs the `clip` package at runtime to encode
+# the vocabulary, and `clip` is NOT installable as a plain PyPI dependency
+# (git-only) plus it downloads a ~340MB CLIP checkpoint on first use. Without
+# it, YOLO-World failed to load on EVERY store machine and Tier 2 silently
+# fell back to Tier 1 — the exact "fails silently" failure mode this agent is
+# supposed to avoid. Injecting these pre-baked embeddings into
+# WorldModel.txt_feats is functionally identical to set_classes() (the
+# checkpoint was trained against CLIP ViT-B/32 embeddings) but needs no clip
+# package, no extra download, and no runtime package installs.
+_PRODUCT_PROMPT_EMBEDDINGS = "assets/yolo_world_product_prompts.npy"
+
+# Ultralytics release asset for the worldv2 weights (24.7 MB).
+_WORLDV2_WEIGHTS_URL = (
+    "https://github.com/ultralytics/assets/releases/download/"
+    "v8.4.0/yolov8s-worldv2.pt"
+)
+
 
 class ProductCountDetector:
     """Open-vocabulary product/emptiness counter for a small shelf-zone crop.
@@ -774,7 +795,7 @@ class ProductCountDetector:
     Uses YOLO-World (``yolov8s-worldv2.pt``) with a fixed text-prompt
     vocabulary — zero training data required, per the approved Tier 2 scope.
     Lazily loaded on first actual use so agents with no shelf zones
-    configured never pay the extra weight download/load cost, and shared
+    configured never pay the weights download/load cost, and shared
     as a single instance across all camera workers (main.py creates one and
     passes it to every CameraWorker) so multiple shelf-monitored cameras
     don't each load a separate copy of the model into memory.
@@ -783,6 +804,14 @@ class ProductCountDetector:
     def __init__(self):
         self._model = None
         self._load_failed = False
+        # Machine-readable state for the heartbeat ("idle" until the first
+        # shelf event actually needs it — loading is deliberately lazy).
+        self.status: dict = {
+            "state": "idle",
+            "model": "yolov8s-worldv2",
+            "classes": PRODUCT_PROMPT_CLASSES,
+            "error": None,
+        }
         # YOLO-World is shared by all camera workers. Ultralytics predictors
         # keep mutable state, so never invoke the same model concurrently.
         self._model_lock = threading.RLock()
@@ -794,15 +823,67 @@ class ProductCountDetector:
             if self._model is not None or self._load_failed:
                 return
             try:
+                # NEVER let ultralytics pip-install packages at runtime: on
+                # store laptops that means surprise multi-hundred-MB downloads
+                # (it once tried to pull a full torch wheel mid-shift and
+                # filled the disk). If something is missing we fail cleanly
+                # and fall back to Tier 1 instead.
+                os.environ.setdefault("YOLO_AUTOINSTALL", "false")
+
+                import torch
                 from ultralytics import YOLO
+
+                # 1) Weights, cached under ~/.vantag/models like every other
+                #    model this agent downloads (never the CWD, which may be
+                #    read-only or transient).
+                cache_dir = Path.home() / ".vantag" / "models"
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                weights = cache_dir / "yolov8s-worldv2.pt"
+                if not weights.exists():
+                    log.info(
+                        "Downloading YOLO-World weights (yolov8s-worldv2.pt, "
+                        "~25 MB, first use only)…"
+                    )
+                    import requests
+
+                    tmp = weights.with_suffix(".part")
+                    with requests.get(_WORLDV2_WEIGHTS_URL, stream=True, timeout=120) as r:
+                        r.raise_for_status()
+                        with open(tmp, "wb") as f:
+                            for chunk in r.iter_content(chunk_size=1 << 20):
+                                f.write(chunk)
+                    tmp.replace(weights)
+
+                # 2) Pre-baked CLIP text embeddings for the fixed vocabulary
+                #    (see _PRODUCT_PROMPT_EMBEDDINGS note above).
+                emb_path = Path(__file__).resolve().parent / _PRODUCT_PROMPT_EMBEDDINGS
+                if not emb_path.exists():
+                    raise FileNotFoundError(
+                        f"pre-baked prompt embeddings missing: {emb_path}"
+                    )
+                emb = np.load(emb_path).astype(np.float32)
+                if emb.shape != (1, len(PRODUCT_PROMPT_CLASSES), 512):
+                    raise ValueError(
+                        f"unexpected embeddings shape {emb.shape} — asset is "
+                        f"stale, re-bake for {len(PRODUCT_PROMPT_CLASSES)} classes"
+                    )
+
+                # 3) Load and inject. This replicates YOLOWorld.set_classes()
+                #    without ever touching the CLIP code path.
                 log.info(
                     "Loading YOLO-World (yolov8s-worldv2.pt) for shelf product "
-                    "counting (first use only, ~30s)…"
+                    "counting (first use only)…"
                 )
-                m = YOLO("yolov8s-worldv2.pt")
-                m.set_classes(PRODUCT_PROMPT_CLASSES)
+                m = YOLO(str(weights))
+                inner = m.model  # ultralytics.nn.tasks.WorldModel
+                inner.txt_feats = torch.from_numpy(emb)
+                inner.model[-1].nc = len(PRODUCT_PROMPT_CLASSES)
+                # names is read-only on the YOLOWorld wrapper (it proxies
+                # inner.names), so set it on the inner model only.
+                inner.names = list(PRODUCT_PROMPT_CLASSES)
                 self._model = m
-                log.info("YOLO-World shelf product counter ready.")
+                self.status.update({"state": "ready", "error": None})
+                log.info("YOLO-World shelf product counter ready (offline vocabulary).")
             except Exception as e:  # noqa: BLE001
                 log.warning(
                     f"YOLO-World unavailable ({e}) — Tier 2 product counting "
@@ -810,6 +891,7 @@ class ProductCountDetector:
                     f"the Tier 1 CV-only signal."
                 )
                 self._load_failed = True
+                self.status.update({"state": "failed", "error": str(e)[:300]})
 
     def count_products(self, crop: np.ndarray, conf_threshold: float = 0.15) -> Optional[dict]:
         """Run product detection on a shelf-zone crop.

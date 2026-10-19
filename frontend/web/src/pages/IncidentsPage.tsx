@@ -448,6 +448,20 @@ export default function IncidentsPage() {
                     <span className="text-xs text-slate-300 bg-slate-800/60 px-2 py-0.5 rounded">
                       {EVENT_TYPE_LABELS[inc.type] ?? inc.type}
                     </span>
+                    {/* Tier 2: real product counts from the edge agent's
+                        YOLO-World detector (only present when it actually
+                        ran — older agents / fallbacks show no badge). */}
+                    {inc.type === 'inventory_movement' &&
+                      typeof inc.metadata?.baseline_product_count === 'number' &&
+                      typeof inc.metadata?.current_product_count === 'number' && (
+                        <span
+                          title="YOLO-World product count on the shelf zone: before → after the change"
+                          className="text-[10px] font-bold tracking-wide text-emerald-300 bg-emerald-500/15 border border-emerald-500/40 px-1.5 py-0.5 rounded tabular-nums"
+                        >
+                          {inc.metadata.baseline_product_count as number} →{' '}
+                          {inc.metadata.current_product_count as number} products
+                        </span>
+                      )}
                     {inc.isDemo && (
                       <span
                         title="Synthetic test incident — generated for demo purposes, not a real detection"

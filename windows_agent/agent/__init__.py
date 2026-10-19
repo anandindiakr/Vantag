@@ -1,4 +1,21 @@
 """Vantag Windows Edge Agent"""
+# 1.11.0 — Tier 2 shelf product counting ACTUALLY works. Honest admission:
+# the YOLO-World product counter shipped earlier never ran on ANY store
+# machine — set_classes() requires the git-only `clip` package, which was
+# never in requirements.txt, so the model load failed silently and every
+# shelf event fell back to the Tier 1 CV-only signal. This build ships
+# pre-baked CLIP ViT-B/32 text embeddings for the fixed product vocabulary
+# (agent/assets/yolo_world_product_prompts.npy, ~14 KB) and injects them
+# directly into WorldModel.txt_feats — functionally identical to
+# set_classes() but with no clip package, no ~340 MB CLIP download and no
+# runtime package installs (YOLO_AUTOINSTALL is forced off; ultralytics
+# once tried to pip-install a full torch wheel at runtime and filled the
+# disk). Weights now cache under ~/.vantag/models like every other model.
+# The heartbeat reports product_count_status (idle/ready/failed) so the
+# dashboard can state plainly whether Tier 2 is live on a given machine,
+# and the backend now puts the counts in the incident description
+# ("6 → 5 products") with a badge on the Incidents page.
+#
 # 1.10.0 — BoT-SORT + VisionAI. The people-count tracker (agent/tracker.py)
 # now pairs ByteTrack's two-tier confidence association with a real 8-state
 # Kalman-filter motion model (agent/kalman_filter.py, pure numpy — the
@@ -80,4 +97,4 @@
 # NMS on the fallback path so a fallback can no longer inflate people counts,
 # and reports the verified status in every heartbeat so Admin -> System Health
 # shows the truth instead of an assumption.
-__version__ = "1.10.0"
+__version__ = "1.11.0"
