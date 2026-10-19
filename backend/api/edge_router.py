@@ -683,6 +683,18 @@ class HeartbeatBody(BaseModel):
     # YOLOv8 graph). Keys: architecture, model, expected_model, is_preferred,
     # ultralytics_version, acquire_error.
     model_status: dict | None = None
+    # Tier 2 shelf product counter (YOLO-World): state idle/ready/failed +
+    # error. Reported lazily by the agent — "idle" until the first shelf
+    # event loads the model.
+    product_count_status: dict | None = None
+    # VisionAI (VisualAISearch) dependency/availability status.
+    visionai_status: dict | None = None
+    # Per-camera shelf-watch diagnostics: camera_id → {enabled,
+    # zones_configured, zones: [{zone_id, label, baseline_cells,
+    # last_eval_at, last_skip_reason, last_event_at, ...}]}. Makes a silently
+    # not-firing shelf zone visible on the admin panel instead of looking
+    # like "nothing happened".
+    inventory_status: dict | None = None
     pending_incidents: int | None = None  # durable agent outbox depth
     # Plug-and-play door-relay candidates found on the store LAN by the agent
     # (windows_agent/agent/relay.py). Listed by the Door Relay setup wizard.
@@ -870,19 +882,29 @@ async def heartbeat(
     # and alert the administrator if it silently fell back off YOLO26. Before
     # this, a fallback was only a local log.warning on the customer's laptop —
     # invisible to us and to them, so degraded accuracy went unnoticed.
-    if body.model_status:
+    if body.model_status or body.product_count_status or body.inventory_status:
         try:
             from ..db import system_health_store as _sh_store
 
+            # One combined status blob per agent: the model keys stay at the
+            # top level (the admin panel reads is_preferred/architecture
+            # directly), the newer telemetry nests under its own key.
+            combined = dict(body.model_status or {})
+            if body.product_count_status:
+                combined["product_count"] = body.product_count_status
+            if body.visionai_status:
+                combined["visionai"] = body.visionai_status
+            if body.inventory_status:
+                combined["inventory"] = body.inventory_status
             _sh_store.record_agent_model_status(
                 str(agent.tenant_id),
                 str(agent.id),
                 body.agent_version or "",
-                body.model_status,
+                combined,
             )
             from ..services.system_health import clear_fault, report_fault
 
-            if body.model_status.get("is_preferred") is False:
+            if body.model_status and body.model_status.get("is_preferred") is False:
                 arch = body.model_status.get("architecture") or "unknown"
                 expected = body.model_status.get("expected_model") or "yolo26n"
                 await report_fault(
@@ -902,8 +924,25 @@ async def heartbeat(
                     ),
                     tenant_id=str(agent.tenant_id),
                 )
-            elif body.model_status.get("is_preferred") is True:
+            elif body.model_status and body.model_status.get("is_preferred") is True:
                 clear_fault("model_fallback")
+            # Tier 2 product counter failing on a store machine is exactly
+            # the kind of silent degradation the admin asked to be emailed
+            # about — report it like a model fallback.
+            pc_state = (body.product_count_status or {}).get("state")
+            if pc_state == "failed":
+                await report_fault(
+                    component="product_count_failed",
+                    summary="Tier 2 shelf product counting failed on an Edge Agent",
+                    detail=(
+                        f"agent_id={agent.id}\n"
+                        f"agent_version={body.agent_version}\n"
+                        f"error={(body.product_count_status or {}).get('error')}"
+                    ),
+                    tenant_id=str(agent.tenant_id),
+                )
+            elif pc_state == "ready":
+                clear_fault("product_count_failed")
         except Exception:  # noqa: BLE001 — never fail a heartbeat over telemetry
             logger.exception(
                 "Failed to record agent model status for agent %s", agent.id

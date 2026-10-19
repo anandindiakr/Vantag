@@ -1,4 +1,20 @@
 """Vantag Windows Edge Agent"""
+# 1.11.2 — Shelf baselines survive restarts + the detector can no longer
+# fail silently. Root cause of "picked an item right after upgrading the
+# agent and NO incident fired": baselines lived only in RAM, so the first
+# person-free frame after the restart quietly became the new baseline — if
+# that frame was the post-theft scene, the event could never fire. Cell
+# baselines (descriptor + crop) now persist to ~/.vantag/inventory_baselines
+# .json (geometry-guarded: frame size, grid and zone bbox must all still
+# match, so an edited zone never resurrects stale geometry) and are
+# restored on the first analysis pass after startup. Baselines also
+# auto-refresh after 50 consecutive stable person-free passes so slow
+# lighting drift never accumulates into a phantom change, and every zone
+# now reports diagnostics (baseline cell count, last decision, last skip
+# reason — "person in view", "no change detected", "waiting for cooldown")
+# in the heartbeat under inventory_status, surfaced on the backend's agent
+# status so a not-firing shelf is visibly explained instead of silent.
+#
 # 1.11.1 — Inventory evidence now shows the FULL picture. Previously the
 # alert snapshot drew only the single highest-scoring changed cell, which
 # read as "the yellow box is in the wrong place" whenever a shadow or
@@ -108,4 +124,4 @@
 # NMS on the fallback path so a fallback can no longer inflate people counts,
 # and reports the verified status in every heartbeat so Admin -> System Health
 # shows the truth instead of an assumption.
-__version__ = "1.11.1"
+__version__ = "1.11.2"

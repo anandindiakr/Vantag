@@ -415,6 +415,7 @@ def start_monitoring():
         fps_per_camera = {}
         person_counts = {}
         person_entries = {}
+        inventory_status = {}
         for w in _workers:
             cam_id = w.config.id
             camera_statuses[cam_id] = "online" if w.is_connected else "offline"
@@ -431,6 +432,14 @@ def start_monitoring():
                 person_entries[cam_id] = int(w._analyzer.entries_today)
             except Exception:  # noqa: BLE001
                 person_entries[cam_id] = 0
+            try:
+                # Shelf-watch diagnostics per camera: configured? baselines
+                # held? what did the detector last decide (and why not)?
+                inv = w._analyzer.get_inventory_status()
+                if inv.get("zones_configured"):
+                    inventory_status[cam_id] = inv
+            except Exception:  # noqa: BLE001
+                pass
         # Visible proof in the agent console of what is being counted
         counted = {w.config.name: person_counts.get(w.config.id, 0) for w in _workers}
         entries = {w.config.name: person_entries.get(w.config.id, 0) for w in _workers}
@@ -498,6 +507,7 @@ def start_monitoring():
             "model_status": model_status,
             "visionai_status": visionai_status,
             "product_count_status": product_count_status,
+            "inventory_status": inventory_status,
             "pending_incidents": _api.pending_incidents,
             "discovered_relays": _discovered_relays,
         })

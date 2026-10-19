@@ -12,11 +12,13 @@ Analyzers implemented
 """
 import base64
 import collections
+import json
 import logging
 import os
 import re
 import threading
 import time
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Optional
 from urllib.parse import quote, unquote
@@ -31,7 +33,7 @@ os.environ.setdefault(
 import cv2
 import numpy as np
 
-from .config import CameraConfig
+from .config import CameraConfig, CONFIG_DIR
 from .api_client import VantagApiClient
 from .inference import (
     YoloInference, RETAIL_CLASSES,
@@ -603,6 +605,12 @@ class DetectionAnalyzer:
     # change. Longer than this and the photo is dropped rather than shown,
     # since it could no longer represent who actually made the change.
     _INVENTORY_PERSON_EVIDENCE_MAX_AGE_SEC = 120.0
+    # After this many consecutive stable, person-free analysis passes with
+    # no change candidate, quietly refresh the baseline to the current
+    # scene so slow lighting drift (sun moving across the day) never
+    # accumulates into a phantom change. Cells with an in-progress change
+    # streak are excluded from the refresh.
+    _INVENTORY_BASELINE_REFRESH_FRAMES = 50
 
     def __init__(
         self,
@@ -732,6 +740,18 @@ class DetectionAnalyzer:
         # _analyze_inventory_zones below) — never per-frame. May be None
         # (model unavailable) — Tier 1 must keep working unaffected.
         self._product_count_detector = product_count_detector
+        # v1.11.2 — persisted baselines + stability refresh + diagnostics:
+        # previously every baseline lived only in RAM, so an agent restart
+        # wiped them; if the first person-free frame after the restart
+        # happened to be the moment AFTER an item was picked, the baseline
+        # silently re-formed around the new (item-less) scene and the event
+        # never fired. Baselines now persist under ~/.vantag and reload on
+        # startup, and refresh automatically after long stable person-free
+        # periods to absorb slow lighting drift.
+        self._inventory_stable_frames: dict[str, int] = {}
+        self._inventory_diag: dict[str, dict] = {}
+        self._baseline_store_last_save: float = 0.0
+        self._load_inventory_baselines()
 
         # High-Value Counter (jewellery / luxury goods) detectors, fed the
         # normalized scene profile from the backend's /api/edge/config
@@ -955,6 +975,261 @@ class DetectionAnalyzer:
         edge_change = min(1.0, abs(base["edge"] - cur["edge"]) / denom)
         return 0.6 * colour_change + 0.4 * edge_change, colour_change, edge_change
 
+    # ------------------------------------------------------------------
+    # Shelf baseline persistence + diagnostics (v1.11.2)
+    # ------------------------------------------------------------------
+    #
+    # WHY: baselines previously lived ONLY in RAM. After every agent restart
+    # the first person-free look at a cell silently became the new baseline —
+    # so if the user restarted the agent and picked an item before the first
+    # person-free frame, the baseline re-formed around the POST-THEFT scene
+    # and the event never fired (exactly what was observed after upgrading
+    # to 1.11.1). Baselines now persist to disk and are restored on startup,
+    # guarded by frame-size + grid + zone-bbox checks so a stale or edited
+    # zone never resurrects wrong geometry.
+
+    @staticmethod
+    def _inventory_baseline_store_path():
+        return CONFIG_DIR / "inventory_baselines.json"
+
+    # Serialises read-modify-write of the shared baselines file across the
+    # per-camera DetectionAnalyzer instances (one per camera thread).
+    _baseline_store_lock = threading.Lock()
+
+    def _load_inventory_baselines(self) -> None:
+        """Read the on-disk baseline records. Actual application is deferred
+        to the first analysis pass (we need the live frame size to validate
+        geometry)."""
+        self._pending_baseline_restore: dict = {}
+        try:
+            path = self._inventory_baseline_store_path()
+            if path.exists():
+                data = json.loads(path.read_text(encoding="utf-8"))
+                self._pending_baseline_restore = data.get(self.camera_id) or {}
+        except Exception as e:  # noqa: BLE001 — never block startup on this
+            log.warning("Could not read persisted shelf baselines: %s", e)
+            self._pending_baseline_restore = {}
+
+    def _restore_pending_baselines(self, frame_w: int, frame_h: int) -> None:
+        """Apply deferred baseline records whose geometry still matches the
+        live stream. Runs once, on the first analysis pass after startup."""
+        pending = self._pending_baseline_restore
+        self._pending_baseline_restore = {}
+        if not pending:
+            return
+        restored_cells = 0
+        for zone in self._inventory_zones:
+            zone_key = str(zone.get("id"))
+            rec = pending.get(zone_key) or {}
+            if not rec:
+                continue
+            # Geometry guards: frame size must match, grid must match, and
+            # the zone must not have been edited since the record was saved.
+            if rec.get("frame_w") != frame_w or rec.get("frame_h") != frame_h:
+                log.info(
+                    "Shelf zone '%s': skipping stale persisted baseline "
+                    "(frame size changed)", zone.get("label") or zone_key,
+                )
+                continue
+            bbox_px = self._zone_pixel_bbox(zone, frame_w, frame_h)
+            if bbox_px is None:
+                continue
+            zx1, zy1, zx2, zy2 = bbox_px
+            rows, cols = self._inventory_grid(zx2 - zx1, zy2 - zy1)
+            if rec.get("grid") != [rows, cols]:
+                log.info(
+                    "Shelf zone '%s': skipping stale persisted baseline "
+                    "(grid changed)", zone.get("label") or zone_key,
+                )
+                continue
+            stored_bbox = rec.get("zone_bbox") or []
+            if stored_bbox and any(
+                abs(a - b) > 4 for a, b in zip(stored_bbox, [zx1, zy1, zx2, zy2])
+            ):
+                log.info(
+                    "Shelf zone '%s': skipping stale persisted baseline "
+                    "(zone edited)", zone.get("label") or zone_key,
+                )
+                continue
+            cells = rec.get("cells") or {}
+            for key, cell in cells.items():
+                desc = cell.get("desc") or {}
+                hist = desc.get("hist")
+                if hist is None:
+                    continue
+                self._inventory_baseline_desc[key] = {
+                    "hist": np.asarray(hist, dtype=np.float32),
+                    "edge": float(desc.get("edge", 0.0)),
+                    "lum": float(desc.get("lum", 0.0)),
+                }
+                cb64 = cell.get("crop_b64")
+                if cb64:
+                    try:
+                        arr = cv2.imdecode(
+                            np.frombuffer(base64.b64decode(cb64), dtype=np.uint8),
+                            cv2.IMREAD_COLOR,
+                        )
+                        if arr is not None:
+                            self._inventory_baseline_crop[key] = arr
+                    except Exception:  # noqa: BLE001
+                        pass
+                restored_cells += 1
+            if rec.get("zone_lum"):
+                self._inventory_zone_lum[zone_key] = float(rec["zone_lum"])
+            if cells:
+                log.info(
+                    "Shelf zone '%s': restored %d persisted baseline cell(s) "
+                    "from %s — restart did NOT reset shelf memory",
+                    zone.get("label") or zone_key, len(cells),
+                    rec.get("saved_at"),
+                )
+        if restored_cells:
+            log.info(
+                "Restored %d persisted shelf baseline cell(s) for %s",
+                restored_cells, self.camera_id,
+            )
+
+    def _persist_inventory_baselines(self, force: bool = False) -> None:
+        """Write current baselines to disk (throttled to once per 10s unless
+        forced). Read-modify-write so other cameras' entries survive. Needs
+        frame geometry, so it is only called from the analysis path."""
+        now = time.time()
+        if not force and now - self._baseline_store_last_save < 10.0:
+            return
+        self._baseline_store_last_save = now
+        frame = getattr(self, "_last_frame_for_persist", None)
+        if frame is None:
+            return
+        fh, fw = frame.shape[:2]
+        try:
+            with self._baseline_store_lock:
+                path = self._inventory_baseline_store_path()
+                CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+                data: dict = {}
+                if path.exists():
+                    try:
+                        data = json.loads(path.read_text(encoding="utf-8"))
+                    except Exception:  # noqa: BLE001
+                        data = {}
+                # Rebuild this camera's record from scratch (rather than
+                # patching) so zones deleted in the UI disappear from disk too.
+                cam: dict = {}
+                data[self.camera_id] = cam
+                stamp = datetime.now(timezone.utc).isoformat()
+                for zone in self._inventory_zones:
+                    zone_key = str(zone.get("id"))
+                    bbox_px = self._zone_pixel_bbox(zone, fw, fh)
+                    if bbox_px is None:
+                        continue
+                    zx1, zy1, zx2, zy2 = bbox_px
+                    rows, cols = self._inventory_grid(zx2 - zx1, zy2 - zy1)
+                    cells: dict = {}
+                    for r in range(rows):
+                        for c in range(cols):
+                            key = f"{zone_key}:{r}_{c}"
+                            desc = self._inventory_baseline_desc.get(key)
+                            if not desc:
+                                continue
+                            entry = {
+                                "desc": {
+                                    "hist": desc["hist"].tolist(),
+                                    "edge": desc.get("edge", 0.0),
+                                    "lum": desc.get("lum", 0.0),
+                                }
+                            }
+                            crop = self._inventory_baseline_crop.get(key)
+                            if crop is not None:
+                                try:
+                                    ok, enc = cv2.imencode(
+                                        ".jpg", crop,
+                                        [cv2.IMWRITE_JPEG_QUALITY, 70],
+                                    )
+                                    if ok:
+                                        entry["crop_b64"] = base64.b64encode(
+                                            enc.tobytes()
+                                        ).decode("ascii")
+                                except Exception:  # noqa: BLE001
+                                    pass
+                            cells[key] = entry
+                    if not cells:
+                        continue
+                    cam[zone_key] = {
+                        "frame_w": fw,
+                        "frame_h": fh,
+                        "grid": [rows, cols],
+                        "zone_bbox": [zx1, zy1, zx2, zy2],
+                        "zone_lum": self._inventory_zone_lum.get(zone_key),
+                        "saved_at": stamp,
+                        "cells": cells,
+                    }
+                tmp = path.with_suffix(".tmp")
+                tmp.write_text(json.dumps(data), encoding="utf-8")
+                tmp.replace(path)
+        except Exception as e:  # noqa: BLE001 — persistence must never break detection
+            log.warning("Could not persist shelf baselines: %s", e)
+
+    def _refresh_zone_baseline(
+        self,
+        zone_key: str,
+        frame: np.ndarray,
+        zx1: int, zy1: int, zx2: int, zy2: int,
+        rows: int, cols: int,
+        lum_gain: float,
+    ) -> int:
+        """Re-capture every stable cell's baseline from the current
+        (person-free, change-free) frame. Cells with an in-progress change
+        streak are left alone so a real change is never absorbed."""
+        zone_w, zone_h = zx2 - zx1, zy2 - zy1
+        refreshed = 0
+        for r in range(rows):
+            for c in range(cols):
+                key = f"{zone_key}:{r}_{c}"
+                if key not in self._inventory_baseline_desc:
+                    continue
+                if key in self._inventory_change_since:
+                    continue
+                cx1 = zx1 + int(zone_w * c / cols)
+                cx2 = zx1 + int(zone_w * (c + 1) / cols)
+                cy1 = zy1 + int(zone_h * r / rows)
+                cy2 = zy1 + int(zone_h * (r + 1) / rows)
+                if cx2 - cx1 < 10 or cy2 - cy1 < 10:
+                    continue
+                rcrop = frame[cy1:cy2, cx1:cx2]
+                self._inventory_baseline_desc[key] = self._cell_descriptor(
+                    rcrop, lum_gain
+                )
+                self._inventory_baseline_crop[key] = rcrop.copy()
+                refreshed += 1
+        return refreshed
+
+    def _diag(self, zone_key: str) -> dict:
+        return self._inventory_diag.setdefault(zone_key, {})
+
+    def get_inventory_status(self) -> dict:
+        """Machine-readable snapshot for the heartbeat — lets the backend
+        (and the admin panel) state plainly whether shelf watching is
+        configured, how many baseline cells are held, and what the detector
+        last saw/decided, instead of silently doing nothing."""
+        zones = []
+        for zone in self._inventory_zones:
+            zone_key = str(zone.get("id"))
+            cells = sum(
+                1 for k in self._inventory_baseline_desc
+                if k.startswith(f"{zone_key}:")
+            )
+            entry = {
+                "zone_id": zone_key,
+                "label": zone.get("label") or "Shelf zone",
+                "baseline_cells": cells,
+            }
+            entry.update(self._inventory_diag.get(zone_key) or {})
+            zones.append(entry)
+        return {
+            "enabled": self._is_enabled("inventory_movement"),
+            "zones_configured": len(self._inventory_zones),
+            "zones": zones,
+        }
+
     def _analyze_inventory_zones(self, persons: list, frame: np.ndarray, now: float) -> list[dict]:
         """Real Tier-1 shelf/inventory-movement detection.
 
@@ -981,6 +1256,10 @@ class DetectionAnalyzer:
         events: list[dict] = []
         fh, fw = frame.shape[:2]
         seen_keys: set[str] = set()
+        # One-time restore of baselines persisted before the last restart —
+        # needs live frame geometry to validate, hence deferred to here.
+        self._restore_pending_baselines(fw, fh)
+        self._last_frame_for_persist = frame
 
         # Frame-level person evidence (fallback for the per-cell capture).
         # Throttled to ~2s so we don't re-encode a JPEG every frame.
@@ -1043,6 +1322,10 @@ class DetectionAnalyzer:
                         self._inventory_change_since.pop(k, None)
                         self._inventory_change_last_seen.pop(k, None)
                         self._inventory_change_frames.pop(k, None)
+                    self._diag(zone_key)["last_skip_reason"] = (
+                        f"re-baselined — lighting changed {abs(1.0 - lum_gain) * 100:.0f}% "
+                        "(beyond correction range)"
+                    )
                     continue
                 # Track slow drift so gradual daylight change never accumulates.
                 self._inventory_zone_lum[zone_key] = base_lum * 0.98 + zone_lum * 0.02
@@ -1056,6 +1339,8 @@ class DetectionAnalyzer:
             # than useless to the operator.
             candidates: list[dict] = []
             evaluated_cells = 0
+            person_in_zone = False
+            new_baselines = 0
 
             for r in range(rows):
                 for c in range(cols):
@@ -1068,6 +1353,7 @@ class DetectionAnalyzer:
                     key = f"{zone_key}:{r}_{c}"
 
                     if self._zone_has_person((cx1, cy1, cx2, cy2), persons, fw, fh):
+                        person_in_zone = True
                         # Remember who was last standing here (full frame,
                         # not just the tight crop) so a later confirmed
                         # change can still show a person, even though this
@@ -1093,6 +1379,7 @@ class DetectionAnalyzer:
                         # baseline, nothing to compare against yet.
                         self._inventory_baseline_desc[key] = desc
                         self._inventory_baseline_crop[key] = crop.copy()
+                        new_baselines += 1
                         continue
 
                     change_score, colour_change, edge_change = self._descriptor_change(
@@ -1137,7 +1424,48 @@ class DetectionAnalyzer:
                             "confirm_frames": frames,
                         })
 
+            diag = self._diag(zone_key)
+            diag["last_eval_at"] = int(now)
+            if person_in_zone:
+                # Never count stability (or absorb anything) while someone
+                # is standing at the shelf.
+                self._inventory_stable_frames[zone_key] = 0
+
+            if new_baselines:
+                # Freshly established baselines must survive a restart —
+                # otherwise the pre-v1.11.2 bug returns: item picked right
+                # after an agent restart silently became the new baseline.
+                self._persist_inventory_baselines()
+                diag["last_skip_reason"] = "establishing baselines"
+
             if not candidates:
+                if person_in_zone:
+                    diag["last_skip_reason"] = "person in view — shelf not evaluated"
+                elif not new_baselines:
+                    # Stable, person-free pass — count it, and after a long
+                    # stable run quietly refresh the baseline so slow
+                    # lighting drift never accumulates into a phantom change.
+                    stable = self._inventory_stable_frames.get(zone_key, 0) + 1
+                    self._inventory_stable_frames[zone_key] = stable
+                    diag["stable_frames"] = stable
+                    diag["last_skip_reason"] = (
+                        "no evaluable cells" if evaluated_cells == 0
+                        else "no change detected"
+                    )
+                    if stable >= self._INVENTORY_BASELINE_REFRESH_FRAMES:
+                        self._inventory_stable_frames[zone_key] = 0
+                        refreshed = self._refresh_zone_baseline(
+                            zone_key, frame, zx1, zy1, zx2, zy2,
+                            rows, cols, lum_gain,
+                        )
+                        if refreshed:
+                            diag["last_baseline_refresh_at"] = int(now)
+                            self._persist_inventory_baselines()
+                            log.info(
+                                "Shelf zone '%s': baseline refreshed after %d "
+                                "stable frames (%d cells)",
+                                zone.get("label") or zone_key, stable, refreshed,
+                            )
                 continue
 
             # A real item removal affects ONE product slot. If most of the
@@ -1158,6 +1486,11 @@ class DetectionAnalyzer:
                     self._inventory_change_since.pop(k, None)
                     self._inventory_change_last_seen.pop(k, None)
                     self._inventory_change_frames.pop(k, None)
+                self._persist_inventory_baselines(force=True)
+                diag["last_skip_reason"] = (
+                    f"whole-scene change suppressed ({len(candidates)}/"
+                    f"{evaluated_cells} cells — lighting/exposure)"
+                )
                 continue
 
             # Otherwise report the single most-changed cell — the one that
@@ -1281,6 +1614,9 @@ class DetectionAnalyzer:
             )
             if evt:
                 events.append(evt)
+                diag["last_event_at"] = int(now)
+                diag["last_change_score"] = round(float(change_score), 3)
+                diag["last_skip_reason"] = None
                 # Re-baseline every cell that was a candidate this pass so
                 # the same change doesn't keep re-firing (and so the cells
                 # we deliberately did NOT report don't fire on the next
@@ -1292,6 +1628,15 @@ class DetectionAnalyzer:
                     self._inventory_change_since.pop(k, None)
                     self._inventory_change_last_seen.pop(k, None)
                     self._inventory_change_frames.pop(k, None)
+                # Post-event baselines are the new truth — persist them so
+                # a restart right after an incident doesn't resurrect the
+                # pre-incident scene and re-fire (or miss) on startup.
+                self._persist_inventory_baselines(force=True)
+            else:
+                # Cooldown blocked the emit — the streak is kept alive so
+                # it fires as soon as the cooldown clears, but say so in
+                # diagnostics instead of looking silent.
+                diag["last_skip_reason"] = "change confirmed — waiting for cooldown"
             # If evt is None (this zone's cooldown hasn't elapsed yet),
             # deliberately do NOT re-baseline or clear the streak —
             # otherwise a confirmed change would be silently discarded and
@@ -1316,6 +1661,14 @@ class DetectionAnalyzer:
             self._inventory_last_person_jpeg.pop(k, None)
         for zk in [z for z in self._inventory_zone_lum if z not in seen_keys]:
             self._inventory_zone_lum.pop(zk, None)
+        for zk in [z for z in self._inventory_stable_frames if z not in seen_keys]:
+            self._inventory_stable_frames.pop(zk, None)
+        for zk in [z for z in self._inventory_diag if z not in seen_keys]:
+            self._inventory_diag.pop(zk, None)
+        if stale:
+            # A zone was deleted/edited away — drop its persisted baselines
+            # too, so they can't resurrect after a restart.
+            self._persist_inventory_baselines(force=True)
 
         return events
 
