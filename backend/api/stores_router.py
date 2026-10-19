@@ -18,6 +18,7 @@ The pipeline is injected at application startup via the ``set_pipeline`` helper.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 from datetime import datetime, timezone
@@ -726,8 +727,66 @@ async def list_incidents(
 ) -> IncidentListResponse:
     """Return a paginated incident list for an owned store, newest first."""
     await _assert_store_access(session, user.get("tenant_id"), store_id)
-    # Incident history is held in the on-box pipeline's in-memory buffer. On the
-    # SaaS backend there is none yet — return an empty page rather than 503.
+    tenant_id = str(user.get("tenant_id"))
+    et_lower = event_type.lower() if event_type and event_type != "all" else None
+
+    def _build_response(raws: List[dict], total: int, pages: int) -> IncidentListResponse:
+        incidents: List[IncidentResponse] = []
+        for raw in raws:
+            try:
+                incidents.append(
+                    IncidentResponse(
+                        incident_id=raw.get("incident_id", ""),
+                        store_id=store_id,
+                        camera_id=raw.get("camera_id", ""),
+                        event_type=raw.get("type", raw.get("event_type", "unknown")),
+                        severity=SeverityLevel(raw.get("severity", "low")),
+                        description=raw.get("description", ""),
+                        occurred_at=raw.get("timestamp", raw.get("occurred_at", datetime.now(tz=timezone.utc))),
+                        snapshot_url=raw.get("snapshot_url"),
+                        acknowledged=raw.get("acknowledged", False),
+                        is_demo=bool(raw.get("is_demo", False)),
+                        metadata=raw.get("metadata", {}),
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to parse incident record | error=%s", exc)
+                continue
+        return IncidentListResponse(
+            incidents=incidents,
+            pagination=PaginationMeta(page=page, limit=limit, total=total, pages=pages),
+        )
+
+    # PRIMARY source: the shared SQLite incident store. The backend runs two
+    # uvicorn workers (--workers 2), each holding its OWN in-memory
+    # recent_events buffer — an incident ingested by worker A was invisible
+    # to polls answered by worker B, so the Incident Log showed events and
+    # then lost them a few seconds later on the next 15s refetch. Both
+    # workers share the same incidents.db file, and edge ingest writes to it
+    # before responding, so reading it here is consistent AND immediate.
+    # This also makes the demo-purge button actually take effect on the page
+    # (purge deletes from SQLite; the page previously read only memory).
+    try:
+        from ..db import incident_store as _istore  # lazy import — avoids circular
+
+        raws, total, pages = await asyncio.to_thread(
+            _istore.query_incidents,
+            store_id,
+            page=page,
+            limit=limit,
+            event_type=et_lower,
+            tenant_id=tenant_id,
+        )
+        return _build_response(raws, total, pages)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "SQLite incident read failed, falling back to in-memory buffer | error=%s", exc
+        )
+
+    # FALLBACK: the pipeline's in-memory buffer (per-worker — only reached if
+    # the SQLite read itself failed). Incident history is held in the on-box
+    # pipeline's in-memory buffer. On the SaaS backend there is none yet —
+    # return an empty page rather than 503.
     if _pipeline is None:
         return IncidentListResponse(
             incidents=[],
@@ -743,15 +802,13 @@ async def list_incidents(
     # The in-memory buffer is shared by all tenants in an on-box process.
     # Filter by the authenticated tenant before applying pagination; edge
     # events always carry this claim from the authenticated agent.
-    tenant_id = str(user.get("tenant_id"))
-    all_incidents: List[dict] = [
+    all_incidents = [
         raw for raw in pipeline.recent_events.get(store_id, [])
         if raw.get("tenant_id") == tenant_id
     ]
 
     # Server-side event_type filter — applied before pagination so page counts are correct.
-    if event_type and event_type != "all":
-        et_lower = event_type.lower()
+    if et_lower:
         all_incidents = [
             r for r in all_incidents
             if (r.get("type") or r.get("event_type", "")).lower() == et_lower
@@ -760,35 +817,7 @@ async def list_incidents(
     total = len(all_incidents)
     pages = max(1, math.ceil(total / limit))
     start = (page - 1) * limit
-    end = start + limit
-    page_items = all_incidents[start:end]
-
-    incidents: List[IncidentResponse] = []
-    for raw in page_items:
-        try:
-            incidents.append(
-                IncidentResponse(
-                    incident_id=raw.get("incident_id", ""),
-                    store_id=store_id,
-                    camera_id=raw.get("camera_id", ""),
-                    event_type=raw.get("type", raw.get("event_type", "unknown")),
-                    severity=SeverityLevel(raw.get("severity", "low")),
-                    description=raw.get("description", ""),
-                    occurred_at=raw.get("timestamp", raw.get("occurred_at", datetime.now(tz=timezone.utc))),
-                    snapshot_url=raw.get("snapshot_url"),
-                    acknowledged=raw.get("acknowledged", False),
-                    is_demo=bool(raw.get("is_demo", False)),
-                    metadata=raw.get("metadata", {}),
-                )
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to parse incident record | error=%s", exc)
-            continue
-
-    return IncidentListResponse(
-        incidents=incidents,
-        pagination=PaginationMeta(page=page, limit=limit, total=total, pages=pages),
-    )
+    return _build_response(all_incidents[start:start + limit], total, pages)
 
 
 # ---------------------------------------------------------------------------

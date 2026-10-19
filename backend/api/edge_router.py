@@ -1481,12 +1481,27 @@ async def ingest_event(
         if isinstance(b_count, int) and isinstance(c_count, int):
             zone_label = body.metadata.get("zone_label") or "shelf zone"
             delta = c_count - b_count
-            direction = "removed" if delta < 0 else ("added" if delta > 0 else "changed")
-            description = (
-                f"Inventory change in '{zone_label}': {b_count} → {c_count} "
-                f"products ({abs(delta)} item(s) {direction}, detected by "
-                f"YOLO-World product counting)"
-            )
+            if delta != 0:
+                direction = "removed" if delta < 0 else "added"
+                description = (
+                    f"Inventory change in '{zone_label}': {b_count} → {c_count} "
+                    f"products ({abs(delta)} item(s) {direction}, detected by "
+                    f"YOLO-World product counting)"
+                )
+            elif b_count > 0:
+                description = (
+                    f"Visual change detected in '{zone_label}' — product count "
+                    f"unchanged ({b_count} items); likely rearrangement or lighting"
+                )
+            else:
+                # Counter ran but identified nothing in EITHER crop — claiming
+                # "0 items changed" is nonsense. The Tier 1 CV signal saw the
+                # change; the counter simply cannot resolve products in this
+                # view (small/dark/blurry zone). Say that honestly.
+                description = (
+                    f"Visual change detected in '{zone_label}' (product counter "
+                    f"could not identify individual items in this view)"
+                )
     incident = {
         "id": event.id,
         "incident_id": event.id,
