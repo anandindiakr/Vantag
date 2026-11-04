@@ -337,11 +337,6 @@ export default function Landing() {
   // Get the full RegionConfig for whichever region is active in the switcher
   const region: RegionConfig = IS_LOCALHOST ? (REGION_MAP[activeCode] ?? domainRegion) : domainRegion;
   const regionRow = REGION_SWITCHER.find(r => r.code === region.region) ?? REGION_SWITCHER[0];
-  const showPromotionalVideo = region.region === 'SG' && (
-    window.location.hostname === 'retail-vantag.com' ||
-    window.location.hostname === 'www.retail-vantag.com' ||
-    (IS_LOCALHOST && new URLSearchParams(window.location.search).get('previewVantagVideo') === '1')
-  );
 
   /* group features by category for display */
   const securityFeatures  = AI_FEATURES.filter(f => f.category === 'SECURITY');
@@ -517,13 +512,11 @@ export default function Landing() {
                 Start Free Trial
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
-              {showPromotionalVideo && (
-                <Dialog.Trigger asChild>
-                  <button type="button" onClick={(event) => { videoTriggerRef.current = event.currentTarget; }} className="flex items-center gap-2 px-6 py-4 rounded-2xl text-sm font-semibold border border-cyan-400/40 text-cyan-200 hover:text-white hover:border-cyan-300 transition-all">
-                    <Play className="w-4 h-4" aria-hidden="true" /> Watch the 1-minute video
-                  </button>
-                </Dialog.Trigger>
-              )}
+              <Dialog.Trigger asChild>
+                <button type="button" onClick={(event) => { videoTriggerRef.current = event.currentTarget; }} className="flex items-center gap-2 px-6 py-4 rounded-2xl text-sm font-semibold border border-cyan-400/40 text-cyan-200 hover:text-white hover:border-cyan-300 transition-all">
+                  <Play className="w-4 h-4" aria-hidden="true" /> Watch the 1-minute video
+                </button>
+              </Dialog.Trigger>
               <Link
                 to="/login"
                 className="flex items-center gap-2 px-6 py-4 rounded-2xl text-sm font-semibold border border-white/10 text-white/70 hover:text-white hover:border-white/25 transition-all"
@@ -654,18 +647,17 @@ export default function Landing() {
         </div>
       </section>
 
-      {showPromotionalVideo && (
-        <Section className="py-20 border-t border-white/5" id="vantag-video">
+      <Section className="py-20 border-t border-white/5" id="vantag-video">
           <div className="max-w-5xl mx-auto px-6 grid md:grid-cols-2 gap-10 md:gap-16 items-center">
             <div>
               <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-400/10 border border-cyan-400/25 text-cyan-300 font-mono-alt text-[11px] tracking-widest uppercase mb-5">
-                Vantag in one minute
+                {region.brandShort} in one minute
               </span>
               <h2 className="font-syne text-3xl sm:text-4xl font-black text-white leading-tight mb-5">
                 Your cameras.<br />A clearer next step.
               </h2>
               <p className="text-white/60 text-lg leading-relaxed mb-5">
-                Your team can’t watch every camera at once. See how Vantag can help bring potential events to your attention for review.
+                Your team can’t watch every camera at once. See how {region.brandShort} can help bring potential events to your attention for review.
               </p>
               <p className="text-white/45 text-sm leading-relaxed mb-7">
                 AI-generated fictional scenario for illustration. Not footage of a real incident or a live product demonstration.
@@ -682,7 +674,7 @@ export default function Landing() {
               </div>
             </div>
             <Dialog.Trigger asChild>
-              <button type="button" onClick={(event) => { videoTriggerRef.current = event.currentTarget; }} aria-label="Watch the Vantag promotional video" className="group relative mx-auto w-full max-w-[260px] overflow-hidden rounded-2xl border border-white/15 bg-black shadow-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-400">
+              <button type="button" onClick={(event) => { videoTriggerRef.current = event.currentTarget; }} aria-label={`Watch the ${region.brandShort} promotional video`} className="group relative mx-auto w-full max-w-[260px] overflow-hidden rounded-2xl border border-white/15 bg-black shadow-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-400">
                 <img src="/videos/vantag-series-poster.jpg" alt="" className="w-full aspect-[9/16] object-cover" loading="lazy" />
                 <span className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
                 <span className="absolute inset-0 flex items-center justify-center">
@@ -693,8 +685,7 @@ export default function Landing() {
               </button>
             </Dialog.Trigger>
           </div>
-        </Section>
-      )}
+      </Section>
 
       {/* ═══════════════════════════════════════════════════
           HIGH-VALUE COUNTER — BOLD FEATURE (JEWELLERS)
@@ -1171,7 +1162,7 @@ export default function Landing() {
             Your browser cannot play this video. <a href="/videos/vantag-series.mp4">Download the video</a>.
           </video>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <span className="text-sm text-white/50">Explore Vantag for your store.</span>
+            <span className="text-sm text-white/50">Explore {region.brandShort} for your store.</span>
             <Dialog.Close asChild>
               <Link to="/register" className="inline-flex items-center gap-2 rounded-xl bg-cyan-500 px-5 py-3 text-sm font-semibold text-black hover:bg-cyan-400 transition-colors">
                 Start Free Trial <ArrowRight className="w-4 h-4" aria-hidden="true" />
