@@ -74,6 +74,8 @@ snapshots/
 !frontend/web/public/*.png
 !frontend/web/public/*.jpg
 *.mp4
+!frontend/web/public/videos/vantag-series.mp4
+!frontend/web/public/videos/vantag-series-poster.jpg
 *.avi
 *.ts
 !frontend/**/*.ts
