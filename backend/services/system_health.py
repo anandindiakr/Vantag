@@ -20,7 +20,8 @@ Design notes
   lives in ``backend/db/system_health_store.py``.
 * **Deduplicated with a cooldown.** A failing component is usually hit
   repeatedly (every chat message, every 30s heartbeat). Emailing per
-  occurrence would bury the signal, so each ``component`` emails at most once
+  occurrence would bury the signal, so each component/instance emails at
+  most once
   per ``ALERT_COOLDOWN_MIN``. Occurrences are still counted, and the counter
   appears in the email so severity is visible.
 * **Never raises.** Every entry point swallows its own errors. Alerting about
@@ -77,6 +78,7 @@ async def report_fault(
     summary: str,
     detail: str = "",
     tenant_id: Optional[str] = None,
+    entity_id: Optional[str] = None,
 ) -> None:
     """Record a fault and email the administrator (at most once per cooldown).
 
@@ -84,7 +86,7 @@ async def report_fault(
     raises.
     """
     try:
-        rec = _store.record_fault(component, summary, detail, tenant_id)
+        rec = _store.record_fault(component, summary, detail, tenant_id, entity_id)
         occurrences = rec.get("occurrences", 1)
         last_alert = rec.get("last_alert_ts")
 
@@ -95,17 +97,19 @@ async def report_fault(
             )
             return
 
-        _store.mark_alerted(component)
+        _store.mark_alerted(component, tenant_id, entity_id)
         logger.error("Fault in %s — notifying admin: %s", component, summary)
         await _email_admin(component, rec)
     except Exception:  # noqa: BLE001 — alerting must never propagate
         logger.exception("report_fault(%s) failed", component)
 
 
-def clear_fault(component: str) -> None:
-    """Mark a component healthy again. Safe if it was never faulty."""
+def clear_fault(
+    component: str, tenant_id: Optional[str] = None, entity_id: Optional[str] = None
+) -> None:
+    """Mark one component/instance healthy without clearing another agent."""
     try:
-        _store.resolve_fault(component)
+        _store.resolve_fault(component, tenant_id, entity_id)
     except Exception:  # noqa: BLE001
         logger.exception("clear_fault(%s) failed", component)
 
@@ -152,8 +156,10 @@ def snapshot(tenant_id: Optional[str] = None) -> dict[str, Any]:
 
 
 def _fmt_fault(r: dict[str, Any]) -> dict[str, Any]:
+    component = (r.get("component") or "").split(":", 1)[0]
     return {
-        "component": r.get("component"),
+        "component": component,
+        "fault_key": r.get("component"),
         "summary": r.get("summary"),
         "detail": r.get("detail"),
         "tenant_id": r.get("tenant_id"),
@@ -162,7 +168,7 @@ def _fmt_fault(r: dict[str, Any]) -> dict[str, Any]:
         "last_seen": _iso(r.get("last_seen_ts")),
         "last_alert_at": _iso(r.get("last_alert_ts")),
         "resolved_at": _iso(r.get("resolved_ts")),
-        "impact": COMPONENT_IMPACT.get(r.get("component") or "", ""),
+        "impact": COMPONENT_IMPACT.get(component, ""),
     }
 
 

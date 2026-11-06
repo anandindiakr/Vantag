@@ -141,6 +141,10 @@ class YoloInference:
             import onnxruntime as ort
 
             # Auto-download if model not found
+            repair_existing_cache = (
+                model_path is None
+                and (Path.home() / ".vantag" / "models" / "yolo26n.onnx").exists()
+            )
             if model_path is None:
                 cache_dir = Path.home() / ".vantag" / "models"
                 cache_dir.mkdir(parents=True, exist_ok=True)
@@ -159,6 +163,11 @@ class YoloInference:
                     try:
                         rec = json.loads(manifest.read_text(encoding="utf-8"))
                         stale = rec.get("model") != self.PREFERRED_MODEL
+                        if not stale:
+                            # Cached startup skips _record(), so populate the
+                            # reported model from the validated manifest here.
+                            # The graph check below remains authoritative.
+                            self.status["model"] = rec.get("model")
                         if stale:
                             log.warning(
                                 "Cached detector is %s, not %s — re-acquiring.",
@@ -213,6 +222,18 @@ class YoloInference:
             except Exception as warmup_exc:  # noqa: BLE001
                 log.debug("ONNX warm-up skipped: %s", warmup_exc)
             self._verify_architecture(model_path)
+            if repair_existing_cache and not self.status.get("is_preferred"):
+                # A legacy-shaped cache used to survive this entire run and
+                # only repair on the NEXT restart. Re-export immediately,
+                # once, while bounding recovery to avoid a retry loop.
+                log.warning("Cached detector has the wrong architecture — repairing it now.")
+                self._session = None
+                self._acquire_model(model_path)
+                # The explicit path disables further managed-cache repair.
+                # If acquisition fell back to YOLOv8, keep that honest
+                # fallback instead of recursively retrying a broken export.
+                self._load_model(model_path)
+                return
             log.info(f"ONNX model loaded: {model_path} providers={providers}")
 
         except ImportError:
@@ -362,10 +383,10 @@ class YoloInference:
             # Runtime CPU provider handles best for this head; leaving it
             # unpinned made the export non-deterministic across ultralytics
             # releases.
-            # nms is deliberately NOT passed: YOLO26 is already NMS-free
-            # end-to-end, and asking for NMS applies it twice, which drops
-            # overlapping people — exactly the doorway case people counting
-            # depends on.
+            # nms=False is required: the exporter otherwise selects YOLO26's
+            # legacy one-to-many head, producing [1, 84, 8400] instead of the
+            # native end-to-end [1, 300, 6]. The filename alone cannot tell
+            # these two graphs apart.
             # dynamic=False keeps a fixed input shape, which both avoids a
             # known fragility in the e2e head export and lets ORT plan memory.
             exported = m.export(
@@ -374,7 +395,24 @@ class YoloInference:
                 opset=19,
                 dynamic=False,
                 simplify=True,
+                nms=False,
             )
+            # Verify the generated graph BEFORE promoting it to the cache.
+            # Otherwise an exporter change can silently label a YOLOv8-shaped
+            # model as YOLO26 until the next agent restart.
+            import onnxruntime as ort
+
+            export_session = ort.InferenceSession(
+                str(exported), providers=["CPUExecutionProvider"]
+            )
+            output_shape = list(export_session.get_outputs()[0].shape or [])
+            dims = [d for d in output_shape if isinstance(d, int) and d > 0]
+            if not dims or dims[-1] != 6:
+                raise RuntimeError(
+                    "YOLO26 export did not produce its native end-to-end head: "
+                    f"output_shape={output_shape}. Expected [1, 300, 6]."
+                )
+            del export_session
             shutil.copyfile(str(exported), model_path)
             _record(self.PREFERRED_MODEL)
             log.info(f"YOLO26n model ready at {model_path}")

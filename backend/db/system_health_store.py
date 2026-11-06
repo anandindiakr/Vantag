@@ -17,7 +17,8 @@ to see".
 
 Tables
 ------
-system_faults      : one row per component, with occurrence count + last alert
+system_faults      : one row per component (or per agent for agent-scoped
+                     faults), with occurrence count + last alert
 agent_model_status : one row per (tenant, agent) — which detector is really
                      running, as verified from the ONNX graph on the agent
 
@@ -97,11 +98,25 @@ def init_db() -> None:
 
 # ── Faults ─────────────────────────────────────────────────────────────────
 
+def _fault_key(
+    component: str, tenant_id: Optional[str] = None, entity_id: Optional[str] = None
+) -> str:
+    """Keep independent agents/tenants from overwriting each other's health.
+
+    The base component remains in the stored key for backwards-compatible
+    admin filtering. Existing unsuffixed rows continue to work unchanged.
+    """
+    if entity_id:
+        return f"{component}:{tenant_id or 'global'}:{entity_id}"
+    return component
+
+
 def record_fault(
     component: str,
     summary: str,
     detail: str = "",
     tenant_id: Optional[str] = None,
+    entity_id: Optional[str] = None,
 ) -> dict[str, Any]:
     """Upsert a fault record and return it (including whether to alert).
 
@@ -109,6 +124,7 @@ def record_fault(
     to email based on ``last_alert_ts``.
     """
     now = time.time()
+    fault_key = _fault_key(component, tenant_id, entity_id)
     conn = _get_conn()
     with _lock, conn:
         conn.execute(
@@ -125,31 +141,45 @@ def record_fault(
                 last_seen_ts = excluded.last_seen_ts,
                 resolved_ts = NULL
             """,
-            (component, summary, detail, tenant_id, now, now),
+            (fault_key, summary, detail, tenant_id, now, now),
         )
         row = conn.execute(
-            "SELECT * FROM system_faults WHERE component = ?", (component,)
+            "SELECT * FROM system_faults WHERE component = ?", (fault_key,)
         ).fetchone()
     return dict(row) if row else {}
 
 
-def mark_alerted(component: str) -> None:
+def mark_alerted(
+    component: str, tenant_id: Optional[str] = None, entity_id: Optional[str] = None
+) -> None:
     conn = _get_conn()
     with _lock, conn:
         conn.execute(
             "UPDATE system_faults SET last_alert_ts = ? WHERE component = ?",
-            (time.time(), component),
+            (time.time(), _fault_key(component, tenant_id, entity_id)),
         )
 
 
-def resolve_fault(component: str) -> None:
+def resolve_fault(
+    component: str, tenant_id: Optional[str] = None, entity_id: Optional[str] = None
+) -> None:
     conn = _get_conn()
+    now = time.time()
     with _lock, conn:
         conn.execute(
             "UPDATE system_faults SET resolved_ts = ? "
             "WHERE component = ? AND resolved_ts IS NULL",
-            (time.time(), component),
+            (now, _fault_key(component, tenant_id, entity_id)),
         )
+        if entity_id:
+            # Faults recorded before per-agent keys used one unsuffixed row.
+            # Retire that row only when its own detail identifies the agent
+            # that just recovered; another agent must never clear it.
+            conn.execute(
+                "UPDATE system_faults SET resolved_ts = ? "
+                "WHERE component = ? AND resolved_ts IS NULL AND detail LIKE ?",
+                (now, component, f"%agent_id={entity_id}%"),
+            )
 
 
 def list_faults() -> list[dict[str, Any]]:

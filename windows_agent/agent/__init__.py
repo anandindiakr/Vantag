@@ -1,4 +1,13 @@
 """Vantag Windows Edge Agent"""
+# 1.11.3 — YOLO26 native-head export is explicit and verified. Ultralytics
+# 8.4.202 selected YOLO26's legacy one-to-many head when nms was omitted,
+# exporting [1, 84, 8400] (reported as yolov8-legacy-nms) even though the
+# weights were yolo26n. Export now passes nms=False for the native NMS-free
+# [1, 300, 6] graph and inspects that graph BEFORE caching it, so a wrong
+# export can never be labelled YOLO26. Cached startups also restore the
+# reported model name correctly. Verified with a real 8.4.202 export,
+# actual ONNX inference, and a simulated restart from cache.
+#
 # 1.11.2 — Shelf baselines survive restarts + the detector can no longer
 # fail silently. Root cause of "picked an item right after upgrading the
 # agent and NO incident fired": baselines lived only in RAM, so the first
@@ -124,4 +133,4 @@
 # NMS on the fallback path so a fallback can no longer inflate people counts,
 # and reports the verified status in every heartbeat so Admin -> System Health
 # shows the truth instead of an assumption.
-__version__ = "1.11.2"
+__version__ = "1.11.3"

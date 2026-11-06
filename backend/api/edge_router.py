@@ -923,9 +923,10 @@ async def heartbeat(
                         f"acquire_error={body.model_status.get('acquire_error')}"
                     ),
                     tenant_id=str(agent.tenant_id),
+                    entity_id=str(agent.id),
                 )
             elif body.model_status and body.model_status.get("is_preferred") is True:
-                clear_fault("model_fallback")
+                clear_fault("model_fallback", str(agent.tenant_id), str(agent.id))
             # Tier 2 product counter failing on a store machine is exactly
             # the kind of silent degradation the admin asked to be emailed
             # about — report it like a model fallback.
@@ -940,9 +941,10 @@ async def heartbeat(
                         f"error={(body.product_count_status or {}).get('error')}"
                     ),
                     tenant_id=str(agent.tenant_id),
+                    entity_id=str(agent.id),
                 )
             elif pc_state == "ready":
-                clear_fault("product_count_failed")
+                clear_fault("product_count_failed", str(agent.tenant_id), str(agent.id))
         except Exception:  # noqa: BLE001 — never fail a heartbeat over telemetry
             logger.exception(
                 "Failed to record agent model status for agent %s", agent.id
