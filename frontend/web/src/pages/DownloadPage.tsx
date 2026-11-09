@@ -28,6 +28,7 @@ export default function DownloadPage() {
   const apiUrl = window.location.origin;
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [progress, setProgress] = React.useState<string | null>(null);
   const [version, setVersion] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -39,32 +40,75 @@ export default function DownloadPage() {
 
   const downloadAgent = async (platform: 'windows' | 'linux' | 'mac') => {
     setError(null);
+    setProgress(null);
     setBusy(platform);
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let file: FileSystemWritableFileStream | undefined;
+    let timedOut = false;
+    const resetTimeout = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { timedOut = true; controller.abort(); }, 120_000);
+    };
     try {
       const token = localStorage.getItem('vantag_token');
+      if (!token) throw new Error('Please sign in before downloading the agent.');
+      const filename = `vantag-edge-agent-${platform}${version ? `-v${version}` : ''}.zip`;
+      const picker = (window as Window & { showSaveFilePicker?: (options: object) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
+      if (picker) {
+        const handle = await picker.call(window, { suggestedName: filename, types: [{ description: 'ZIP archive', accept: { 'application/zip': ['.zip'] } }] });
+        file = await handle.createWritable();
+      }
+      setProgress('Preparing your account-specific package…');
+      resetTimeout();
       const res = await fetch(`/api/agent/download?platform=${platform}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.detail || `Download failed (${res.status}).`);
       }
-      const blob = await res.blob();
-      // Server sends a versioned filename (e.g. vantag-edge-agent-windows-v1.2.0.zip)
-      const cd = res.headers.get('Content-Disposition') || '';
-      const m = cd.match(/filename="?([^";]+)"?/);
-      const fname = m ? m[1] : `vantag-edge-agent-${platform}.zip`;
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fname;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      if (!res.body) throw new Error('Your browser cannot download this package. Please try Microsoft Edge or Chrome.');
+      const reader = res.body.getReader();
+      const total = Number(res.headers.get('Content-Length')) || 0;
+      const chunks: ArrayBuffer[] = [];
+      let received = 0;
+      while (true) {
+        resetTimeout();
+        const { done, value } = await reader.read();
+        if (done) break;
+        received += value.byteLength;
+        if (file) await file.write(value);
+        else chunks.push(new Uint8Array(value).buffer);
+        const mb = (received / 1024 / 1024).toFixed(1);
+        setProgress(total ? `Downloading ${mb} of ${(total / 1024 / 1024).toFixed(1)} MB (${Math.min(100, Math.floor(received / total * 100))}%)` : `Downloading ${mb} MB`);
+      }
+      if (total && received !== total) throw new Error('The download was incomplete. Please try again.');
+      clearTimeout(timer);
+      if (file) {
+        await file.close();
+        file = undefined;
+      } else {
+        const url = window.URL.createObjectURL(new Blob(chunks, { type: 'application/zip' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+      }
+      setProgress(platform === 'windows'
+        ? 'Download complete. Extract all files before running VantagAgent.exe.'
+        : 'Download complete. Extract all files before running the agent.');
     } catch (e: any) {
-      setError(e?.message || 'Download failed.');
+      if (file) await file.abort().catch(() => {});
+      if (timedOut) setError('Download stalled for 2 minutes. Check your internet connection and try again.');
+      else if (e?.name !== 'AbortError') setError(e?.message || 'Download failed. Please try again.');
+      setProgress(null);
     } finally {
+      clearTimeout(timer);
       setBusy(null);
     }
   };
@@ -104,6 +148,12 @@ export default function DownloadPage() {
           {error}
         </div>
       )}
+      {progress && (
+        <div role="status" aria-live="polite" className="mb-4 p-3 rounded-lg bg-violet-500/15 border border-violet-500/30 text-violet-100 text-sm">
+          {progress}{busy && ' — keep this page open until it finishes.'}
+        </div>
+      )}
+      <p className="mb-4 text-sm text-white/60">The Windows download is approximately 400 MB and may take several minutes. If prompted, choose where to save it.</p>
       <section className="grid md:grid-cols-3 gap-4 mb-12">
         <button
           onClick={() => downloadAgent('windows')}

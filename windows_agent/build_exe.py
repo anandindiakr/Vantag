@@ -59,11 +59,13 @@ def build():
         raise RuntimeError("Build using the dedicated 64-bit Python 3.11 environment")
     os.environ["YOLO_AUTOINSTALL"] = "false"
     prepare_models()
+    (ROOT / "agent" / "assets").mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ROOT / "assets" / "icon.ico", ROOT / "agent" / "assets" / "icon.ico")
     spec_dir = ROOT / "build" / "standalone_spec"
     spec_dir.mkdir(parents=True, exist_ok=True)
     command = [
         sys.executable, "-m", "PyInstaller", "--name", "VantagAgent", "--onedir",
-        "--windowed", "--noconfirm", "--noupx",
+        "--windowed", "--noconfirm", "--noupx", "--icon", str(ROOT / "assets" / "icon.ico"),
         "--distpath", str(OUTPUT_DIR), "--workpath", str(ROOT / "build" / "standalone_work"),
         "--specpath", str(spec_dir),
         "--hidden-import", "pystray._win32", "--hidden-import", "onnxruntime",
@@ -111,6 +113,21 @@ def build():
         if process.returncode != 0 or not result.get("ok") or not result.get("frozen") or result.get("version") != __version__:
             raise RuntimeError(f"Packaged smoke test failed: {result}")
         print(f"Packaged smoke test passed: {result}")
+
+        ui_result_file = Path(temporary) / "ui-result.json"
+        ui_process = subprocess.run(
+            [str(OUTPUT / "VantagAgent.exe"), "--ui-test", str(ui_result_file)],
+            cwd=temporary,
+            env=environment,
+            timeout=60,
+            check=False,
+        )
+        if not ui_result_file.is_file():
+            raise RuntimeError(f"Packaged UI smoke test did not report a result (exit {ui_process.returncode})")
+        ui_result = json.loads(ui_result_file.read_text(encoding="utf-8"))
+        if ui_process.returncode != 0 or not ui_result.get("ok") or ui_result.get("title") != "Vantag Edge Agent" or "test-camera" not in ui_result.get("cameras", []):
+            raise RuntimeError(f"Packaged UI smoke test failed: {ui_result}")
+        print(f"Packaged UI smoke test passed: {ui_result}")
 
     with zipfile.ZipFile(ARCHIVE, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=4, allowZip64=True) as archive:
         for path in OUTPUT.rglob("*"):

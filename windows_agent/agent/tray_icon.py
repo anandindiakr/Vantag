@@ -4,11 +4,12 @@ Provides start/stop, status, and quit from the Windows system tray.
 """
 import logging
 import threading
-from pathlib import Path
 from typing import Callable
 
 import pystray
-from PIL import Image, ImageDraw
+from PIL import Image
+
+from .resources import bundled_resource
 
 log = logging.getLogger("vantag.tray")
 
@@ -18,14 +19,14 @@ DARK = (10, 10, 15)
 
 
 def _make_icon(online: bool = True) -> Image.Image:
-    """Generate a 64×64 icon image programmatically."""
-    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    color = VIOLET if online else (100, 100, 100)
-    # Shield shape (simplified as rounded rectangle + circle)
-    draw.rounded_rectangle([8, 4, 56, 56], radius=10, fill=color)
-    draw.ellipse([22, 18, 42, 38], fill=(255, 255, 255))
-    return img
+    path = bundled_resource("agent", "assets", "icon.ico")
+    if not path.is_file():
+        path = bundled_resource("assets", "icon.ico")
+    with Image.open(path) as source:
+        image = source.convert("RGBA").resize((64, 64))
+    if not online:
+        image = image.convert("L").convert("RGBA")
+    return image
 
 
 class VantagTrayIcon:
@@ -36,10 +37,12 @@ class VantagTrayIcon:
         on_settings: Callable,
         on_quit: Callable,
         dashboard_url: str = "https://retail-vantag.com",
+        on_open: Callable | None = None,
     ):
         self._on_start = on_start
         self._on_stop = on_stop
         self._on_settings = on_settings
+        self._on_open = on_open or self._open_dashboard
         self._on_quit = on_quit
         self._dashboard_url = dashboard_url
         self._icon: pystray.Icon | None = None
@@ -48,6 +51,7 @@ class VantagTrayIcon:
     def _build_menu(self) -> pystray.Menu:
         return pystray.Menu(
             pystray.MenuItem("Vantag Edge Agent", None, enabled=False),
+            pystray.MenuItem("Open Agent Status", lambda icon, item: self._on_open(), default=True),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
                 "Start Monitoring",
@@ -63,15 +67,21 @@ class VantagTrayIcon:
 
     def _toggle_start(self):
         if self._running:
-            self._on_stop()
-            self._running = False
-            self._update_icon(online=False)
-            self._icon.notify("Vantag Agent stopped")
+            callback = self._on_stop
         else:
-            self._on_start()
-            self._running = True
-            self._update_icon(online=True)
-            self._icon.notify("Vantag Agent started")
+            callback = self._on_start
+        self._running = not self._running
+        self._update_icon(online=self._running)
+
+        def apply():
+            try:
+                callback()
+                if self._icon:
+                    self._icon.notify("Vantag Agent started" if self._running else "Vantag Agent stopped")
+            except Exception as exc:
+                log.error("Monitoring control failed: %s", exc)
+
+        threading.Thread(target=apply, daemon=True, name="tray-monitoring-control").start()
 
     def _update_icon(self, online: bool):
         if self._icon:

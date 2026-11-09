@@ -12,6 +12,7 @@ Responsibilities:
 """
 import logging
 import os
+import re
 import sys
 import time
 import threading
@@ -67,6 +68,31 @@ _workers: list[CameraWorker] = []
 _recent_events: list[dict] = []   # in-memory event log for tray tooltip
 _discovered_relays: list[dict] = []  # plug-and-play door relays found on the LAN
 _scan_lock = threading.Lock()     # guards against concurrent discovery scans
+_monitoring_lock = threading.RLock()
+_monitoring = False
+_monitoring_state = "starting"
+_monitoring_message = "Preparing the agent"
+_scheduler_started = False
+
+
+def get_agent_status() -> dict:
+    workers = list(_workers)
+    model_status = dict(getattr(_inference, "status", {}) or {}) if _inference else {}
+    return {
+        "state": _monitoring_state,
+        "message": _monitoring_message,
+        "backend_url": getattr(_config, "backend_url", ""),
+        "model": "YOLO26 active" if model_status.get("is_preferred") and model_status.get("provider") and not model_status.get("error") else model_status.get("error") or model_status.get("architecture") or "Starting",
+        "cameras": [
+            {
+                "id": w.config.id,
+                "name": w.config.name,
+                "status": "Connected" if w.is_connected else re.sub(r"rtsp://\S+", "rtsp://[hidden]", w.error_msg or "Connecting"),
+                "fps": round(w.current_fps, 1),
+            }
+            for w in workers
+        ],
+    }
 
 
 def run_relay_discovery(reason: str = "startup"):
@@ -236,11 +262,16 @@ def _build_worker(cam):
 
 
 def reconcile_cameras():
+    with _monitoring_lock:
+        _reconcile_cameras()
+
+
+def _reconcile_cameras():
     """Pull the latest camera list from the backend and start/stop workers so
     that cameras added, removed, enabled or disabled in the web dashboard take
     effect on a running agent WITHOUT requiring a restart."""
     global _workers, _inference
-    if _api is None:
+    if _api is None or not _monitoring:
         return
     try:
         remote = _api.get_config()
@@ -321,7 +352,26 @@ def reconcile_cameras():
 
 
 def start_monitoring():
-    global _workers, _inference, _pose_inference, _mqtt
+    global _monitoring, _monitoring_state, _monitoring_message
+    with _monitoring_lock:
+        if _monitoring:
+            return
+        _monitoring = True
+        _monitoring_state = "starting"
+        _monitoring_message = "Loading AI models and connecting cameras"
+        try:
+            _start_monitoring()
+            _monitoring_state = "running"
+            _monitoring_message = "Monitoring active" if _workers else "No cameras configured"
+        except Exception:
+            _monitoring = False
+            _monitoring_state = "error"
+            _monitoring_message = "Monitoring failed to start; check agent.log"
+            raise
+
+
+def _start_monitoring():
+    global _workers, _inference, _pose_inference, _mqtt, _scheduler_started
 
     log.info("Starting monitoring…")
 
@@ -537,35 +587,41 @@ def start_monitoring():
                     name=f"rtsp-probe-{_job.get('job_id', '?')[:8]}",
                 ).start()
 
-    schedule.every(30).seconds.do(send_heartbeat)
-    # Periodically reconcile the camera list with the dashboard so cameras the
-    # user adds/removes online start/stop monitoring without an agent restart.
-    schedule.every(20).seconds.do(reconcile_cameras)
-    threading.Thread(
-        target=lambda: [time.sleep(1) or schedule.run_pending() for _ in iter(int, 1)],
-        daemon=True,
-        name="heartbeat",
-    ).start()
+    if not _scheduler_started:
+        schedule.every(30).seconds.do(send_heartbeat)
+        # Periodically reconcile the camera list with the dashboard so cameras the
+        # user adds/removes online start/stop monitoring without an agent restart.
+        schedule.every(20).seconds.do(reconcile_cameras)
+        threading.Thread(
+            target=lambda: [time.sleep(1) or schedule.run_pending() for _ in iter(int, 1)],
+            daemon=True,
+            name="heartbeat",
+        ).start()
+        _scheduler_started = True
 
 
 def stop_monitoring():
-    global _workers, _mqtt
-    log.info("Stopping monitoring…")
-    for w in _workers:
-        w.stop()
-    _workers.clear()
-    if _mqtt:
-        _mqtt.disconnect()
-        _mqtt = None
-    log.info("Monitoring stopped")
+    global _workers, _mqtt, _monitoring, _monitoring_state, _monitoring_message
+    with _monitoring_lock:
+        _monitoring = False
+        _monitoring_state = "stopped"
+        _monitoring_message = "Monitoring stopped by the user"
+        log.info("Stopping monitoring…")
+        for w in _workers:
+            w.stop()
+        _workers.clear()
+        if _mqtt:
+            _mqtt.disconnect()
+            _mqtt = None
+        log.info("Monitoring stopped")
 
 
 def open_settings():
     webbrowser.open(f"{_config.backend_url}/onboarding")
 
 
-def main():
-    global _config, _api
+def main(background_tray: bool = False, on_open=None, on_quit=None):
+    global _config, _api, _monitoring_message
 
     # Minimise the console immediately — the agent lives in the system tray.
     _hide_console()
@@ -593,7 +649,7 @@ def main():
                 break
         if not _config.is_configured():
             log.error("Setup not completed within 10 minutes. Exiting.")
-            sys.exit(1)
+            raise RuntimeError("Setup not completed within 10 minutes")
 
     # Register / validate with backend
     _api = VantagApiClient(base_url=_config.backend_url, api_key=_config.api_key)
@@ -602,6 +658,7 @@ def main():
     # platform, hostname and OS version — fixes agents provisioned via
     # QR pairing showing up as "android".
     log.info("Registering agent with backend…")
+    _monitoring_message = "Registering with the Vantag backend"
     try:
         result = _api.register(device_type="windows")
         new_id = result.get("agent_id")
@@ -612,7 +669,7 @@ def main():
     except Exception as e:
         if not _config.agent_id:
             log.error(f"Registration failed: {e}")
-            sys.exit(1)
+            raise RuntimeError(f"Could not register with the Vantag backend: {e}") from e
         log.warning(f"Re-registration failed (continuing with saved agent_id): {e}")
 
     # Auto-start monitoring
@@ -640,11 +697,15 @@ def main():
         on_start=start_monitoring,
         on_stop=stop_monitoring,
         on_settings=open_settings,
-        on_quit=lambda: sys.exit(0),
+        on_open=on_open,
+        on_quit=on_quit or stop_monitoring,
         dashboard_url=_config.backend_url,
     )
     log.info("Vantag tray icon running. Right-click tray icon to control.")
-    tray.run()   # blocks until tray icon quits
+    if background_tray:
+        threading.Thread(target=tray.run, daemon=True, name="vantag-tray").start()
+    else:
+        tray.run()   # blocks until tray icon quits
 
 
 if __name__ == "__main__":
