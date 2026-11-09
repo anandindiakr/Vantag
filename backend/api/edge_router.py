@@ -2142,10 +2142,32 @@ async def download_agent(
         ],
     }
 
+    version = _agent_version()
+    fname = f"vantag-edge-agent-{platform}-v{version}.zip"
+    if platform == "windows":
+        from fastapi.concurrency import run_in_threadpool
+        from fastapi.responses import FileResponse
+        from starlette.background import BackgroundTask
+        from ..services.agent_package import PackageUnavailable, build_windows_package, remove_package
+
+        artifact = Path(os.getenv("VANTAG_WINDOWS_AGENT_ARTIFACT", "/app/data/agent-artifacts/windows-agent.zip"))
+        try:
+            filename = await run_in_threadpool(build_windows_package, artifact, config, version)
+        except PackageUnavailable as exc:
+            logger.error("Windows agent download unavailable: %s", exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return FileResponse(
+            filename,
+            media_type="application/zip",
+            filename=fname,
+            headers={"Cache-Control": "no-store"},
+            background=BackgroundTask(remove_package, filename),
+        )
+    if platform not in {"linux", "mac"}:
+        raise HTTPException(status_code=400, detail="Unsupported agent platform")
     data = _build_agent_zip(config, platform)
-    fname = f"vantag-edge-agent-{platform}-v{_agent_version()}.zip"
     return Response(
         content=data,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+        headers={"Content-Disposition": f'attachment; filename="{fname}"', "Cache-Control": "no-store"},
     )

@@ -185,11 +185,11 @@ const sections: Section[] = [
     content: (
       <>
         <p className="text-slate-400 text-xs mb-3">
-          The Edge Agent is a small Windows program that runs on the store PC and handles all local camera work.
+          The Edge Agent is a Windows program that runs on the store PC and handles local camera work.
         </p>
         <Step n={1} text={<>Download from <em>Install Edge Agent</em> in the sidebar. Extract the ZIP to any folder (e.g. <code className="bg-slate-800 px-1 rounded">C:\Vantag\</code>).</>} />
-        <Step n={2} text={<>Run <code className="bg-slate-800 px-1 rounded">retail-vantag.exe</code> (or <code className="bg-slate-800 px-1 rounded">run.bat</code>). The tray icon appears — green = connected.</>} />
-        <Step n={3} text={<>To make it start automatically with Windows: right-click <code className="bg-slate-800 px-1 rounded">run.bat</code> → Create shortcut → press <kbd className="bg-slate-700 px-1 rounded">Win+R</kbd> → type <code className="bg-slate-800 px-1 rounded">shell:startup</code> → paste the shortcut there.</>} />
+        <Step n={2} text={<>Run <code className="bg-slate-800 px-1 rounded">VantagAgent.exe</code>. Keep the other extracted files together in the same folder.</>} />
+        <Step n={3} text={<>To make it start automatically with Windows: right-click <code className="bg-slate-800 px-1 rounded">VantagAgent.exe</code> → Create shortcut → press <kbd className="bg-slate-700 px-1 rounded">Win+R</kbd> → type <code className="bg-slate-800 px-1 rounded">shell:startup</code> → paste the shortcut there.</>} />
         <Step n={4} text={<>If the agent gets stuck at "Scanning…" it has finished ONVIF probing but found no cameras. This is normal for NVR setups. Click <strong>Skip</strong> and add cameras manually via RTSP URL.</>} />
         <Step n={5} text={<>After updating the Vantag app, re-download and replace the agent folder to get the latest version. The version number is shown in Agent Status → Version.</>} />
 

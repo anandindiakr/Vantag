@@ -776,9 +776,9 @@ export default function AccountPage() {
 
             <div className="mt-3 p-4 bg-amber-500/5 border border-amber-500/15 rounded-xl text-xs text-amber-200/70 space-y-1.5">
               <p className="font-semibold text-amber-300">How to update an existing agent:</p>
-              <p>1. Copy this <code>config.json</code> into your extracted Edge Agent folder — the same folder that has <code>run.bat</code> (replace the old file)</p>
-              <p>2. Double-click <code>run.bat</code> to start (or restart) the agent — keep that window open or minimised</p>
-              <p>3. Within ~1 minute the Agent Status page shows ONLINE and cameras start connecting</p>
+              <p>1. Copy this <code>config.json</code> into your extracted Edge Agent folder beside <code>VantagAgent.exe</code> (replace the old file).</p>
+              <p>2. Restart the agent and double-click <code>VantagAgent.exe</code>. Look for its icon in the system tray.</p>
+              <p>3. Check the Agent Status page for ONLINE and allow time for cameras to connect.</p>
               <p>4. If cameras are not found automatically, go to <strong>Manage Cameras → Manual Add</strong></p>
             </div>
           </div>

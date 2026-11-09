@@ -44,8 +44,6 @@ export default function Pair() {
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
-  const apiBase = payload?.api_url || window.location.origin;
-
   const copyKey = async () => {
     if (!payload?.api_key) return;
     try {
@@ -61,8 +59,15 @@ export default function Pair() {
     setError(null);
     setBusy(platform);
     try {
-      const res = await fetch(`${apiBase}/api/agent/download?platform=${platform}`);
-      if (!res.ok) throw new Error(`Download failed (${res.status}).`);
+      const token = localStorage.getItem('vantag_token');
+      if (!token) throw new Error('Sign in to the same account on this PC before downloading the agent.');
+      const res = await fetch(`/api/agent/download?platform=${platform}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.detail || `Download failed (${res.status}).`);
+      }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -133,10 +138,10 @@ export default function Pair() {
             <div className="space-y-3 mb-6">
               <h2 className="text-sm font-semibold text-white/70">How to finish setup</h2>
               {[
-                'On a Windows or Linux PC that is on the SAME network as your cameras, download the Edge Agent below.',
-                'Unzip and run the agent (run.bat on Windows, run.sh on Linux).',
-                'When it asks for a pairing key, paste the key above — or scan this same QR from the agent\u2019s setup screen.',
-                'The agent auto-discovers your cameras and they appear on your dashboard within a minute.',
+                'On a PC on the SAME network as your cameras, sign in to the same account and download the Edge Agent below.',
+                'Extract all files and run VantagAgent.exe on Windows, or run.sh on Linux.',
+                'Keep the included config.json next to the agent; it contains your account configuration.',
+                'Check Agent Status and add cameras manually if discovery does not find them.',
               ].map((t, i) => (
                 <div key={i} className="flex gap-3 text-sm text-white/60">
                   <span className="shrink-0 w-6 h-6 rounded-full bg-violet-600/30 text-violet-200 text-xs flex items-center justify-center font-bold">{i + 1}</span>

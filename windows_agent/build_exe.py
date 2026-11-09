@@ -1,133 +1,125 @@
-"""
-Build the Vantag Windows Edge Agent as a standalone .exe using PyInstaller.
-
-Requirements:
-  - Python 3.11 or 3.12  (PyInstaller does not yet support 3.14)
-  - pip install pyinstaller pillow
-
-Usage:
-    python build_exe.py
-
-Output: dist/VantagAgent/VantagAgent.exe
-Then ZIP and upload: dist/VantagAgent/  (the whole folder)
-"""
+import importlib.util
+import json
+import os
+import shutil
 import subprocess
 import sys
-import struct
+import tempfile
+import zipfile
 from pathlib import Path
 
-ROOT = Path(__file__).parent
-ASSETS_DIR = ROOT / "assets"
-ICON_PATH = ASSETS_DIR / "icon.ico"
+ROOT = Path(__file__).resolve().parent
+REPO = ROOT.parent
+BUILD_MODELS = ROOT / "build" / "standalone_models"
+OUTPUT_DIR = ROOT / "build" / "standalone_output"
+OUTPUT = OUTPUT_DIR / "VantagAgent"
+ARCHIVE = OUTPUT_DIR / "windows-agent.zip"
+WORLD_URL = "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolov8s-worldv2.pt"
 
 
-def check_python_version():
-    major, minor = sys.version_info[:2]
-    if major != 3 or minor > 12:
-        print(f"[WARNING] Python {major}.{minor} detected.")
-        print("  PyInstaller works best with Python 3.11 or 3.12.")
-        print("  Python 3.13+ may have compatibility issues.")
-        print("  Consider installing Python 3.11: https://www.python.org/downloads/release/python-3119/")
-        resp = input("  Continue anyway? (y/N): ").strip().lower()
-        if resp != "y":
-            sys.exit(1)
+def prepare_models():
+    import onnxruntime as ort
+    import requests
+    from ultralytics import YOLO
 
-
-def generate_icon():
-    """Generate a minimal valid .ico file programmatically (no external tools needed)."""
-    ASSETS_DIR.mkdir(exist_ok=True)
-    if ICON_PATH.exists():
-        print(f"[OK] Icon found: {ICON_PATH}")
-        return
-
-    print("[*] Generating icon (no assets/icon.ico found)...")
-    try:
-        from PIL import Image, ImageDraw
-        # Violet shield icon matching the tray icon style
-        sizes = [256, 128, 64, 48, 32, 16]
-        images = []
-        for size in sizes:
-            img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(img)
-            pad = size // 8
-            draw.rounded_rectangle(
-                [pad, pad // 2, size - pad, size - pad],
-                radius=size // 8,
-                fill=(139, 92, 246),
-            )
-            cx, cy, r = size // 2, size // 2, size // 6
-            draw.ellipse([cx - r, cy - r - size // 10, cx + r, cy + r - size // 10],
-                         fill=(255, 255, 255))
-            images.append(img)
-        images[0].save(str(ICON_PATH), format="ICO", sizes=[(s, s) for s in sizes],
-                       append_images=images[1:])
-        print(f"[OK] Icon generated: {ICON_PATH}")
-    except ImportError:
-        print("[WARNING] Pillow not installed — building without icon")
-        return None
-    return ICON_PATH
+    BUILD_MODELS.mkdir(parents=True, exist_ok=True)
+    for weights, expected in (("yolo26n.pt", [1, 300, 6]), ("yolov8n-pose.pt", [1, 56, 8400])):
+        source = REPO / "models" / weights
+        if not source.is_file():
+            raise FileNotFoundError(f"Required source weights missing: {source}")
+        target_weights = BUILD_MODELS / weights
+        shutil.copyfile(source, target_weights)
+        model = YOLO(str(target_weights))
+        options = {"format": "onnx", "imgsz": 640, "dynamic": False, "nms": False}
+        if weights == "yolo26n.pt":
+            options.update(opset=19, simplify=True)
+        else:
+            options.update(opset=12, simplify=False)
+        exported = Path(model.export(**options))
+        session = ort.InferenceSession(str(exported), providers=["CPUExecutionProvider"])
+        shape = session.get_outputs()[0].shape
+        if shape != expected:
+            raise RuntimeError(f"Unexpected {weights} output shape: {shape}; expected {expected}")
+        del session
+    shutil.copyfile(REPO / "models" / "hand_landmarker.task", BUILD_MODELS / "hand_landmarker.task")
+    world = BUILD_MODELS / "yolov8s-worldv2.pt"
+    if not world.is_file():
+        temporary = world.with_suffix(".part")
+        with requests.get(WORLD_URL, stream=True, timeout=(30, 180)) as response:
+            response.raise_for_status()
+            with temporary.open("wb") as output:
+                for chunk in response.iter_content(1024 * 1024):
+                    output.write(chunk)
+        temporary.replace(world)
+    YOLO(str(world))
 
 
 def build():
-    check_python_version()
-    icon = generate_icon()
-
-    # Bundle the config template alongside the exe
-    cfg_template = ROOT / "config.template.json"
-    if not cfg_template.exists():
-        print("[WARNING] config.template.json not found — skipping bundle")
-
-    cmd = [
-        sys.executable, "-m", "PyInstaller",
-        "--name", "VantagAgent",
-        "--onedir",
-        "--windowed",           # No console window (runs via tray icon)
-        "--hidden-import", "pystray._win32",
-        "--hidden-import", "PIL._tkinter_finder",
-        "--hidden-import", "onnxruntime",
-        "--hidden-import", "schedule",
-        "--hidden-import", "psutil",
-        "--collect-submodules", "onnxruntime",
-        "--collect-submodules", "cv2",
-        "--noconfirm",
-        "--clean",
+    if sys.version_info[:2] != (3, 11):
+        raise RuntimeError("Build using the dedicated 64-bit Python 3.11 environment")
+    os.environ["YOLO_AUTOINSTALL"] = "false"
+    prepare_models()
+    spec_dir = ROOT / "build" / "standalone_spec"
+    spec_dir.mkdir(parents=True, exist_ok=True)
+    command = [
+        sys.executable, "-m", "PyInstaller", "--name", "VantagAgent", "--onedir",
+        "--windowed", "--noconfirm", "--noupx",
+        "--distpath", str(OUTPUT_DIR), "--workpath", str(ROOT / "build" / "standalone_work"),
+        "--specpath", str(spec_dir),
+        "--hidden-import", "pystray._win32", "--hidden-import", "onnxruntime",
+        "--collect-all", "ultralytics", "--collect-all", "mediapipe",
+        "--collect-all", "onnxruntime", "--collect-all", "cv2", "--collect-binaries", "torchvision",
+        "--add-data", f"{BUILD_MODELS}{os.pathsep}models",
+        "--add-data", f"{ROOT / 'agent' / 'assets'}{os.pathsep}agent/assets",
+        str(ROOT / "standalone_entry.py"),
     ]
+    subprocess.run(command, cwd=ROOT, check=True)
+    torchvision = importlib.util.find_spec("torchvision")
+    if torchvision is None or not torchvision.origin:
+        raise RuntimeError("torchvision is required for the standalone product counter")
+    torchvision_dir = Path(torchvision.origin).parent
+    for name in ("_C_stable.pyd", "image_stable.pyd"):
+        source = torchvision_dir / name
+        if not source.is_file():
+            raise FileNotFoundError(f"Required torchvision extension missing: {source}")
+        shutil.copyfile(source, OUTPUT / "_internal" / "torchvision" / name)
+    sys.path.insert(0, str(ROOT))
+    from agent import __version__
 
-    # Add icon if generated/found
-    if icon and icon.exists():
-        cmd += ["--icon", str(icon)]
-        cmd += ["--add-data", f"{ASSETS_DIR};assets"]
+    with tempfile.TemporaryDirectory(prefix="vantag-standalone-smoke-") as temporary:
+        result_file = Path(temporary) / "result.json"
+        environment = os.environ.copy()
+        environment.update({
+            "PATH": str(Path(os.environ["SYSTEMROOT"]) / "System32"),
+            "APPDATA": temporary,
+            "LOCALAPPDATA": temporary,
+            "USERPROFILE": temporary,
+            "YOLO_AUTOINSTALL": "false",
+        })
+        environment.pop("PYTHONPATH", None)
+        environment.pop("PYTHONHOME", None)
+        process = subprocess.run(
+            [str(OUTPUT / "VantagAgent.exe"), "--smoke-test", str(result_file)],
+            cwd=temporary,
+            env=environment,
+            timeout=600,
+            check=False,
+        )
+        if not result_file.is_file():
+            raise RuntimeError(f"Packaged smoke test did not report a result (exit {process.returncode})")
+        result = json.loads(result_file.read_text(encoding="utf-8"))
+        if process.returncode != 0 or not result.get("ok") or not result.get("frozen") or result.get("version") != __version__:
+            raise RuntimeError(f"Packaged smoke test failed: {result}")
+        print(f"Packaged smoke test passed: {result}")
 
-    # Bundle config template so users can rename it
-    if cfg_template.exists():
-        cmd += ["--add-data", f"{cfg_template};."]
-
-    cmd.append("agent/main.py")
-
-    print("\n" + "=" * 60)
-    print("Building VantagAgent.exe (this takes 2-5 minutes)...")
-    print("=" * 60 + "\n")
-    result = subprocess.run(cmd, cwd=str(ROOT))
-
-    if result.returncode == 0:
-        exe = ROOT / "dist" / "VantagAgent" / "VantagAgent.exe"
-        print("\n" + "=" * 60)
-        print("[SUCCESS] Build complete!")
-        print(f"  EXE: {exe}")
-        print(f"  DIR: {exe.parent}")
-        print("\nNext steps:")
-        print("  1. Copy config.template.json into dist/VantagAgent/ and rename to config.json")
-        print("  2. Set api_key in config.json")
-        print("  3. ZIP the entire dist/VantagAgent/ folder")
-        print("  4. Upload the ZIP to your VPS or distribute to store staff")
-        print("=" * 60)
-    else:
-        print("\n[FAILED] Build failed — check output above")
-        print("\nCommon fixes:")
-        print("  - Wrong Python version: use 3.11 or 3.12")
-        print("  - Missing PyInstaller: pip install pyinstaller")
-        print("  - Missing Pillow: pip install pillow")
-        sys.exit(1)
+    with zipfile.ZipFile(ARCHIVE, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=4, allowZip64=True) as archive:
+        for path in OUTPUT.rglob("*"):
+            if path.is_file():
+                archive.write(path, path.relative_to(OUTPUT).as_posix())
+        archive.writestr("PACKAGE_VERSION.txt", __version__)
+    print(f"Package: {ARCHIVE}")
+    print(f"Compressed bytes: {ARCHIVE.stat().st_size}")
+    print(f"Extracted bytes: {sum(path.stat().st_size for path in OUTPUT.rglob('*') if path.is_file())}")
 
 
 if __name__ == "__main__":

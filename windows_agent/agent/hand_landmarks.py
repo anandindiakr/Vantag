@@ -38,10 +38,13 @@ FINGERTIPS = (4, 8, 12, 16, 20)  # thumb, index, middle, ring, pinky tips
 
 
 def _candidate_model_paths() -> List[str]:
+    from .resources import bundled_resource
+
     here = Path(__file__).resolve()
     return [
-        str(here.parent.parent / "models" / "hand_landmarker.task"),      # zip layout
-        str(here.parent.parent.parent / "models" / "hand_landmarker.task"),  # repo layout
+        str(bundled_resource("models", "hand_landmarker.task")),
+        str(here.parent.parent / "models" / "hand_landmarker.task"),
+        str(here.parent.parent.parent / "models" / "hand_landmarker.task"),
     ]
 
 

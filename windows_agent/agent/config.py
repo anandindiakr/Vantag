@@ -5,6 +5,7 @@ Falls back to vantag_config.json in the executable directory.
 """
 import json
 import os
+import sys
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import List, Optional
@@ -94,7 +95,11 @@ class AgentConfig:
         # 2) The %APPDATA% config only carries locally-tuned / runtime-updated
         #    fields (door_control pushed from the dashboard wizard, scan_subnet,
         #    inference overrides), so those are merged back on top.
-        local_cfg = Path(__file__).resolve().parent.parent / "config.json"
+        local_cfg = (
+            Path(sys.executable).resolve().parent / "config.json"
+            if getattr(sys, "frozen", False)
+            else Path(__file__).resolve().parent.parent / "config.json"
+        )
 
         def _load(path: Path) -> Optional["AgentConfig"]:
             try:

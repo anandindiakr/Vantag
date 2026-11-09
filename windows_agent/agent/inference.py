@@ -16,6 +16,7 @@ affordable on a normal shop laptop.
 import json
 import logging
 import os
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -140,6 +141,14 @@ class YoloInference:
         try:
             import onnxruntime as ort
 
+            packaged_detector = model_path is None and getattr(sys, "frozen", False)
+            if packaged_detector:
+                from .resources import bundled_resource
+
+                model_path = str(bundled_resource("models", "yolo26n.onnx"))
+                if not Path(model_path).is_file():
+                    raise FileNotFoundError(f"Bundled YOLO26 model missing: {model_path}")
+
             # Auto-download if model not found
             repair_existing_cache = (
                 model_path is None
@@ -222,6 +231,11 @@ class YoloInference:
             except Exception as warmup_exc:  # noqa: BLE001
                 log.debug("ONNX warm-up skipped: %s", warmup_exc)
             self._verify_architecture(model_path)
+            if packaged_detector:
+                if not self.status.get("is_preferred"):
+                    self._session = None
+                    raise RuntimeError("Bundled YOLO26 model has an unexpected output shape")
+                self.status["model"] = self.PREFERRED_MODEL
             if repair_existing_cache and not self.status.get("is_preferred"):
                 # A legacy-shaped cache used to survive this entire run and
                 # only repair on the NEXT restart. Re-export immediately,
@@ -463,7 +477,7 @@ class YoloInference:
         if self._session is None:
             return []
 
-        t0 = time.time()
+        t0 = time.perf_counter()
         try:
             h, w = frame_bgr.shape[:2]
             blob = self._preprocess(frame_bgr)
@@ -671,6 +685,13 @@ class YoloPoseInference(YoloInference):
         try:
             import onnxruntime as ort
 
+            if model_path is None and getattr(sys, "frozen", False):
+                from .resources import bundled_resource
+
+                model_path = str(bundled_resource("models", "yolov8n-pose.onnx"))
+                if not Path(model_path).is_file():
+                    raise FileNotFoundError(f"Bundled pose model missing: {model_path}")
+
             if model_path is None:
                 cache_dir = Path.home() / ".vantag" / "models"
                 cache_dir.mkdir(parents=True, exist_ok=True)
@@ -874,9 +895,16 @@ class ProductCountDetector:
                 # 1) Weights, cached under ~/.vantag/models like every other
                 #    model this agent downloads (never the CWD, which may be
                 #    read-only or transient).
-                cache_dir = Path.home() / ".vantag" / "models"
-                cache_dir.mkdir(parents=True, exist_ok=True)
-                weights = cache_dir / "yolov8s-worldv2.pt"
+                if getattr(sys, "frozen", False):
+                    from .resources import bundled_resource
+
+                    weights = bundled_resource("models", "yolov8s-worldv2.pt")
+                    if not weights.is_file():
+                        raise FileNotFoundError(f"Bundled product-count model missing: {weights}")
+                else:
+                    cache_dir = Path.home() / ".vantag" / "models"
+                    cache_dir.mkdir(parents=True, exist_ok=True)
+                    weights = cache_dir / "yolov8s-worldv2.pt"
                 if not weights.exists():
                     log.info(
                         "Downloading YOLO-World weights (yolov8s-worldv2.pt, "
@@ -945,6 +973,7 @@ class ProductCountDetector:
         try:
             with self._model_lock:
                 results = self._model.predict(crop, conf=conf_threshold, verbose=False)
+                self.status.update({"state": "ready", "error": None})
             if not results:
                 return {"count": 0, "mean_confidence": 0.0}
             boxes = results[0].boxes
@@ -954,5 +983,6 @@ class ProductCountDetector:
             mean_conf = float(sum(confs) / len(confs)) if confs else 0.0
             return {"count": int(len(boxes)), "mean_confidence": round(mean_conf, 3)}
         except Exception as e:  # noqa: BLE001
+            self.status.update({"state": "failed", "error": str(e)[:300]})
             log.warning(f"Product count inference failed: {e}")
             return None

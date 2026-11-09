@@ -46,7 +46,8 @@ export default function DownloadPage() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) {
-        throw new Error(`Download failed (${res.status}). Please log in again.`);
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.detail || `Download failed (${res.status}).`);
       }
       const blob = await res.blob();
       // Server sends a versioned filename (e.g. vantag-edge-agent-windows-v1.2.0.zip)
@@ -158,7 +159,7 @@ export default function DownloadPage() {
               <h3 className="font-bold text-lg">Extract the downloaded file</h3>
             </div>
             <p className="text-white/60 ml-11">
-              Windows / Mac: right-click → Extract. Linux: <code className="bg-black/40 px-1.5 py-0.5 rounded">tar -xzf vantag-agent-linux.tar.gz</code>
+              Windows / Mac: right-click → Extract. Linux: <code className="bg-black/40 px-1.5 py-0.5 rounded">unzip vantag-edge-agent-linux.zip</code>
             </p>
           </div>
 
@@ -169,13 +170,13 @@ export default function DownloadPage() {
             </div>
             <div className="ml-11">
               <p className="text-white/60 mb-2">Open the extracted folder and run the launcher for your platform:</p>
-              <CodeBlock>{`# Windows: double-click
-run.bat
+              <CodeBlock>{`# Windows: double-click (no separate Python installation)
+VantagAgent.exe
 
-# Linux / Mac:
+# Linux / Mac (Python and internet required):
 chmod +x run.sh
 ./run.sh`}</CodeBlock>
-              <p className="text-white/60 mt-2">It auto-creates a Python environment, installs dependencies, and starts the agent.</p>
+              <p className="text-white/60 mt-2">On Windows, keep the extracted files together and look for the agent in the system tray. Linux and Mac install dependencies on first run.</p>
             </div>
           </div>
 

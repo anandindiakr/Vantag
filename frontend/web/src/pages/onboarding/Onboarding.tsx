@@ -105,7 +105,10 @@ export default function Onboarding() {
       const res = await fetch(`/api/agent/download?platform=${platform}`, {
         headers: { Authorization: `Bearer ${token()}` },
       });
-      if (!res.ok) throw new Error(`Download failed (${res.status}). Please log in again.`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.detail || `Download failed (${res.status}).`);
+      }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
