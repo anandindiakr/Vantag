@@ -23,6 +23,19 @@ Optional AI features may require additional downloads or dependencies.
 """
 
 
+PUBLIC_AGENT_HOSTS = frozenset({
+    "retailnazar.com", "retailnazar.in", "retailnazar.info", "retail-vantag.com",
+    "jagajaga.my", "retailjagajaga.com", "retailbantay.com", "retailbantay.ph",
+    "retailpantau.com",
+})
+
+
+def agent_backend_url(host: str, forwarded_proto: str) -> str:
+    hostname = host.split(":", 1)[0].lower()
+    scheme = "https" if hostname in PUBLIC_AGENT_HOSTS else forwarded_proto
+    return f"{scheme}://{host}"
+
+
 def remove_package(path: str) -> None:
     Path(path).unlink(missing_ok=True)
 

@@ -44,6 +44,19 @@ def test_missing_or_mismatched_package_fails_without_leaking_temp_files(tmp_path
     assert sorted(item.name for item in tmp_path.iterdir()) == ["base.zip"]
 
 
+@pytest.mark.parametrize("host", [
+    "retailnazar.com", "retailnazar.in", "retailnazar.info", "retail-vantag.com",
+    "jagajaga.my", "retailjagajaga.com", "retailbantay.com", "retailbantay.ph",
+    "retailpantau.com",
+])
+def test_public_domains_use_https_even_behind_http_proxy(host):
+    assert agent_package.agent_backend_url(host, "http") == f"https://{host}"
+
+
+def test_nonproduction_hosts_keep_forwarded_protocol():
+    assert agent_package.agent_backend_url("localhost:8800", "http") == "http://localhost:8800"
+
+
 def test_rejects_preconfigured_base_archive(tmp_path):
     base = tmp_path / "base.zip"
     create_base(base)

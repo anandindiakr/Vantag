@@ -2110,7 +2110,9 @@ async def download_agent(
     # canonical domain directly and never hits that redirect.
     if host.startswith("www."):
         host = host[4:]
-    backend_url = f"{proto}://{host}"
+    from ..services.agent_package import agent_backend_url
+
+    backend_url = agent_backend_url(host, proto)
     # MQTT broker is on the same VPS — strip the port from the Host header to
     # get just the hostname (retail-vantag.com / retailnazar.com / etc.)
     mqtt_host = host.split(":")[0]
