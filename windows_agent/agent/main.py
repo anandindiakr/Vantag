@@ -165,7 +165,8 @@ def _run_rtsp_probe_job(job: dict):
         # intentionally left credentials blank; authenticated cameras must be
         # probed with credentials supplied from the dashboard.
         creds = [(username or "", password or "")]
-        paths = discovery._candidate_paths(brand)
+        requested_path = job.get("rtsp_path")
+        paths = [requested_path] if requested_path else discovery._candidate_paths(brand)
         for path in paths:
             tried.append(path)
             for u, p in creds:
@@ -178,6 +179,10 @@ def _run_rtsp_probe_job(job: dict):
     except Exception as e:  # noqa: BLE001
         log.warning("RTSP probe job %s failed: %s", job_id, e)
 
+    diagnostic = None
+    if result is None:
+        diagnostic_path = job.get("rtsp_path") or (tried[0] if tried else "/")
+        diagnostic = discovery.diagnose_rtsp(f"rtsp://{ip}:{port}{diagnostic_path}")
     payload = {
         "job_id": job_id,
         "success": result is not None,
@@ -185,7 +190,8 @@ def _run_rtsp_probe_job(job: dict):
         "rtsp_url": result["rtsp_url"] if result else None,
         "brand": brand,
         "tried_paths": tried[:50],
-        "error": None if result else "No candidate RTSP path produced a video frame. Check IP, port and credentials.",
+        "thumbnail_base64": result.get("thumbnail") if result else None,
+        "error": diagnostic,
     }
     try:
         resp = _api._session.post(

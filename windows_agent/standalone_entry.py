@@ -56,6 +56,107 @@ def smoke_test(output_path: str) -> int:
     Path(output_path).write_text(json.dumps(result, indent=2), encoding="utf-8")
     return 0 if result["ok"] else 1
 
+def offline_smoke_test(output_path: str) -> int:
+    import base64
+    import re
+    import tempfile
+    import time
+    import webbrowser
+    from agent.local import configure_offline_environment
+
+    configure_offline_environment()
+    blocked = []
+
+    def network_guard(event, arguments):
+        if event == "socket.connect":
+            address = arguments[1]
+            if isinstance(address, tuple) and address[0] not in {"127.0.0.1", "::1"}:
+                blocked.append(str(address[0]))
+                raise RuntimeError("Offline package test blocked a non-loopback connection")
+        elif event == "socket.getaddrinfo" and arguments[0] not in {"localhost", "127.0.0.1", "::1", None}:
+            blocked.append(str(arguments[0]))
+            raise RuntimeError("Offline package test blocked an external DNS lookup")
+
+    sys.addaudithook(network_guard)
+    if smoke_test(output_path) != 0:
+        return 1
+    result = json.loads(Path(output_path).read_text(encoding="utf-8"))
+    result["ok"] = False
+    original_home = os.environ.get("USERPROFILE")
+    original_open = webbrowser.open
+    desktop = None
+    try:
+        import requests
+        from agent.local import desktop
+
+        with tempfile.TemporaryDirectory(prefix="vantag-offline-console-test-") as temporary:
+            os.environ["USERPROFILE"] = temporary
+            webbrowser.open = lambda *args, **kwargs: True
+            desktop.start_agent()
+            try:
+                deadline = time.monotonic() + 60
+                while time.monotonic() < deadline:
+                    state = desktop.get_runtime_status()
+                    if state["state"] == "Startup failed":
+                        raise RuntimeError(state["message"])
+                    if state["state"] == "Offline console ready":
+                        break
+                    time.sleep(0.1)
+                else:
+                    raise RuntimeError("Packaged offline console startup timed out")
+                url = desktop.current_backend_url()
+                with requests.Session() as client:
+                    client.trust_env = False
+
+                    def request(method, path, expected=200, **kwargs):
+                        response = client.request(method, url + path, timeout=15, **kwargs)
+                        if response.status_code != expected:
+                            raise RuntimeError(f"Offline console {path}: expected {expected}, got {response.status_code}")
+                        return response
+
+                    page = request("GET", "/").text
+                    for asset in re.findall(r'(?:src|href)="([^"]+)"', page):
+                        if not asset.startswith("/assets/"):
+                            raise RuntimeError("Offline console contains an unexpected asset URL")
+                        request("GET", asset)
+                    request("GET", "/api/status", 401)
+                    request("POST", "/api/setup", json={"username": "package-test", "password": "isolated-package-test-password"})
+                    request("POST", "/api/site", json={"name": "Isolated package test", "timezone": "Asia/Jakarta"})
+                    request("POST", "/api/cameras", 403, json={"name": "Unlicensed test"})
+                    request("GET", "/api/frame/test", 403)
+                    store = desktop._runtime.store
+                    if store.directory != Path(temporary) / ".vantag" / "offline-site":
+                        raise RuntimeError("Packaged test did not isolate the site directory")
+                    store.record_count("package-test", "2026-11-16", 1, 2, "test-run")
+                    store.record_event({"event_id": "package-test", "snapshot_b64": base64.b64encode(b"package-test-evidence").decode()})
+                    events = request("GET", "/api/events").json()
+                    evidence = request("GET", events[0]["evidence"]["snapshot_b64"]).content
+                    if evidence != b"package-test-evidence":
+                        raise RuntimeError("Packaged evidence did not round-trip")
+                    if request("GET", "/api/counts?day=2026-11-16").json()[0]["entries"] != 2:
+                        raise RuntimeError("Packaged count persistence did not round-trip")
+                    request("GET", "/api/counts.csv?day=2026-11-16")
+                    request("GET", "/api/backup")
+                    request("GET", "/api/status", 403, headers={"Origin": "https://example.com"})
+                    result["offline_console"] = "Loopback startup, bundled assets, owner login, timezone, licence restrictions, counts, evidence, CSV and backup passed"
+            finally:
+                desktop.stop_agent()
+        if blocked:
+            raise RuntimeError("Offline package attempted non-loopback networking")
+        result.update(ok=True, blocked_network_attempts=blocked, qualification="Development-host smoke test with Python socket guard, not clean-PC or firewall qualification")
+    except Exception:
+        result["error"] = traceback.format_exc()
+        result["blocked_network_attempts"] = blocked
+    finally:
+        webbrowser.open = original_open
+        if original_home is None:
+            os.environ.pop("USERPROFILE", None)
+        else:
+            os.environ["USERPROFILE"] = original_home
+    Path(output_path).write_text(json.dumps(result, indent=2), encoding="utf-8")
+    return 0 if result["ok"] else 1
+
+
 def ui_smoke_test(output_path: str) -> int:
     import subprocess
     import threading
@@ -123,6 +224,31 @@ def ui_smoke_test(output_path: str) -> int:
     return 0 if result["ok"] else 1
 
 
+def local_mode_requested(arguments=None, directory=None) -> bool:
+    arguments = sys.argv[1:] if arguments is None else arguments
+    if "--offline" in arguments:
+        return True
+    if directory is None:
+        from agent.resources import application_directory
+
+        directory = application_directory()
+    try:
+        return json.loads((Path(directory) / "config.json").read_text(encoding="utf-8")).get("mode") == "offline"
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def runtime_module():
+    import importlib
+
+    if local_mode_requested():
+        from agent.local import configure_offline_environment
+
+        configure_offline_environment()
+        return importlib.import_module("agent.local.desktop")
+    return importlib.import_module("agent.main")
+
+
 def run_desktop() -> int:
     import threading
     from agent.single_instance import SingleInstance, show_existing_window
@@ -144,7 +270,7 @@ def run_desktop() -> int:
 
     def bootstrap():
         try:
-            from agent import main as agent_main
+            agent_main = runtime_module()
 
             window.set_status_provider(agent_main.get_agent_status)
             agent_main.main(
@@ -163,16 +289,16 @@ def run_desktop() -> int:
             })
 
     def agent_main_start():
-        from agent.main import start_monitoring
-        start_monitoring()
+        runtime_module().start_monitoring()
 
     def agent_main_stop():
-        from agent.main import stop_monitoring
-        stop_monitoring()
+        runtime_module().stop_monitoring()
 
     def current_backend_url():
-        from agent.main import _config
-        return getattr(_config, "backend_url", None) or "https://retail-vantag.com"
+        module = runtime_module()
+        if local_mode_requested():
+            return module.current_backend_url() or "about:blank"
+        return getattr(module._config, "backend_url", None) or "https://retail-vantag.com"
 
     window = AgentStatusWindow(
         on_start=lambda: background(agent_main_start),
@@ -192,6 +318,8 @@ def run_desktop() -> int:
 
     poll_show_requests()
     window.run()
+    if local_mode_requested():
+        runtime_module().stop_agent()
     instance.release()
     return 0
 
@@ -202,6 +330,8 @@ if __name__ == "__main__":
 
         show_existing_window(name="Local\\VantagAgentPackageTest")
         sys.exit(0)
+    if len(sys.argv) == 3 and sys.argv[1] == "--offline-smoke-test":
+        sys.exit(offline_smoke_test(sys.argv[2]))
     if len(sys.argv) == 3 and sys.argv[1] == "--smoke-test":
         sys.exit(smoke_test(sys.argv[2]))
     if len(sys.argv) == 3 and sys.argv[1] == "--ui-test":

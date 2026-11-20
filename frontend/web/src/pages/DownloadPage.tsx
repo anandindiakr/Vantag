@@ -30,15 +30,23 @@ export default function DownloadPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [progress, setProgress] = React.useState<string | null>(null);
   const [version, setVersion] = React.useState<string | null>(null);
+  const [offlineAvailable, setOfflineAvailable] = React.useState(false);
 
   React.useEffect(() => {
     fetch('/api/agent/version')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => data?.version && setVersion(data.version))
       .catch(() => {});
+    const token = localStorage.getItem('vantag_token');
+    if (token) {
+      fetch('/api/agent/offline/availability', { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => setOfflineAvailable(data?.available === true))
+        .catch(() => setOfflineAvailable(false));
+    }
   }, []);
 
-  const downloadAgent = async (platform: 'windows' | 'linux' | 'mac') => {
+  const downloadAgent = async (platform: 'windows' | 'linux' | 'mac' | 'offline') => {
     setError(null);
     setProgress(null);
     setBusy(platform);
@@ -53,7 +61,7 @@ export default function DownloadPage() {
     try {
       const token = localStorage.getItem('vantag_token');
       if (!token) throw new Error('Please sign in before downloading the agent.');
-      const filename = `vantag-edge-agent-${platform}${version ? `-v${version}` : ''}.zip`;
+      const filename = `${platform === 'offline' ? 'vantag-offline-agent-windows' : `vantag-edge-agent-${platform}`}${version ? `-v${version}` : ''}.zip`;
       const picker = (window as Window & { showSaveFilePicker?: (options: object) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
       if (picker) {
         const handle = await picker.call(window, { suggestedName: filename, types: [{ description: 'ZIP archive', accept: { 'application/zip': ['.zip'] } }] });
@@ -61,7 +69,7 @@ export default function DownloadPage() {
       }
       setProgress('Preparing your account-specific package…');
       resetTimeout();
-      const res = await fetch(`/api/agent/download?platform=${platform}`, {
+      const res = await fetch(platform === 'offline' ? '/api/agent/offline/download' : `/api/agent/download?platform=${platform}`, {
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
       });
@@ -99,7 +107,9 @@ export default function DownloadPage() {
         link.remove();
         setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
       }
-      setProgress(platform === 'windows'
+      setProgress(platform === 'offline'
+        ? 'Download complete. Extract all files, run VantagAgent.exe and create your local owner login on the camera PC.'
+        : platform === 'windows'
         ? 'Download complete. Extract all files before running VantagAgent.exe.'
         : 'Download complete. Extract all files before running the agent.');
     } catch (e: any) {
@@ -196,6 +206,16 @@ export default function DownloadPage() {
             {busy === 'mac' ? 'Preparing…' : 'Download .zip'}
           </div>
         </button>
+      </section>
+
+      <section className="mb-12 rounded-xl border border-white/10 bg-white/5 p-6">
+        <h2 className="text-2xl font-bold mb-3">Offline Site Console · Windows</h2>
+        <p className="text-white/70 mb-3">A separate operating mode for onboarding and viewing LAN cameras on the same PC without a public website. Only packaged, qualified local AI features are supported; cloud email, payments and remote dashboards are not available offline.</p>
+        <p className="text-white/60 mb-4">Your paid period, trial or approved extension sets the entitlement expiry, followed by seven days of grace. Afterwards, live viewing and new AI stop; saved records and renewal remain accessible. Renew using a signed file transferred from an internet-connected PC.</p>
+        <button disabled={!offlineAvailable || busy !== null} onClick={() => downloadAgent('offline')} className="rounded-lg bg-violet-600 px-5 py-3 font-semibold disabled:opacity-50">
+          {busy === 'offline' ? 'Preparing offline package…' : offlineAvailable ? 'Download account-specific offline package' : 'Under validation — not available for installation'}
+        </button>
+        {!offlineAvailable && <p className="text-sm text-amber-200 mt-3">Distribution stays blocked until disconnected packaged-app checks and model redistribution approvals are complete. The online agent above does not provide disconnected onboarding.</p>}
       </section>
 
       {/* ── Installation steps ───────────────────────────────────────────── */}

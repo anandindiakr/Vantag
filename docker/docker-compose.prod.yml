@@ -132,6 +132,10 @@ services:
       DATABASE_URL:         postgresql+asyncpg://${POSTGRES_USER:-vantag}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vantag}
       VANTAG_JWT_SECRET:    ${VANTAG_JWT_SECRET}
       VANTAG_FACE_KEY:      ${VANTAG_FACE_KEY}
+      VANTAG_OFFLINE_RELEASE_READY: ${VANTAG_OFFLINE_RELEASE_READY:-0}
+      VANTAG_OFFLINE_SIGNING_KEY_FILE: ${VANTAG_OFFLINE_SIGNING_KEY_FILE:-/app/data/offline-keys/issuer.pem}
+      VANTAG_OFFLINE_KEY_ID: ${VANTAG_OFFLINE_KEY_ID:-vantag-offline-2026}
+      VANTAG_WINDOWS_OFFLINE_ARTIFACT: ${VANTAG_WINDOWS_OFFLINE_ARTIFACT:-/app/data/agent-artifacts/windows-offline-agent.zip}
       MQTT_BROKER:          mosquitto
       MQTT_PORT:            ${MQTT_PORT:-1883}
       MQTT_TLS:             ${MQTT_TLS:-false}

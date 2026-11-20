@@ -36,11 +36,52 @@ def agent_backend_url(host: str, forwarded_proto: str) -> str:
     return f"{scheme}://{host}"
 
 
+def validate_offline_windows_artifact(artifact: Path, version: str) -> dict:
+    try:
+        with zipfile.ZipFile(artifact) as source:
+            qualification = json.loads(source.read("OFFLINE_CAPABILITIES.json"))
+            if qualification.get("version") != version or not qualification.get("disconnected_core_validated") or not qualification.get("commercial_redistribution_approved"):
+                raise ValueError("Offline qualification has not passed")
+            keys = json.loads(source.read("_internal/offline_keys.json"))
+            from cryptography.hazmat.primitives import serialization
+            from .offline_entitlement import signing_key
+            key_id, private = signing_key()
+            expected = private.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+            if keys.get(key_id) != expected:
+                raise ValueError("The package does not trust the licence signer")
+    except (zipfile.BadZipFile, KeyError, ValueError, OSError) as exc:
+        raise PackageUnavailable("The offline artifact is not qualified for distribution") from exc
+    return qualification
+
+
+def build_offline_windows_package(artifact: Path, envelope: dict, version: str, temporary_directory: Path | None = None) -> str:
+    validate_offline_windows_artifact(artifact, version)
+    readme = """Vantag Offline Site Console
+
+Extract all files. Keep config.json, offline-entitlement.json and _internal beside VantagAgent.exe.
+Run VantagAgent.exe. Create a LOCAL owner login in the console opened on this PC.
+Configure NVR/camera channels on the same local network; internet is not required for supported local functions.
+AI feature coverage and hardware requirements are listed in OFFLINE_CAPABILITIES.json and local health.
+After entitlement expiry there is seven days of grace, then live viewing and new AI processing stop.
+Saved records and reports remain accessible. Export a device renewal request and import a signed renewal file.
+Cloud email, hosted dashboards, online payments and off-site live viewing are not live offline.
+Keep this account-specific package private. Back up the local site data before upgrades.
+"""
+    filename = build_windows_package(artifact, {"mode": "offline"}, version, temporary_directory, readme=readme)
+    try:
+        with zipfile.ZipFile(filename, "a", compression=zipfile.ZIP_DEFLATED) as output:
+            output.writestr("offline-entitlement.json", json.dumps(envelope, indent=2))
+        return filename
+    except BaseException:
+        remove_package(filename)
+        raise
+
+
 def remove_package(path: str) -> None:
     Path(path).unlink(missing_ok=True)
 
 
-def build_windows_package(base: Path, config: dict, version: str, temp_dir: Path | None = None) -> str:
+def build_windows_package(base: Path, config: dict, version: str, temp_dir: Path | None = None, readme: str = WINDOWS_README) -> str:
     try:
         with zipfile.ZipFile(base) as archive:
             names = archive.namelist()
@@ -48,6 +89,7 @@ def build_windows_package(base: Path, config: dict, version: str, temp_dir: Path
                 names.count("VantagAgent.exe") != 1
                 or names.count("PACKAGE_VERSION.txt") != 1
                 or "config.json" in names
+                or "offline-entitlement.json" in names
                 or archive.read("PACKAGE_VERSION.txt").decode("utf-8").strip() != version
             ):
                 raise PackageUnavailable("The standalone Windows agent package is invalid or outdated.")
@@ -61,7 +103,7 @@ def build_windows_package(base: Path, config: dict, version: str, temp_dir: Path
         with zipfile.ZipFile(filename, "a", compression=zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("config.json", json.dumps(config, indent=2))
             archive.writestr("VERSION.txt", f"Vantag Edge Agent v{version}\n")
-            archive.writestr("README.txt", WINDOWS_README)
+            archive.writestr("README.txt", readme)
         return filename
     except BaseException:
         remove_package(filename)

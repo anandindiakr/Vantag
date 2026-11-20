@@ -123,6 +123,40 @@ interface TestResult {
   thumbnail_base64?: string;
   error?: string;
   lan_unreachable?: boolean;
+  queued?: boolean;
+  job_id?: string;
+}
+
+async function testCameraStream(body: {
+  ip: string; port: number; username?: string; password?: string; rtsp_path: string;
+}): Promise<TestResult> {
+  const response = await api.post<TestResult>('/cameras/test', body);
+  if (!response.data.queued || !response.data.job_id) return response.data;
+  const deadline = Date.now() + 95_000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const result = await api.get<{
+      status: string; success?: boolean; rtsp_path?: string;
+      thumbnail_base64?: string; error?: string;
+    }>(`/cameras/auto-detect-path/result/${response.data.job_id}`);
+    if (result.data.status === 'expired') {
+      return { success: false, error: 'Connection test expired. Start the Edge Agent and retry.' };
+    }
+    if (result.data.status === 'done') {
+      const expectedPath = body.rtsp_path.startsWith('/') ? body.rtsp_path : `/${body.rtsp_path}`;
+      if (result.data.success && result.data.rtsp_path === expectedPath && result.data.thumbnail_base64) {
+        return { success: true, thumbnail_base64: result.data.thumbnail_base64 };
+      }
+      return {
+        success: false,
+        error: result.data.error ?? 'No preview received for this stream. Update the Edge Agent and check the NVR channel and RTSP permissions.',
+      };
+    }
+  }
+  return {
+    success: false,
+    error: 'No video confirmation from the Edge Agent within 95 seconds. Check that it is running on the NVR network and connected to this account.',
+  };
 }
 
 interface AutoDetectResult {
@@ -582,7 +616,7 @@ function ManualAddSectionWrapper({
 
   // Auto-detect state
   const [detecting, setDetecting] = useState(false);
-  const [detectProgress, setDetectProgress] = useState<{ tried: number; total: number } | null>(null);
+  const [detectProgress, setDetectProgress] = useState<string | null>(null);
 
   const set = (key: keyof typeof BLANK_FORM) => (v: string) =>
     setForm((f) => ({ ...f, [key]: v }));
@@ -605,18 +639,16 @@ function ManualAddSectionWrapper({
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await api.post<TestResult>('/cameras/test', {
+      const result = await testCameraStream({
         ip: form.ip,
         port: Number(form.port),
         username: form.username || undefined,
         password: form.password || undefined,
         rtsp_path: form.rtsp_path || '/',
       });
-      setTestResult(res.data);
-      if (res.data.success) toast.success('Connection successful!');
-      else if (res.data.lan_unreachable)
-        toast.success('LAN camera detected — click "Save Camera" and your Edge Agent will validate it locally.');
-      else toast.error(res.data.error ?? 'Connection failed.');
+      setTestResult(result);
+      if (result.success) toast.success('Video frame received — connection verified.');
+      else toast.error(result.error ?? 'Connection failed.');
     } catch (err: unknown) {
       setTestResult({ success: false, error: (err as Error).message });
       toast.error((err as Error).message ?? 'Test failed.');
@@ -628,16 +660,8 @@ function ManualAddSectionWrapper({
   const handleAutoDetect = async () => {
     if (!form.ip) { toast.error('IP / Host is required before auto-detecting.'); return; }
     setDetecting(true);
-    setDetectProgress({ tried: 0, total: 24 });
+    setDetectProgress('Requesting a video-verified stream path…');
     setTestResult(null);
-
-    // Simulate incremental progress while waiting for the real response
-    let fakeCount = 0;
-    const totalPaths = Object.values(BRAND_RTSP_PRESETS).flatMap((p) => p.paths).length;
-    const progressInterval = setInterval(() => {
-      fakeCount = Math.min(fakeCount + 1, totalPaths - 1);
-      setDetectProgress({ tried: fakeCount, total: totalPaths });
-    }, 1200);
 
     try {
       const res = await api.post<AutoDetectResult>('/cameras/auto-detect-path', {
@@ -646,7 +670,6 @@ function ManualAddSectionWrapper({
         username: form.username || undefined,
         password: form.password || undefined,
       });
-      clearInterval(progressInterval);
       setDetectProgress(null);
 
       if (res.data.success && res.data.path) {
@@ -669,7 +692,7 @@ function ManualAddSectionWrapper({
       } else if ((res.data as { queued?: boolean; job_id?: string }).queued) {
         // LAN camera — the probe runs on the user's Edge Agent. Poll for the result.
         const jobId = (res.data as { job_id?: string }).job_id!;
-        toast('Camera is on your LAN — probing through your Edge Agent (up to ~90s)…', { icon: '📡' });
+        setDetectProgress('Waiting for the Edge Agent to test stream paths on your LAN…');
         const deadline = Date.now() + 95_000;
         let finished = false;
         while (Date.now() < deadline) {
@@ -677,12 +700,15 @@ function ManualAddSectionWrapper({
           try {
             const poll = await api.get<{
               status: string; success?: boolean; rtsp_path?: string;
-              rtsp_url?: string; error?: string;
+              rtsp_url?: string; thumbnail_base64?: string; error?: string;
             }>(`/cameras/auto-detect-path/result/${jobId}`);
             if (poll.data.status === 'done') {
               finished = true;
               if (poll.data.success && poll.data.rtsp_path) {
                 setForm((f) => ({ ...f, rtsp_path: poll.data.rtsp_path! }));
+                if (poll.data.thumbnail_base64) {
+                  setTestResult({ success: true, thumbnail_base64: poll.data.thumbnail_base64 });
+                }
                 toast.success(`Edge Agent found a working path: ${poll.data.rtsp_path}`);
               } else {
                 toast.error(poll.data.error ?? 'Edge Agent could not find a working RTSP path. Check the IP, port and camera credentials.');
@@ -703,7 +729,6 @@ function ManualAddSectionWrapper({
         toast.error(res.data.message ?? 'Could not auto-detect RTSP path.');
       }
     } catch (err: unknown) {
-      clearInterval(progressInterval);
       setDetectProgress(null);
       toast.error((err as Error).message ?? 'Auto-detect failed.');
     } finally {
@@ -861,14 +886,7 @@ function ManualAddSectionWrapper({
               >
                 <div className="flex items-center gap-2 text-xs text-cyan-400/70">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  Trying paths… {detectProgress.tried}/{detectProgress.total}
-                </div>
-                <div className="mt-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-cyan-500/60 rounded-full"
-                    animate={{ width: `${(detectProgress.tried / detectProgress.total) * 100}%` }}
-                    transition={{ ease: 'linear' }}
-                  />
+                  {detectProgress}
                 </div>
               </motion.div>
             )}
@@ -1023,8 +1041,8 @@ function ManualAddSectionWrapper({
               <div className="flex items-start gap-2 text-amber-300 text-sm bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2.5">
                 <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
                 <span>
-                  This camera is on your local network, so the cloud can't test it directly — that's normal.
-                  Click <strong>Save Camera</strong> and your on-site Edge Agent will connect to it locally and start monitoring.
+                  Video is not verified. The cloud cannot test this local address directly.
+                  You may save the configuration, but monitoring starts only after the on-site Edge Agent receives video.
                 </span>
               </div>
             ) : (
@@ -1179,12 +1197,10 @@ function CameraRow({
     setTestingEdit(true);
     setEditTestResult(null);
     try {
-      const res = await api.post<TestResult>('/cameras/test', parsed);
-      setEditTestResult(res.data);
-      if (res.data.success) toast.success('Connection successful!');
-      else if (res.data.lan_unreachable)
-        toast.success('LAN camera — click "Save Changes" and your Edge Agent will validate it locally.');
-      else toast.error(res.data.error ?? 'Connection failed.');
+      const result = await testCameraStream(parsed);
+      setEditTestResult(result);
+      if (result.success) toast.success('Video frame received — connection verified.');
+      else toast.error(result.error ?? 'Connection failed.');
     } catch (err: unknown) {
       setEditTestResult({ success: false, error: (err as Error).message });
       toast.error((err as Error).message ?? 'Test failed.');

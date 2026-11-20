@@ -13,15 +13,17 @@ Pipeline:
                             base64 JPEG thumbnail (ports backend _try_rtsp_path).
   5. run_discovery()     -> orchestrate; return a list of discovered cameras.
 
-Credentials are best-effort: anonymous first, then a small list of common
-factory defaults. We NEVER silently persist a guessed password — when a host
-answers on :554 but no path/credential yields a frame we flag
-``needs_credentials=True`` so the dashboard can prompt the user.
+Credentials are best-effort: anonymous access or explicitly supplied credentials
+only. We never guess factory passwords, because repeated failed guesses can lock
+an NVR account. A reachable host without a decoded frame is not confirmed video.
 """
 from __future__ import annotations
 
 import base64
+import hashlib
+import secrets
 import logging
+import os
 import re
 import socket
 import struct
@@ -29,8 +31,12 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ipaddress import IPv4Network
 from typing import Optional
+from urllib.parse import quote, unquote, urlsplit, urlunsplit
+from urllib.request import parse_http_list, parse_keqv_list
 
 log = logging.getLogger("vantag.discovery")
+
+os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp")
 
 try:
     import cv2  # type: ignore
@@ -62,18 +68,7 @@ for _brand, _preset in _BRAND_RTSP_PRESETS.items():
     for _p in _preset["paths"]:
         _PATH_TO_BRAND.setdefault(_p, _brand)
 
-# Common factory-default credential pairs. Tried ONLY after anonymous fails.
-# We never persist these silently — a successful grab records which creds won so
-# the user can confirm; a failure flags needs_credentials.
-_DEFAULT_CREDS: list[tuple[Optional[str], Optional[str]]] = [
-    (None, None),
-    ("admin", "admin"),
-    ("admin", ""),
-    ("admin", "12345"),
-    ("admin", "123456"),
-    ("admin", "password"),
-    ("root", "root"),
-]
+_DEFAULT_CREDS: list[tuple[Optional[str], Optional[str]]] = [(None, None)]
 
 _PROBE_PORTS = [554, 8000, 80]
 _TCP_TIMEOUT = 0.6           # per-host port connect timeout (seconds)
@@ -286,22 +281,291 @@ def _ws_discovery(timeout: float = 3.0) -> dict[str, dict]:
 # ---------------------------------------------------------------------------
 # 4) RTSP path resolution + thumbnail (ported from backend _try_rtsp_path)
 # ---------------------------------------------------------------------------
+def _rtsp_exchange(connection, request: str, timeout: float) -> bytes:
+    import time
+    deadline = time.monotonic() + timeout
+    connection.settimeout(timeout)
+    connection.sendall(request.encode("utf-8"))
+    response = bytearray()
+    expected = None
+    while len(response) < 65536:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("RTSP response timed out")
+        connection.settimeout(remaining)
+        chunk = connection.recv(min(4096, 65536 - len(response)))
+        if not chunk:
+            break
+        response.extend(chunk)
+        if expected is None and b"\r\n\r\n" in response:
+            header, _, body = response.partition(b"\r\n\r\n")
+            match = re.search(rb"(?im)^content-length:\s*(\d+)", header)
+            expected = len(header) + 4 + (int(match[1]) if match else 0)
+            if expected > 65536:
+                raise ValueError("RTSP response exceeds diagnostic limit")
+        if expected is not None and len(response) >= expected:
+            break
+    return bytes(response)
+
+
+def _authenticated_rtsp_status(parsed, target: str, challenges: list[str], timeout: float, *, structured: bool = False, connection=None) -> str | dict:
+    username, password = unquote(parsed.username or ""), unquote(parsed.password or "")
+    authorization = None
+    for challenge in challenges:
+        if not challenge.lower().startswith("digest "):
+            continue
+        fields = parse_keqv_list(parse_http_list(challenge[7:]))
+        algorithm = fields.get("algorithm", "MD5").upper()
+        if algorithm not in {"MD5", "MD5-SESS"}:
+            continue
+        realm, nonce = fields.get("realm", ""), fields.get("nonce", "")
+        if not nonce or any(char in username + realm + nonce + fields.get("opaque", "") for char in "\r\n"):
+            return "Invalid RTSP authentication challenge; credentials were not retried."
+        qops = [value.strip().lower() for value in fields.get("qop", "").split(",") if value.strip()]
+        if qops and "auth" not in qops:
+            continue
+        cnonce = secrets.token_hex(16)
+        def digest(value: str) -> str:
+            return hashlib.md5(value.encode("utf-8")).hexdigest()
+        def quoted(value: str) -> str:
+            return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+        first = digest(f"{username}:{realm}:{password}")
+        if algorithm == "MD5-SESS":
+            first = digest(f"{first}:{nonce}:{cnonce}")
+        second = digest("DESCRIBE:" + target)
+        response = digest(f"{first}:{nonce}:00000001:{cnonce}:auth:{second}" if qops else f"{first}:{nonce}:{second}")
+        authorization = f'Digest username={quoted(username)}, realm={quoted(realm)}, nonce={quoted(nonce)}, uri={quoted(target)}, response="{response}", algorithm={algorithm}'
+        if qops:
+            authorization += f', qop=auth, nc=00000001, cnonce="{cnonce}"'
+        elif algorithm == "MD5-SESS":
+            authorization += f', cnonce="{cnonce}"'
+        if "opaque" in fields:
+            authorization += ", opaque=" + quoted(fields["opaque"])
+        break
+    if authorization is None:
+        if not any(challenge.lower().startswith("basic ") for challenge in challenges):
+            return "RTSP authentication method is unsupported; credentials were not retried."
+        authorization = "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
+    request = f"DESCRIBE {target} RTSP/1.0\r\nCSeq: 2\r\nAccept: application/sdp\r\nAuthorization: {authorization}\r\n\r\n"
+    response_bytes = b""
+    if connection is not None:
+        try:
+            response_bytes = _rtsp_exchange(connection, request, timeout)
+        except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+            response_bytes = b""
+    if connection is None or not response_bytes:
+        with socket.create_connection((parsed.hostname, parsed.port or 554), timeout=timeout) as retry_connection:
+            response_bytes = _rtsp_exchange(retry_connection, request, timeout)
+    match = re.match(rb"RTSP/\d\.\d\s+(\d{3})", response_bytes)
+    code = int(match[1]) if match else None
+    if structured:
+        return {"code": code, "authenticated": True}
+    if code == 200:
+        return "RTSP credentials were accepted for this exact path (authenticated DESCRIBE 200), but video decoding failed. Check H.264 encoding, stream encryption, session limits and TCP transport."
+    if code == 401:
+        return "Device rejected an authenticated RTSP request (401) using the supplied credentials. Re-enter the actual device password, including #; check RTSP/remote live-view permissions and account lockout. Web login access alone does not confirm RTSP access. No other paths or passwords were tried."
+    if code == 403:
+        return "Device rejected RTSP access (authenticated 403). Check account permissions and stream security."
+    if code == 404:
+        return "Device returned authenticated RTSP 404 for this exact channel/path. Confirm the recorder brand and enabled channel; access restrictions may also hide streams."
+    return f"Authenticated RTSP diagnostic returned {code or 'no valid response'}. No video was verified."
+
+
+def diagnose_rtsp(url: str, timeout: float = 3.0, *, authenticate: bool = False) -> str:
+    try:
+        if authenticate:
+            initial = urlsplit(url)
+            if initial.scheme != "rtsp" or not initial.hostname:
+                return "Invalid RTSP address. Check the saved stream URL."
+            description = _describe_stream(url, timeout)
+            if description.get("auth_error"):
+                return description["auth_error"]
+            code = description.get("code")
+            if code == 200:
+                return "RTSP credentials were accepted for this exact path (authenticated DESCRIBE 200), but video decoding failed. Check H.264 encoding, stream encryption, session limits and TCP transport."
+            if code == 401:
+                return "Device rejected an authenticated RTSP request (401), including same-connection authentication. This does not establish that the password is wrong: RTSP permissions, firmware compatibility or a concealed invalid path can produce this result. Use ONVIF device-reported profiles, and verify the ONVIF-specific media account with the device administrator. No other passwords were tried."
+            if code == 403:
+                return "Device rejected RTSP access (authenticated 403). Check account permissions and stream security."
+            if code == 404:
+                return "Device returned authenticated RTSP 404 for this exact channel/path. Confirm the enabled channel using ONVIF profiles; access restrictions may also hide streams."
+            return f"RTSP diagnostic returned {code or 'no valid response'}. No video was verified."
+        parsed = urlsplit(url)
+        host = parsed.hostname
+        if parsed.scheme.lower() != "rtsp" or not host:
+            return "Invalid RTSP address. Check the saved stream URL."
+        port = parsed.port or 554
+        authority = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+        target = urlunsplit(("rtsp", authority, parsed.path or "/", parsed.query, ""))
+        if "\r" in target or "\n" in target:
+            return "Invalid RTSP address. Check the saved stream URL."
+        request = f"DESCRIBE {target} RTSP/1.0\r\nCSeq: 1\r\nAccept: application/sdp\r\n\r\n"
+        with socket.create_connection((host, port), timeout=timeout) as connection:
+            connection.settimeout(timeout)
+            connection.sendall(request.encode("ascii"))
+            response = bytearray()
+            while b"\r\n\r\n" not in response and len(response) < 16384:
+                chunk = connection.recv(min(4096, 16384 - len(response)))
+                if not chunk:
+                    break
+                response.extend(chunk)
+        headers = bytes(response).split(b"\r\n\r\n", 1)[0].decode("ascii", errors="replace")
+        lines = headers.splitlines()
+        status = re.match(r"RTSP/\d\.\d\s+(\d{3})", lines[0] if lines else "")
+        if not status:
+            return "Port reachable, but no valid RTSP response. Check the NVR RTSP service and port."
+        code = int(status.group(1))
+        if code == 401:
+            challenges = [line.partition(":")[2].strip() for line in lines[1:]
+                          if line.lower().startswith("www-authenticate:")]
+            algorithms = []
+            compatible = False
+            for challenge in challenges:
+                if challenge.lower().startswith("basic "):
+                    compatible = True
+                if challenge.lower().startswith("digest "):
+                    match = re.search(r'algorithm\s*=\s*"?([A-Za-z0-9_-]+)', challenge, re.IGNORECASE)
+                    algorithm = match.group(1).upper() if match else "MD5"
+                    algorithms.append(algorithm)
+                    compatible = compatible or algorithm in {"MD5", "MD5-SESS"}
+            if algorithms and not compatible:
+                offered = ", ".join(sorted(set(algorithms)))
+                return (
+                    f"NVR offers RTSP Digest {offered}, incompatible with this bundled FFmpeg authentication. "
+                    "Ask the NVR administrator for a supported secure streaming configuration or compatible gateway."
+                )
+            if authenticate and parsed.username:
+                return _authenticated_rtsp_status(parsed, target, challenges, timeout)
+            return (
+                "RTSP authentication is required (401 from a password-free diagnostic). "
+                "This does not prove the password is wrong. Check RTSP permissions, account lockout and stream security."
+            )
+        if code == 404:
+            return "NVR returned RTSP 404: verify this NVR channel and main/sub-stream path; access restrictions may also hide channels."
+        if code == 403:
+            return "NVR returned RTSP 403: check remote live-view permission, account restrictions and stream security."
+        if code == 200:
+            return "NVR returned an RTSP description (200), but video decoding failed. Check codec, stream encryption, TCP transport and session limits."
+        return f"NVR returned RTSP {code}. Check NVR stream configuration and connection limits."
+    except (socket.timeout, TimeoutError):
+        return "NVR did not answer RTSP within the diagnostic timeout. Check routing, firewall and RTSP service."
+    except (OSError, ValueError, UnicodeError):
+        return "RTSP diagnostic could not connect. Check the saved host/port, network route and NVR RTSP service."
+
+
+def _describe_stream(url: str, timeout: float) -> dict:
+    parsed = urlsplit(url)
+    host, port = parsed.hostname, parsed.port or 554
+    authority = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+    target = urlunsplit(("rtsp", authority, parsed.path or "/", parsed.query, ""))
+    if any(character in target for character in "\r\n"):
+        raise ValueError("Invalid RTSP path")
+    request = f"DESCRIBE {target} RTSP/1.0\r\nCSeq: 1\r\nAccept: application/sdp\r\n\r\n"
+    with socket.create_connection((host, port), timeout=timeout) as connection:
+        response = _rtsp_exchange(connection, request, timeout)
+        lines = response.split(b"\r\n\r\n", 1)[0].decode("ascii", errors="replace").splitlines()
+        match = re.match(r"RTSP/\d\.\d\s+(\d{3})", lines[0] if lines else "")
+        result = {"code": int(match[1]) if match else None, "authenticated": False, "brand_hint": None}
+        hints = " ".join(line for line in lines[1:] if line.lower().startswith(("server:", "www-authenticate:"))).lower()
+        for brand in ("hikvision", "dahua", "axis", "hanwha", "bosch", "vivotek", "avigilon", "uniview", "reolink"):
+            if brand in hints:
+                result["brand_hint"] = brand
+                break
+        if 'realm="htms"' in hints:
+            result["brand_hint"] = "HTMS firmware family (OEM brand unknown)"
+        if result["code"] == 401 and parsed.username:
+            challenges = [line.partition(":")[2].strip() for line in lines[1:] if line.lower().startswith("www-authenticate:")]
+            authenticated = _authenticated_rtsp_status(parsed, target, challenges, timeout, structured=True, connection=connection)
+            if isinstance(authenticated, dict):
+                result.update(authenticated)
+            else:
+                result["auth_error"] = authenticated
+        return result
+
+
+def auto_diagnose_stream(url: str, *, channel: int = 1, timeout: float = 1.5) -> dict:
+    parsed = urlsplit(url)
+    if parsed.scheme != "rtsp" or not parsed.hostname or parsed.fragment or not parsed.path.startswith("/") or not 1 <= channel <= 256:
+        raise ValueError("Use a valid RTSP address and channel from 1 to 256")
+    stages = {name: "not tested" for name in ("network", "protocol", "credentials", "path", "decode")}
+    result = {"success": False, "path": None, "thumbnail": None, "brand_hint": None, "stages": stages, "attempts": []}
+
+    def failed(stage: str, message: str) -> dict:
+        stages[stage] = "failed"
+        return {**result, "failed_stage": stage, "message": message}
+
+    current = parsed.path + ("?" + parsed.query if parsed.query else "")
+    from .local.store import stream_identity
+    current_channel = stream_identity(url)["channel"]
+    candidates = [current] if current_channel is None or current_channel == channel else []
+    candidates.extend([
+        f"/cam/realmonitor?channel={channel}&subtype=1",
+        f"/Streaming/Channels/{channel}02",
+        f"/cam/realmonitor?channel={channel}&subtype=0",
+        f"/Streaming/Channels/{channel}01",
+        f"/LiveChannel/{channel - 1}/media.smp",
+        f"/axis-media/media.amp?camera={channel}&videocodec=h264",
+        f"/?line={channel}&inst=2",
+        f"/Src/MediaInput/stream_2/ch_{channel}",
+    ])
+    if channel == 1:
+        candidates.extend(["/stream1", "/live2.sdp", "/profile2/media.smp", "/media/video1", "/live.sdp"])
+    candidates = list(dict.fromkeys(candidates))[:10]
+    import time
+    deadline = time.monotonic() + 24
+    for path in candidates:
+        if time.monotonic() >= deadline:
+            break
+        candidate = urlunsplit(("rtsp", parsed.netloc, path.split("?", 1)[0], path.partition("?")[2], ""))
+        try:
+            description = _describe_stream(candidate, min(timeout, max(0.1, (deadline - time.monotonic()) / 2)))
+        except (OSError, ValueError, UnicodeError):
+            return failed("network", "Cannot complete an RTSP connection to this IP and port. Check the LAN connection, RTSP port/service and firewall. No camera configuration was changed.")
+        stages["network"] = "reachable"
+        code = description["code"]
+        result["attempts"].append({"candidate": len(result["attempts"]) + 1, "status": code, "authenticated_request": description.get("authenticated", False)})
+        result["brand_hint"] = result["brand_hint"] or description.get("brand_hint")
+        if code is None:
+            return failed("protocol", "Port answered without a valid RTSP response. Verify the RTSP service port, not the web-login port.")
+        stages["protocol"] = "RTSP response received"
+        if description.get("auth_error"):
+            return failed("credentials", description["auth_error"])
+        if code == 401:
+            return failed("credentials", "The device returned authenticated RTSP 401 after a same-connection challenge response. This alone cannot distinguish account/RTSP permission rejection, firmware compatibility or an invalid path hidden by the device. Use Read device profiles (ONVIF) to request actual stream choices without knowing the brand. Web and ONVIF accounts may differ. No alternate paths or passwords were tried.")
+        if code == 403:
+            return failed("permissions", "Device forbids this RTSP stream (403). Ask the device administrator to enable this account's remote live-view/RTSP channel permission and check stream security. Detection stopped.")
+        stages["credentials"] = "accepted for stream" if code == 200 and description.get("authenticated") else "not required for description" if code == 200 else "unconfirmed"
+        if code == 200:
+            stages["path"] = "RTSP description found"
+            decoded = _try_rtsp(parsed.hostname, parsed.port or 554, path, unquote(parsed.username or ""), unquote(parsed.password or ""))
+            if not decoded:
+                return failed("decode", "RTSP description found, but no video frame decoded. Check H.264 codec, stream encryption, TCP transport and recorder connection limits. No path was applied; this is not verified live video.")
+            stages["decode"] = "frame decoded"
+            return {**result, "success": True, "path": path, "thumbnail": decoded.get("thumbnail"), "failed_stage": None, "message": "Decoded video verified. Detected path filled into the form, not saved. Check that the picture is the intended camera/channel, then Save camera. Brand hint is not manufacturer identification; AI accuracy was not tested."}
+        if code not in {400, 404}:
+            return failed("path", f"Device returned RTSP {code}. Check recorder stream/session settings with its administrator. No configuration was changed.")
+    return failed("path", "No video path found in the bounded template search for the selected channel. A 404 does not prove credentials are accepted. Verify the channel is enabled and obtain its exact RTSP path from the device's ONVIF GetStreamUri or installer. This is not an exhaustive brand/model search.")
+
+
 def _try_rtsp(ip: str, port: int, path: str,
               username: Optional[str], password: Optional[str]) -> Optional[dict]:
     """Open RTSP URL, read one frame within ~3s. Returns dict on success."""
     if cv2 is None:
         return None
     path = path if path.startswith("/") else f"/{path}"
-    if username and password:
-        rtsp_url = f"rtsp://{username}:{password}@{ip}:{port}{path}"
+    if username:
+        safe_user = quote(username, safe="")
+        safe_password = quote(password or "", safe="")
+        rtsp_url = f"rtsp://{safe_user}:{safe_password}@{ip}:{port}{path}"
     else:
         rtsp_url = f"rtsp://{ip}:{port}{path}"
 
     cap = None
     try:
-        cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
-        cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000)
+        cap = cv2.VideoCapture(
+            rtsp_url, cv2.CAP_FFMPEG,
+            [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000, cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000],
+        )
         if not cap.isOpened():
             return None
         ok, frame = cap.read()

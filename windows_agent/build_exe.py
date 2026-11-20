@@ -1,3 +1,5 @@
+import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -54,11 +56,57 @@ def prepare_models():
     YOLO(str(world))
 
 
-def build():
+def prepare_offline_bundle() -> list[str]:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+    keys_file = ROOT / "offline_keys.json"
+    if not keys_file.is_file():
+        keys_file = ROOT / "assets" / "offline_keys.json"
+    if not keys_file.is_file():
+        raise FileNotFoundError("Provide offline public verification keys; never bundle a signing private key")
+    keys = json.loads(keys_file.read_text(encoding="utf-8"))
+    if not isinstance(keys, dict) or not keys:
+        raise ValueError("At least one offline verification key is required")
+    for name, pem in keys.items():
+        if not isinstance(name, str) or not isinstance(pem, str) or not isinstance(serialization.load_pem_public_key(pem.encode()), Ed25519PublicKey):
+            raise ValueError("Offline keys must be named Ed25519 public keys; never bundle a private key")
+    subprocess.run(["npm.cmd", "run", "build:offline"], cwd=REPO / "frontend" / "web", check=True)
+    ui = REPO / "frontend" / "web" / "dist-offline"
+    if not (ui / "offline.html").is_file() or not (ui / "assets").is_dir():
+        raise FileNotFoundError("Build the offline console assets first")
+    hashes = {}
+    for name in ("yolo26n.onnx", "yolov8n-pose.onnx", "yolov8s-worldv2.pt", "hand_landmarker.task"):
+        with (BUILD_MODELS / name).open("rb") as source:
+            hashes[name] = hashlib.file_digest(source, "sha256").hexdigest()
+    (BUILD_MODELS / "offline-manifest.json").write_text(json.dumps({"version": 1, "sha256": hashes}, indent=2), encoding="utf-8")
+    return [
+        "--add-data", f"{ui}{os.pathsep}offline-ui",
+        "--add-data", f"{keys_file}{os.pathsep}.",
+        "--collect-all", "cryptography", "--collect-all", "fastapi",
+        "--collect-all", "uvicorn", "--collect-all", "tzdata",
+        "--hidden-import", "agent.local.desktop",
+        "--hidden-import", "uvicorn.logging",
+        "--hidden-import", "uvicorn.loops.asyncio",
+        "--hidden-import", "uvicorn.protocols.http.h11_impl",
+        "--hidden-import", "uvicorn.lifespan.on",
+    ]
+
+
+def write_offline_launch_config(directory: Path) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "config.json").write_text(json.dumps({"mode": "offline"}), encoding="utf-8")
+
+
+def build(offline: bool = False):
     if sys.version_info[:2] != (3, 11):
         raise RuntimeError("Build using the dedicated 64-bit Python 3.11 environment")
     os.environ["YOLO_AUTOINSTALL"] = "false"
     prepare_models()
+    offline_arguments = prepare_offline_bundle() if offline else []
+    output_dir = OUTPUT_DIR / "offline" if offline else OUTPUT_DIR
+    output = output_dir / "VantagAgent"
+    archive_path = output_dir / ("windows-offline-agent.zip" if offline else "windows-agent.zip")
     (ROOT / "agent" / "assets").mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ROOT / "assets" / "icon.ico", ROOT / "agent" / "assets" / "icon.ico")
     spec_dir = ROOT / "build" / "standalone_spec"
@@ -66,13 +114,14 @@ def build():
     command = [
         sys.executable, "-m", "PyInstaller", "--name", "VantagAgent", "--onedir",
         "--windowed", "--noconfirm", "--noupx", "--icon", str(ROOT / "assets" / "icon.ico"),
-        "--distpath", str(OUTPUT_DIR), "--workpath", str(ROOT / "build" / "standalone_work"),
+        "--distpath", str(output_dir), "--workpath", str(ROOT / "build" / "standalone_work"),
         "--specpath", str(spec_dir),
         "--hidden-import", "pystray._win32", "--hidden-import", "onnxruntime",
         "--collect-all", "ultralytics", "--collect-all", "mediapipe",
         "--collect-all", "onnxruntime", "--collect-all", "cv2", "--collect-binaries", "torchvision",
         "--add-data", f"{BUILD_MODELS}{os.pathsep}models",
         "--add-data", f"{ROOT / 'agent' / 'assets'}{os.pathsep}agent/assets",
+        *offline_arguments,
         str(ROOT / "standalone_entry.py"),
     ]
     subprocess.run(command, cwd=ROOT, check=True)
@@ -84,9 +133,12 @@ def build():
         source = torchvision_dir / name
         if not source.is_file():
             raise FileNotFoundError(f"Required torchvision extension missing: {source}")
-        shutil.copyfile(source, OUTPUT / "_internal" / "torchvision" / name)
+        shutil.copyfile(source, output / "_internal" / "torchvision" / name)
     sys.path.insert(0, str(ROOT))
     from agent import __version__
+
+    if offline:
+        write_offline_launch_config(output)
 
     with tempfile.TemporaryDirectory(prefix="vantag-standalone-smoke-") as temporary:
         result_file = Path(temporary) / "result.json"
@@ -101,7 +153,7 @@ def build():
         environment.pop("PYTHONPATH", None)
         environment.pop("PYTHONHOME", None)
         process = subprocess.run(
-            [str(OUTPUT / "VantagAgent.exe"), "--smoke-test", str(result_file)],
+            [str(output / "VantagAgent.exe"), "--offline-smoke-test" if offline else "--smoke-test", str(result_file)],
             cwd=temporary,
             env=environment,
             timeout=600,
@@ -116,7 +168,7 @@ def build():
 
         ui_result_file = Path(temporary) / "ui-result.json"
         ui_process = subprocess.run(
-            [str(OUTPUT / "VantagAgent.exe"), "--ui-test", str(ui_result_file)],
+            [str(output / "VantagAgent.exe"), "--ui-test", str(ui_result_file)],
             cwd=temporary,
             env=environment,
             timeout=60,
@@ -129,15 +181,24 @@ def build():
             raise RuntimeError(f"Packaged UI smoke test failed: {ui_result}")
         print(f"Packaged UI smoke test passed: {ui_result}")
 
-    with zipfile.ZipFile(ARCHIVE, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=4, allowZip64=True) as archive:
-        for path in OUTPUT.rglob("*"):
-            if path.is_file():
-                archive.write(path, path.relative_to(OUTPUT).as_posix())
+    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=4, allowZip64=True) as archive:
+        for path in output.rglob("*"):
+            if path.is_file() and not (offline and path.relative_to(output).as_posix() == "config.json"):
+                archive.write(path, path.relative_to(output).as_posix())
         archive.writestr("PACKAGE_VERSION.txt", __version__)
-    print(f"Package: {ARCHIVE}")
-    print(f"Compressed bytes: {ARCHIVE.stat().st_size}")
-    print(f"Extracted bytes: {sum(path.stat().st_size for path in OUTPUT.rglob('*') if path.is_file())}")
+        if offline:
+            archive.writestr("OFFLINE_CAPABILITIES.json", json.dumps({
+                "version": __version__, "disconnected_core_validated": False,
+                "commercial_redistribution_approved": False,
+                "status": "development; not qualified for customer distribution",
+                "unavailable": ["staff_matching", "visual_verification", "visual_search", "assistant", "high_value_counter"],
+            }, indent=2))
+    print(f"Package: {archive_path}")
+    print(f"Compressed bytes: {archive_path.stat().st_size}")
+    print(f"Extracted bytes: {sum(path.stat().st_size for path in output.rglob('*') if path.is_file())}")
 
 
 if __name__ == "__main__":
-    build()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--offline-bundle", action="store_true")
+    build(offline=parser.parse_args().offline_bundle)

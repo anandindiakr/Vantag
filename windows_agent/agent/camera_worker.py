@@ -34,6 +34,7 @@ import cv2
 import numpy as np
 
 from .config import CameraConfig, CONFIG_DIR
+from .discovery import diagnose_rtsp
 from .api_client import VantagApiClient
 from .inference import (
     YoloInference, RETAIL_CLASSES,
@@ -430,13 +431,28 @@ class PoseShopliftingDetector:
         self._cooldown = max(cooldown_sec, 60)
         self._last_run: float = 0.0
         self._last_event: dict[str, float] = {}
-        # cell → consecutive gesture-frame count
         self._streaks: dict[str, int] = {}
+        self._tracks: dict[str, tuple] = {}
+        self._next_track = 1
+        self.status = {"evaluated_at": None, "people_observed": 0, "error": "", "requires_review": True}
 
-    def _cell(self, box) -> str:
-        cx = int(min(box.x + box.w / 2, 0.999) * 4)
-        cy = int(min(box.y + box.h / 2, 0.999) * 4)
-        return f"{cx}_{cy}"
+    def _associate(self, box, unmatched, now):
+        candidates = []
+        for identity in unmatched:
+            previous, stamp = self._tracks[identity]
+            distance = ((previous.x + previous.w / 2 - box.x - box.w / 2) ** 2 + (previous.y + previous.h / 2 - box.y - box.h / 2) ** 2) ** 0.5
+            intersection = max(0, min(previous.x + previous.w, box.x + box.w) - max(previous.x, box.x)) * max(0, min(previous.y + previous.h, box.y + box.h) - max(previous.y, box.y))
+            overlap = intersection / max(1e-6, previous.w * previous.h + box.w * box.h - intersection)
+            if now - stamp <= 2.5 and overlap >= 0.1 and distance <= max(0.05, min(0.2, box.w)):
+                candidates.append((overlap - distance, identity))
+        if candidates:
+            identity = max(candidates)[1]
+            unmatched.remove(identity)
+        else:
+            identity = str(self._next_track)
+            self._next_track += 1
+        self._tracks[identity] = (box, now)
+        return identity
 
     @staticmethod
     def _gesture(person: "PersonPose") -> Optional[str]:
@@ -468,20 +484,31 @@ class PoseShopliftingDetector:
                 return side
         return None
 
-    def analyse(self, frame: np.ndarray) -> Optional[dict]:
-        if self._pose is None or self._pose._session is None:
-            return None
+    def analyse(self, frame: np.ndarray, excluded=lambda box, frame: False) -> Optional[dict]:
         now = time.time()
         if now - self._last_run < self.POSE_INTERVAL:
             return None
         self._last_run = now
-
-        poses = self._pose.detect_poses(frame, conf_threshold=0.4)
+        try:
+            if self._pose is None or self._pose._session is None:
+                raise RuntimeError("Bundled pose model is unavailable")
+            poses = self._pose.detect_poses(frame, conf_threshold=0.4, raise_errors=True)
+            poses = [person for person in poses if not excluded(person.box, frame)]
+        except Exception as exc:
+            self._streaks.clear()
+            self._tracks.clear()
+            self._last_event.clear()
+            self.status["error"] = f"Concealment analysis unavailable: {type(exc).__name__}"
+            return None
+        self.status.update(evaluated_at=now, people_observed=len(poses), error="")
+        self._tracks = {identity: value for identity, value in self._tracks.items() if now - value[1] <= 2.5}
+        self._last_event = {identity: stamp for identity, stamp in self._last_event.items() if identity in self._tracks}
+        unmatched = set(self._tracks)
         seen: set[str] = set()
         result: Optional[dict] = None
 
         for person in poses:
-            cell = self._cell(person.box)
+            cell = self._associate(person.box, unmatched, now)
             seen.add(cell)
             side = self._gesture(person)
             if side is None:
@@ -510,6 +537,9 @@ class PoseShopliftingDetector:
                 "metadata": {
                     "timestamp": int(now * 1000),
                     "detection_method": "pose_concealment",
+                    "requires_review": True,
+                    "description": "Suspected concealment gesture; operator review required. Not proof of theft.",
+                    "track_id": cell,
                     "wrist_side": side,
                     "bounding_boxes": [person.box.to_dict()],
                     "pose": person.to_dict(),
@@ -624,6 +654,7 @@ class DetectionAnalyzer:
         detections: Optional[dict] = None,
         product_count_detector: Optional["ProductCountDetector"] = None,
         high_value_counter: Optional[dict] = None,
+        count_day: Optional[Callable[[], str]] = None,
     ):
         self.camera_id = camera_id
         self.cooldown_sec = cooldown_sec
@@ -671,7 +702,8 @@ class DetectionAnalyzer:
         # local midnight. Unlike the live count this never drops back to 0
         # when people leave, which is what a footfall dashboard actually needs.
         self.entries_today: int = 0
-        self._entries_day: str = time.strftime("%Y-%m-%d")
+        self._count_day = count_day or (lambda: time.strftime("%Y-%m-%d"))
+        self._entries_day: str = self._count_day()
         # Persistent-ID tracker (v1.5.0) — replaces the old occupancy-rise
         # heuristic. Each confirmed track is counted as a visitor exactly
         # ONCE, the first time it appears inside the count zone, instead of
@@ -1717,7 +1749,8 @@ class DetectionAnalyzer:
         # frame when no zone is configured). This drives "visitors today".
         self.last_zone_count = self._count_people(tracked, frame)
         self._entry_window.append((now, self.last_zone_count))
-        self._update_entries_via_tracks(tracked, frame)
+        if self._is_enabled("people_count"):
+            self._update_entries_via_tracks(tracked, frame)
 
         # 1. Shoplifting: person near high-value item for >2s
         # Key on the ITEM's position (items are stationary — backpack/bag on shelf).
@@ -1828,7 +1861,7 @@ class DetectionAnalyzer:
         # skipping it entirely on cameras where shoplifting is switched off
         # is also the biggest available latency win on multi-camera sites.
         if self._pose_detector is not None and self._is_enabled("shoplifting"):
-            pose_evt = self._pose_detector.analyse(frame)
+            pose_evt = self._pose_detector.analyse(frame, excluded=lambda box, image: not self._filter_exclusions([box], image.shape[1], image.shape[0]))
             if pose_evt:
                 events.append(pose_evt)
 
@@ -1945,7 +1978,7 @@ class DetectionAnalyzer:
 
         Resets ``entries_today`` and the counted-ID set at local midnight.
         """
-        day = time.strftime("%Y-%m-%d")
+        day = self._count_day()
         if day != self._entries_day:
             self._entries_day = day
             self.entries_today = 0
@@ -2020,6 +2053,7 @@ class CameraWorker:
         detections: Optional[dict] = None,
         product_count_detector: Optional["ProductCountDetector"] = None,
         high_value_counter: Optional[dict] = None,
+        count_day: Optional[Callable[[], str]] = None,
     ):
         self.config = config
         self._inference = inference
@@ -2038,7 +2072,11 @@ class CameraWorker:
             detections=detections,
             product_count_detector=product_count_detector,
             high_value_counter=high_value_counter,
+            count_day=count_day,
         )
+        self.count_sample = None
+        self.inference_error = ""
+        self.inference_ms = 0.0
 
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -2083,7 +2121,7 @@ class CameraWorker:
             daemon=True,
         )
         self._thread.start()
-        log.info(f"[{self.config.name}] Worker started → {self.config.rtsp_url}")
+        log.info("[%s] Camera worker started (stream credentials redacted)", self.config.name)
         # Make the per-camera analytic configuration VISIBLE in the console.
         # Without this, testing an analytic in front of a camera where it is
         # switched off produced total silence — indistinguishable from a
@@ -2135,6 +2173,7 @@ class CameraWorker:
         in-flight flag), so a slow pass simply lowers the effective detection
         fps instead of freezing the live view.
         """
+        started = time.monotonic()
         try:
             # Single YOLO pass at the LOW threshold, then split by confidence:
             # low-conf persons feed the people counter, high-conf boxes feed
@@ -2146,6 +2185,9 @@ class CameraWorker:
             events = self._analyzer.analyse(
                 alert_boxes, frame, count_persons=count_persons
             )
+            self.count_sample = {"day": self._analyzer._entries_day, "visible": self._analyzer.last_person_count, "entries": self._analyzer.entries_today, "updated_at": time.time()}
+            self.inference_ms = (time.monotonic() - started) * 1000
+            self.inference_error = ""
             self._maybe_push_count_snapshot(frame, count_persons)
             for event in events:
                 log.info(
@@ -2156,6 +2198,7 @@ class CameraWorker:
                     self._on_event(event)
                 self._api.post_event(event)
         except Exception as e:  # noqa: BLE001 — inference must never kill the worker
+            self.inference_error = type(e).__name__
             log.warning(f"[{self.config.name}] Inference error: {e}")
         finally:
             self._infer_inflight.clear()
@@ -2223,11 +2266,14 @@ class CameraWorker:
             cap = None
             try:
                 stream_url = sanitize_rtsp_url(self.config.rtsp_url)
-                cap = cv2.VideoCapture(stream_url, cv2.CAP_FFMPEG)
+                cap = cv2.VideoCapture(
+                    stream_url, cv2.CAP_FFMPEG,
+                    [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 8000, cv2.CAP_PROP_READ_TIMEOUT_MSEC, 8000],
+                )
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
                 if not cap.isOpened():
-                    raise ConnectionError(f"Cannot open RTSP stream: {self.config.rtsp_url}")
+                    raise ConnectionError(diagnose_rtsp(stream_url))
 
                 self.is_connected = True
                 self.consecutive_failures = 0

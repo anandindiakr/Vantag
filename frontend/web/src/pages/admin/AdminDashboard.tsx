@@ -14,6 +14,7 @@ import {
   CalendarPlus,
 } from 'lucide-react';
 import SystemHealthTab from './SystemHealthTab';
+import OfflineDemoTab from './OfflineDemoTab';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -234,7 +235,7 @@ function ArchitectureTab() {
 
 // ── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'tenants' | 'payments' | 'incidents' | 'alerts' | 'architecture' | 'health';
+type Tab = 'overview' | 'tenants' | 'payments' | 'incidents' | 'alerts' | 'architecture' | 'health' | 'offline';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -408,6 +409,7 @@ export default function AdminDashboard() {
     { key: 'alerts',        label: 'Alerts',        icon: <Bell size={16} />, badge: alerts.length },
     { key: 'architecture',  label: 'Architecture',  icon: <Network size={16} /> },
     { key: 'health',        label: 'System Health', icon: <Activity size={16} /> },
+    { key: 'offline',       label: 'Offline demos', icon: <Download size={16} /> },
   ];
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -784,6 +786,7 @@ export default function AdminDashboard() {
           {tab === 'architecture' && <ArchitectureTab />}
 
           {tab === 'health' && <SystemHealthTab />}
+          {tab === 'offline' && <OfflineDemoTab />}
         </main>
       </div>
 

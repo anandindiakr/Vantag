@@ -750,9 +750,11 @@ class YoloPoseInference(YoloInference):
         except Exception as e:  # noqa: BLE001
             raise RuntimeError(f"Could not obtain YOLOv8n-pose model: {e}")
 
-    def detect_poses(self, frame_bgr: np.ndarray, conf_threshold: float = 0.4) -> List["PersonPose"]:
+    def detect_poses(self, frame_bgr: np.ndarray, conf_threshold: float = 0.4, raise_errors: bool = False) -> List["PersonPose"]:
         """Run pose inference on a BGR frame. Returns list of PersonPose."""
         if self._session is None:
+            if raise_errors:
+                raise RuntimeError("Pose model is unavailable")
             return []
         try:
             blob = self._preprocess(frame_bgr)
@@ -761,6 +763,8 @@ class YoloPoseInference(YoloInference):
             return self._postprocess_pose(outputs[0], conf_threshold)
         except Exception as e:
             log.error(f"Pose inference error: {e}")
+            if raise_errors:
+                raise
             return []
 
     def _postprocess_pose(self, output: np.ndarray, conf: float) -> List["PersonPose"]:
@@ -860,7 +864,9 @@ class ProductCountDetector:
     don't each load a separate copy of the model into memory.
     """
 
-    def __init__(self):
+    def __init__(self, offline: bool = False, model_dir: Optional[Path] = None):
+        self._offline = offline
+        self._model_dir = model_dir
         self._model = None
         self._load_failed = False
         # Machine-readable state for the heartbeat ("idle" until the first
@@ -888,6 +894,10 @@ class ProductCountDetector:
                 # filled the disk). If something is missing we fail cleanly
                 # and fall back to Tier 1 instead.
                 os.environ.setdefault("YOLO_AUTOINSTALL", "false")
+                if self._offline:
+                    os.environ["YOLO_AUTOINSTALL"] = "false"
+                    if self._model_dir is None or not (self._model_dir / "yolov8s-worldv2.pt").is_file():
+                        raise FileNotFoundError("Offline product-count model missing from the package")
 
                 import torch
                 from ultralytics import YOLO
@@ -895,7 +905,9 @@ class ProductCountDetector:
                 # 1) Weights, cached under ~/.vantag/models like every other
                 #    model this agent downloads (never the CWD, which may be
                 #    read-only or transient).
-                if getattr(sys, "frozen", False):
+                if self._offline:
+                    weights = self._model_dir / "yolov8s-worldv2.pt"
+                elif getattr(sys, "frozen", False):
                     from .resources import bundled_resource
 
                     weights = bundled_resource("models", "yolov8s-worldv2.pt")

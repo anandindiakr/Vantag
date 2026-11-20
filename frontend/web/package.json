@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:offline": "tsc && vite build --config vite.offline.config.ts",
     "postbuild": "node scripts/prerender.mjs && node scripts/generate-seo-files.mjs",
     "build:in": "cross-env PRERENDER_BASE_URL=https://retailnazar.com npm run build",
     "build:sg": "cross-env PRERENDER_BASE_URL=https://retail-vantag.com npm run build",

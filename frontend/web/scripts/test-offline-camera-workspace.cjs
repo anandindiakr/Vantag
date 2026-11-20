@@ -1,0 +1,84 @@
+const assert = require('node:assert/strict');
+const http = require('node:http');
+const path = require('node:path');
+const { chromium } = require('playwright');
+const handler = require('serve-handler');
+const server = http.createServer((request, response) => handler(request, response, { public: path.resolve(__dirname, '../dist-offline') }));
+let checks = 0, tests = 0, removals = 0, monitoring = true;
+const cameras = Array.from({ length: 18 }, (_, index) => ({ id: `cam-${index}`, name: `Camera ${index + 1}`, enabled: true, rtsp_url: '', stream_info: { host: '192.168.1.2', port: 554, path: `/Streaming/Channels/${index + 1}02`, family: 'Hikvision', channel: index + 1, stream_type: 'sub', source: String(index + 1) }, people_count_zones: [], inventory_zones: [], exclusion_zones: [], detections: { people_count: false }, detection_schedule: {} }));
+(async () => {
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+    page.setDefaultTimeout(5000);
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('dialog', dialog => dialog.accept());
+    await page.route('**/api/**', async route => {
+      const endpoint = new URL(route.request().url()).pathname.slice(5);
+      let body = {};
+      if (endpoint === 'bootstrap') body = { setup_required: false };
+      else if (endpoint === 'login') body = { ok: true };
+      else if (endpoint === 'status') body = { site: { name: 'Operations test', timezone: 'UTC' }, licence: { state: 'active', can_process: true, claims: { camera_limit: 24 } }, runtime: { running: monitoring, cameras: cameras.map(camera => ({ id: camera.id, connected: true, frame_age_sec: 0.5, fps: 2, inference_ms: 50, inference_error: '' })), camera_capacity: { entitlement_limit: 24 } } };
+      else if (endpoint === 'cameras') body = cameras;
+      else if (['counts', 'events'].includes(endpoint)) body = [];
+      else if (endpoint.startsWith('frame/')) return route.fulfill({ status: 503 });
+      else if (endpoint === 'cameras/cam-0/test') { tests++; body = { success: true, message: 'Existing decoded frame verified. No extra login.' }; }
+      else if (endpoint === 'cameras/cam-17' && route.request().method() === 'DELETE') { removals++; cameras.pop(); body = { ok: true }; }
+      else if (endpoint === 'monitoring/start') { monitoring = true; body = { ok: true }; }
+      else throw new Error(`Unexpected endpoint ${endpoint}`);
+      await route.fulfill({ json: body });
+    });
+    await page.goto(`http://127.0.0.1:${server.address().port}/offline.html`);
+    await page.getByLabel('Local username').fill('owner');
+    await page.getByLabel('Local password', { exact: true }).fill('unique-test-owner-password');
+    await page.getByRole('button', { name: 'Sign in locally' }).click();
+    await page.getByRole('button', { name: 'Video wall', exact: true }).click();
+    await page.getByLabel('Wall layout').selectOption('4');
+    assert.equal(await page.locator('.camera-tile').count(), 16); checks++;
+    assert.equal(await page.locator('.video-wall').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length), 4); checks++;
+    const geometry = await page.locator('.camera-tile').evaluateAll(tiles => tiles.map(tile => { const box = tile.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width }; }));
+    assert.equal(new Set(geometry.slice(0, 4).map(box => Math.round(box.y))).size, 1); checks++;
+    assert.ok(geometry[0].width > 200); checks++;
+    const wallBottom = await page.locator('.camera-tile').last().evaluate(element => element.getBoundingClientRect().bottom);
+    const layoutDetails = await page.locator('.camera-tile').first().evaluate(element => { const media = element.querySelector('.wall-frame'); const grid = element.parentElement; return { tileHeight: element.getBoundingClientRect().height, frameHeight: media.getBoundingClientRect().height, gridTop: grid.getBoundingClientRect().top, frameRule: getComputedStyle(media).height, compact: !!element.closest('.wall-compact') }; });
+    assert.ok(wallBottom <= 1000, `Compact 16-camera wall extends below viewport: ${wallBottom}; ${JSON.stringify(layoutDetails)}`); checks++;
+    await page.setViewportSize({ width: 1600, height: 720 });
+    await page.getByRole('button', { name: 'Fullscreen wall', exact: true }).click();
+    await page.waitForFunction(() => !!document.fullscreenElement); checks++;
+    const fullscreenGeometry = await page.locator('.camera-tile').last().evaluate(element => ({ bottom: element.getBoundingClientRect().bottom, viewport: innerHeight, tileHeight: element.getBoundingClientRect().height, frameHeight: element.querySelector('.wall-frame').getBoundingClientRect().height, gridTop: element.parentElement.getBoundingClientRect().top }));
+    assert.ok(fullscreenGeometry.bottom <= fullscreenGeometry.viewport, `Fullscreen 16-camera wall should fit: ${JSON.stringify(fullscreenGeometry)}`); checks++;
+    await page.getByRole('button', { name: 'Fullscreen wall', exact: true }).click();
+    await page.waitForFunction(() => !document.fullscreenElement);
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    await page.getByRole('button', { name: 'Next wall page' }).click();
+    assert.equal(await page.locator('.camera-tile').count(), 2); checks++;
+    assert.equal(await page.locator('.camera-tile h3').first().textContent(), 'Camera 17'); checks++;
+    await page.getByLabel('Wall layout').selectOption('3');
+    assert.equal(await page.locator('.camera-tile').count(), 9); checks++;
+    await page.getByLabel('Compact tiles').uncheck();
+    assert.ok(await page.locator('.wall-tile-metrics').first().isVisible()); checks++;
+    await page.getByLabel('Wall layout').selectOption('2');
+    assert.equal(await page.locator('.camera-tile').count(), 4); checks++;
+    await page.getByRole('button', { name: 'Fullscreen wall', exact: true }).waitFor(); checks++;
+    await page.getByRole('button', { name: 'Cameras', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: 'Auto-detect / diagnose stream' }).isVisible(), false); checks++;
+    await page.getByText('Advanced connection tools', { exact: true }).click();
+    assert.ok(await page.getByRole('button', { name: 'Auto-detect / diagnose stream' }).isVisible()); checks++;
+    await page.getByRole('button', { name: 'Test saved Camera 1', exact: true }).click();
+    await page.locator('.camera-row').first().getByText('Existing decoded frame verified. No extra login.', { exact: true }).waitFor();
+    assert.equal(tests, 1); checks++;
+    assert.match(await page.locator('.camera-row').first().getByRole('status').textContent(), /decoded frame verified/); checks++;
+    await page.getByRole('button', { name: 'Remove Camera 18', exact: true }).click();
+    await page.getByText('Camera removed; other streams were left running.', { exact: true }).waitFor();
+    assert.equal(removals, 1); checks++;
+    assert.ok(monitoring); checks++;
+    const fullWidth = await page.locator('main').evaluate(element => element.getBoundingClientRect().width);
+    assert.ok(fullWidth > 1200); checks++;
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)); checks++;
+    assert.deepEqual(errors, []); checks++;
+    console.log(JSON.stringify({ ok: true, checks, scope: 'Mocked 18-camera operations, dense layouts, pagination, responsive geometry, saved tests and removal. Not hardware accuracy.' }));
+  } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => server.close());

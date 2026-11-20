@@ -1,4 +1,14 @@
 absl-py==2.5.1
+annotated-doc==0.0.6
+annotated-types==0.7.0
+click==8.3.2
+cryptography==46.0.6
+fastapi==0.135.3
+pydantic==2.12.5
+pydantic-core==2.41.5
+starlette==1.0.0
+typing-inspection==0.4.2
+uvicorn==0.43.0
 altgraph==0.17.5
 anyio==4.16.0
 certifi==2026.10.23

@@ -563,15 +563,18 @@ def _prune_probe_results() -> None:
 
 def queue_rtsp_probe(tenant_id: str, ip: str, port: int = 554,
                      username: str | None = None, password: str | None = None,
-                     brand: str | None = None) -> str:
+                     brand: str | None = None, rtsp_path: str | None = None) -> str:
     """Queue an agent-side RTSP path probe. Returns the job_id to poll."""
     _prune_probe_results()
     job_id = uuid.uuid4().hex
     _rtsp_probe_jobs.setdefault(tenant_id, []).append({
         "job_id": job_id, "ip": ip, "port": port,
         "username": username, "password": password, "brand": brand,
+        "rtsp_path": rtsp_path,
     })
     _rtsp_probe_results[job_id] = {
+        "tenant_id": str(tenant_id),
+        "requested_path": rtsp_path,
         "status": "pending",
         "_ts": datetime.now(timezone.utc).timestamp(),
     }
@@ -853,10 +856,13 @@ async def heartbeat(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     now = datetime.now(timezone.utc)
+    agent_values = {"status": "online", "last_heartbeat": now}
+    if body.camera_statuses is not None:
+        agent_values["camera_count"] = len(body.camera_statuses)
     await session.execute(
         update(EdgeAgent)
         .where(EdgeAgent.id == agent.id)
-        .values(status="online", last_heartbeat=now)
+        .values(**agent_values)
     )
     # Update camera connection statuses
     if body.camera_statuses:
@@ -1006,6 +1012,7 @@ class RtspProbeResultBody(BaseModel):
     rtsp_url: str | None = None
     brand: str | None = None
     tried_paths: list[str] | None = None
+    thumbnail_base64: str | None = None
     error: str | None = None
 
 
@@ -1017,16 +1024,24 @@ async def rtsp_probe_result(
     """Edge Agent reports the outcome of an RTSP path probe job."""
     rec = _rtsp_probe_results.get(body.job_id)
     if rec is None:
-        # Unknown/expired job — accept silently so the agent doesn't retry.
         return {"ok": True, "known": False}
+    if rec.get("tenant_id") != str(agent.tenant_id):
+        raise HTTPException(status_code=404, detail="Probe job not found")
+    requested_path = rec.get("requested_path")
+    exact_path_verified = not requested_path or (
+        body.tried_paths == [requested_path]
+        and (not body.success or body.rtsp_path == requested_path)
+    )
+    success = body.success and exact_path_verified
     rec.update({
         "status": "done",
-        "success": body.success,
+        "success": success,
         "rtsp_path": body.rtsp_path,
         "rtsp_url": body.rtsp_url,
         "brand": body.brand,
         "tried_paths": body.tried_paths or [],
-        "error": body.error,
+        "thumbnail_base64": body.thumbnail_base64 if success else None,
+        "error": body.error if exact_path_verified else "Update the Edge Agent to verify the exact NVR channel; this agent ran a path scan instead.",
         "_ts": datetime.now(timezone.utc).timestamp(),
     })
     return {"ok": True, "known": True}

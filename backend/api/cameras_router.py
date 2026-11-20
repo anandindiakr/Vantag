@@ -1061,6 +1061,8 @@ class TestConnectionResponse(BaseModel):
     # the cloud cannot reach. The Edge Agent validates these locally, so the UI
     # should still allow the camera to be saved.
     lan_unreachable: bool = False
+    queued: bool = False
+    job_id: Optional[str] = None
 
 
 @router.post(
@@ -1097,16 +1099,21 @@ async def test_camera_connection(
         import ipaddress
         ip_obj = ipaddress.ip_address(body.ip)
         if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local:
+            from .edge_router import queue_rtsp_probe
+
+            tenant_id = user.get("tenant_id")
+            if not tenant_id:
+                raise HTTPException(status_code=400, detail="No tenant in session")
+            job_id = queue_rtsp_probe(
+                tenant_id, body.ip, body.port, body.username, body.password,
+                rtsp_path=path,
+            )
             return TestConnectionResponse(
                 success=False,
                 lan_unreachable=True,
-                error=(
-                    "This camera is on your local network ("
-                    f"{body.ip}), which our cloud cannot reach directly. "
-                    "That's expected — just click \"Save Camera\" and your "
-                    "on-site Edge Agent will connect to it locally and start "
-                    "monitoring. (No cloud test is needed for LAN cameras.)"
-                ),
+                queued=True,
+                job_id=job_id,
+                error="Waiting for your on-site Edge Agent to open this exact stream and capture a video frame.",
             )
     except ValueError:
         # Not a literal IP (could be a hostname/DDNS) - allow the probe to run.
@@ -1115,9 +1122,10 @@ async def test_camera_connection(
     def _capture() -> TestConnectionResponse:
         cap = None
         try:
-            cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000)
-            cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000)
+            cap = cv2.VideoCapture(
+                rtsp_url, cv2.CAP_FFMPEG,
+                [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5000, cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5000],
+            )
 
             if not cap.isOpened():
                 return TestConnectionResponse(success=False, error="Failed to open RTSP stream.")
@@ -1367,9 +1375,10 @@ def _try_rtsp_path(ip: str, port: int, path: str, username: Optional[str], passw
 
     cap = None
     try:
-        cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
-        cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000)
+        cap = cv2.VideoCapture(
+            rtsp_url, cv2.CAP_FFMPEG,
+            [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000, cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000],
+        )
         if not cap.isOpened():
             return None
         ok, frame = cap.read()
@@ -1558,13 +1567,16 @@ async def auto_detect_path_result(
     rec = get_rtsp_probe_result(job_id)
     if rec is None:
         return {"status": "expired", "message": "Probe job expired — please run Auto-Detect again."}
+    if rec.get("tenant_id") != str(user.get("tenant_id")):
+        raise HTTPException(status_code=404, detail="Probe job not found")
     if rec.get("status") != "done":
         return {"status": "pending"}
     return {
         "status": "done",
         "success": rec.get("success", False),
         "rtsp_path": rec.get("rtsp_path"),
-        "rtsp_url": rec.get("rtsp_url"),
+        "rtsp_url": _mask_rtsp(rec["rtsp_url"]) if rec.get("rtsp_url") else None,
+        "thumbnail_base64": rec.get("thumbnail_base64"),
         "brand": rec.get("brand"),
         "tried_paths": rec.get("tried_paths", []),
         "error": rec.get("error"),
