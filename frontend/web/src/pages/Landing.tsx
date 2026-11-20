@@ -7,6 +7,7 @@ import { useRegion } from '../hooks/useRegion';
 import { REGIONS as REGION_MAP, type RegionConfig } from '../config/regions';
 import { LanguageSelector } from '../components/LanguageSelector';
 import Seo from '../components/Seo';
+import OfflineSiteGuide from '../components/OfflineSiteGuide';
 import {
   Shield, Camera, Lock, BarChart3, Bell,
   CheckCircle, ArrowRight, Eye, Cpu, Smartphone,
@@ -646,6 +647,12 @@ export default function Landing() {
           </motion.div>
         </div>
       </section>
+
+      <Section className="pt-16 border-t border-white/5">
+        <div className="max-w-5xl mx-auto px-6">
+          <OfflineSiteGuide compact />
+        </div>
+      </Section>
 
       <Section className="py-20 border-t border-white/5" id="vantag-video">
           <div className="max-w-5xl mx-auto px-6 grid md:grid-cols-2 gap-10 md:gap-16 items-center">

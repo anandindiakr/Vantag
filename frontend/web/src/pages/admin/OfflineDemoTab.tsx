@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 
 export default function OfflineDemoTab() {
   const [request, setRequest] = useState({ tenant_id: '', device_id: '' });
@@ -36,6 +37,7 @@ export default function OfflineDemoTab() {
     <h2 className="text-2xl font-bold">Offline demo licences</h2>
     <p className="text-white/70">Superadmin only. Customers retain paid/trial expiry plus seven days of grace. Internal team demos can be non-expiring, but are bound to one PC. Fully offline devices cannot be remotely revoked.</p>
     <p className="text-amber-300">The offline installer remains under validation. Issuing a licence does not qualify model redistribution rights or prove fall/theft accuracy. Do not distribute a live installation containing camera credentials or evidence.</p>
+    <Link to="/help#offline-site-guide" className="inline-block text-cyan-300 underline underline-offset-4">Read offline setup, customer renewal and team demo instructions</Link>
     <form onSubmit={issue} className="space-y-4">
       <fieldset disabled={busy} className="space-y-4">
         <label className="block">Import device renewal request (JSON)<input className={inputClass} type="file" accept=".json,application/json" onChange={event => { const file = event.target.files?.[0]; if (!file) return; setError(''); void (async () => { try { if (file.size > 65536) throw new Error('Request is too large'); const value = JSON.parse(await file.text()); if (value.version !== 1 || value.purpose !== 'offline_entitlement_renewal' || typeof value.device_id !== 'string' || !/^[0-9a-f]{64}$/.test(value.device_id) || (value.tenant_id != null && typeof value.tenant_id !== 'string')) throw new Error('Choose a device renewal request exported from the local console'); setRequest({ device_id: value.device_id, tenant_id: value.tenant_id || '' }); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid request file'); } })(); }} /></label>

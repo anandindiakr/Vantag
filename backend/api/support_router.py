@@ -27,6 +27,34 @@ SUPPORT_EMAIL = "support@retail-vantag.com"
 
 _bearer = HTTPBearer(auto_error=False)
 
+OFFLINE_GUIDANCE = (
+    "The online Edge Agent and the Windows Offline Site Console are different modes. "
+    "The hosted website still needs internet. With the separate offline package and a valid "
+    "signed entitlement, use the local console opened by VantagAgent.exe on that same PC "
+    "to configure LAN cameras and use supported packaged AI without internet. "
+    "The PC, cameras/NVR and LAN must stay powered and connected. "
+    "Download preparation and account/payment management need an internet-connected PC; "
+    "public offline distribution remains under validation pending clean-PC disconnected "
+    "checks, model redistribution approval and representative fall/theft testing. "
+    "Check Downloads for availability; the standard online package is not an offline installer. "
+    "The local owner login is separate from the website login and camera/NVR credentials. "
+    "Cloud dashboards, remote viewing, email/SMS/WhatsApp, payments and cloud AI/support "
+    "chat are not available offline. Offline records do not automatically sync to the website. "
+    "Advanced AI features are available only when qualified packaged models and hardware "
+    "are ready; do not promise all cloud features or verified physical detection accuracy. "
+    "Customer entitlements follow the authorised paid/trial/extension period plus seven days "
+    "of grace. After grace, live viewing and new AI stop; saved records, exports and renewal "
+    "remain accessible. Export the device request, obtain a newer signed entitlement using "
+    "an internet-connected PC and import it locally; online account changes alone do not "
+    "renew an isolated PC. No cloud check is required at each offline startup. "
+    "A superadmin uses Admin > Offline demos to issue timed customer/dealer evaluations "
+    "or permanent device-bound internal team demo licences. Each PC needs its own device "
+    "request and signed licence. This is not employee-user management and does not change "
+    "subscription/payment dates or bypass installer release checks. Use Admin > Tenants "
+    "for customer accounts and access extensions. Read /how-it-works#offline-site-guide "
+    "or the updated Help Center for the step-by-step offline workflow."
+)
+
 # ─── Vantag Knowledge Base (burned into the system prompt) ─────────────────
 VANTAG_SYSTEM_PROMPT = """You are Vantag Assistant — the official AI support agent for Vantag
 (also branded as "Retail Nazar" in India, "JagaJaga" in Malaysia, "Retail Bantay" in the
@@ -74,16 +102,18 @@ snapshots to the Vantag cloud dashboard.
 - Philippines: retailbantay.com (brand: "Retail Bantay")
 - Indonesia: retailpantau.com (brand: "RetailPantau")
 
-# Setup (Plug & Play, under 30 minutes)
-1. Register on the web portal or mobile (email, phone, store name, country)
-2. Pick a plan; pay via Razorpay/Xendit
-3. From dashboard, click "Install Edge Agent" → download for Windows/Linux/Mac
-4. Run install.ps1 (Win) or install.sh (Linux/Mac) on a local PC/Pi
-5. Paste Cloud URL + Tenant ID (shown in dashboard)
-6. Agent auto-scans LAN for RTSP cameras (192.168.x.x port 554)
-7. Confirm cameras in dashboard, draw zones (drag boxes on snapshot)
-8. Wait ~2 minutes for the agent to finish loading its AI libraries and
-   connect each camera — live alerts start flowing after that
+# Setup for ONLINE mode (not the Offline Site Console)
+1. Register on the web portal (email, phone, store name, country)
+2. Pick a plan or valid trial/extension
+3. From dashboard, click "Install Edge Agent" to download the online package
+4. On Windows, extract ALL files and run VantagAgent.exe; no separate Python install
+5. The account-specific package already contains the cloud connection settings
+6. In the website, add camera/NVR details and test the exact RTSP stream
+7. Confirm an actual decoded frame, save zones, enable detections and start monitoring
+8. Check per-camera/model readiness and real test incidents; startup time varies
+
+# Offline mode and licensing (takes precedence over generic online instructions)
+""" + OFFLINE_GUIDANCE + """
 
 # CCTV & networking knowledge
 - Most IP cameras speak RTSP on port 554. URL pattern: rtsp://user:pass@ip:554/stream1
@@ -113,9 +143,11 @@ snapshots to the Vantag cloud dashboard.
   or /102 for channel 1 sub-stream. Dahua/CP Plus pattern:
   rtsp://user:pass@NVR-IP:554/cam/realmonitor?channel=1&subtype=0
   (subtype=0 main, subtype=1 sub).
-- If the camera/NVR password contains special characters (# @ % : / etc.)
-  they MUST be URL-encoded in the RTSP string (e.g. # becomes %23, @ becomes
-  %40) or the connection will silently fail.
+- In a separate camera password field, enter the original password literally,
+  including #. The app encodes credentials when assembling the RTSP URL.
+  Only in a manually assembled full RTSP URL, encode # as %23 and @ as %40
+  inside the password. Do not change the actual NVR password to these encodings.
+  RTSP 401 indicates rejected authentication/permissions; ping does not prove video access.
 - Pulling many simultaneous RTSP streams from one NVR is CPU/bandwidth
   limited — both on the NVR itself and on the PC running the Edge Agent.
   Symptom: some cameras load fine, others go blank or "offline" after a
@@ -284,14 +316,12 @@ _FALLBACK_KEYWORDS = {
         "Each plan tier covers more cameras. See our Pricing section for details."
     ),
     "setup": (
-        "Setup takes ~30 minutes:\n"
-        "1. Register → pick plan → pay\n"
-        "2. Download Edge Agent from dashboard\n"
-        "3. Run installer on local PC/Pi\n"
-        "4. Paste Cloud URL + Tenant ID\n"
-        "5. Agent auto-scans your LAN for cameras\n"
-        "6. Confirm in dashboard and draw zones\n"
-        "7. Wait ~2 minutes for the agent to finish loading before checking live feed"
+        "First choose online website operation or the separate Windows Offline Site Console. "
+        "For online mode: sign in, obtain valid access, download your account-specific "
+        "package and extract all files. On Windows run VantagAgent.exe; no separate "
+        "Python install or Cloud URL entry is needed. Add camera/NVR details on the "
+        "website, confirm a decoded frame, save zones and enable the required detections. "
+        "For offline setup and availability, read /how-it-works#offline-site-guide."
     ),
     "camera": (
         "Vantag works with any IP camera that speaks RTSP (port 554). "
@@ -331,6 +361,15 @@ _FALLBACK_KEYWORDS = {
 
 def _fallback_reply(user_text: str) -> str:
     low = user_text.lower()
+    if low.strip() == "offline" or any(
+        phrase in low
+        for phrase in (
+            "offline site", "offline console", "offline package", "offline mode",
+            "offline setup", "offline demo", "offline licence", "offline license",
+            "without internet", "no internet", "local console", "local site console",
+        )
+    ):
+        return OFFLINE_GUIDANCE + f"\n\nNeed more help? Email {SUPPORT_EMAIL} when connected."
     for key, answer in _FALLBACK_KEYWORDS.items():
         if key in low:
             return answer + f"\n\nNeed more help? Email {SUPPORT_EMAIL}"
@@ -460,8 +499,68 @@ async def get_faq() -> dict:
     return {
         "categories": [
             {
+                "id": "offline-site-console",
+                "title": "Offline Site Console: Setup, Benefits & Demo Licences",
+                "icon": "HardDrive",
+                "items": [
+                    {
+                        "q": "Can I use Vantag without internet, and how is this different from before?",
+                        "a": OFFLINE_GUIDANCE,
+                    },
+                    {
+                        "q": "How do I set up the offline package step by step?",
+                        "a": "1. On an internet-connected PC, sign in and check Downloads for the separate "
+                             "offline Windows package. If it says Under validation, public installation "
+                             "is not enabled. Do not substitute the standard online package.\n"
+                             "2. Transfer the complete package to the camera PC, extract all files and "
+                             "run VantagAgent.exe. Python is bundled; no separate Python install.\n"
+                             "3. Open the local address shown by the agent on that same PC. Create a "
+                             "local owner login; website credentials do not sign into the local console.\n"
+                             "4. Import the appropriate signed entitlement if required. Set the site "
+                             "timezone, enter the camera/NVR IP, port, credentials, path and channel.\n"
+                             "5. Confirm a decoded frame, save cameras/zones, enable detections and "
+                             "schedules, start monitoring and check readiness. Keep the PC awake.\n"
+                             "6. Run safe controlled scene tests and review local evidence. "
+                             "Read /how-it-works#offline-site-guide for the full guide.",
+                    },
+                    {
+                        "q": "What are the benefits, and which AI features work offline?",
+                        "a": "You can onboard LAN cameras, view the video wall and review local records "
+                             "without a public website, including at exhibitions with no internet. "
+                             "Local operation does not depend on a cloud check at every startup. "
+                             "Only entitled features with ready packaged models and sufficient hardware "
+                             "are supported. Check fall/theft/shelf readiness per camera and test real "
+                             "scenes. A model loading or a simulated incident is not proof of accuracy. "
+                             "Do not assume cloud AI, facial recognition, search or assistant parity. "
+                             "Email/SMS/WhatsApp, cloud dashboards, off-site viewing, payments and "
+                             "website support chat need internet. Offline records do not auto-sync.",
+                    },
+                    {
+                        "q": "How does a superadmin manage customer evaluations and team demos?",
+                        "a": "Sign in as superadmin and open Admin → Offline demos. Use an activation "
+                             "request exported from the target PC to issue its signed device-bound "
+                             "licence. Choose a timed customer/dealer evaluation or a permanent internal "
+                             "team demo licence. Transfer and import the licence on that PC. Every demo "
+                             "PC needs its own request; do not share superadmin access. This screen "
+                             "issues licences; it is not an employee-user management screen. Use Admin "
+                             "→ Tenants for customer accounts/extensions. Demo licences do not mark "
+                             "invoices paid, change subscription/payment dates, or unlock a gated installer.",
+                    },
+                    {
+                        "q": "What happens at customer expiry, and how do I renew without internet?",
+                        "a": "Customer entitlement follows the authorised paid/trial/extension period, "
+                             "then seven days of grace. After grace, live viewing and new AI stop; "
+                             "saved incidents, exports and renewal remain accessible. Export the device "
+                             "request, transfer it to an internet-connected PC, obtain a newer signed "
+                             "entitlement and import it locally. Paying or extending on the website "
+                             "alone cannot update an isolated PC. Permanent internal demo licences "
+                             "are a separate superadmin-controlled entitlement, not a customer billing plan.",
+                    },
+                ],
+            },
+            {
                 "id": "getting-started",
-                "title": "Getting Started",
+                "title": "Getting Started — Online Website Mode",
                 "icon": "Rocket",
                 "diagram": "/images/faq/edge-agent-install-flow.png",
                 "items": [
@@ -477,16 +576,20 @@ async def get_faq() -> dict:
                     },
                     {
                         "q": "How long does setup take?",
-                        "a": "Under 30 minutes for most retailers: register → pay → download "
-                             "Edge Agent → run installer → auto-scan cameras → confirm zones. "
-                             "After the agent starts, allow about 2 minutes for it to finish "
-                             "loading its AI libraries and connect each camera before checking "
-                             "the live feed.",
+                        "a": "Setup time varies with camera credentials, RTSP access, model loading "
+                             "and hardware. For online mode: sign in → obtain valid access → download "
+                             "your account-specific package → extract all files → run VantagAgent.exe "
+                             "on Windows → test decoded video → save cameras/zones and enable AI. "
+                             "No separate Python installation is needed for the Windows package. "
+                             "For disconnected onboarding, use the separate Offline Site Console "
+                             "workflow and check its release availability first.",
                     },
                     {
                         "q": "What if I don't have a PC?",
-                        "a": "A Raspberry Pi 4 or an old Android tablet runs the Edge Agent "
-                             "fine. We also sell a pre-configured Vantag Edge Box.",
+                        "a": "The Offline Site Console needs a compatible Windows 10/11 64-bit PC. "
+                             "Do not assume an Android tablet or Raspberry Pi can run that package. "
+                             "Other online-agent platforms have separate dependencies and capacity "
+                             "requirements; ask support to qualify hardware for your camera workload.",
                     },
                     {
                         "q": "Can I cancel anytime?",
@@ -564,9 +667,12 @@ async def get_faq() -> dict:
                         "a": "The three most common reasons are: (1) wrong IP address — double-check "
                              "it with the steps above, (2) wrong username/password — try the "
                              "defaults listed above, (3) the camera and your PC are on different "
-                             "networks — they must both be connected to the same router. If the "
-                             "password contains special characters (# @ % etc.) they must be "
-                             "URL-encoded (# → %23, @ → %40) or the connection will silently fail.",
+                             "networks — they must both be connected to the same router. In a "
+                             "separate password field, enter the original password including #; "
+                             "the app encodes it when building the URL. Only manually assembled "
+                             "full RTSP URLs need # → %23 and @ → %40 inside the password. "
+                             "Check the exact channel/path and RTSP permissions; RTSP 401 means "
+                             "rejected authentication/permissions, not proof of a network outage.",
                     },
                     {
                         "q": "Can I use wireless (WiFi) cameras, or do they need to be wired?",
@@ -583,10 +689,13 @@ async def get_faq() -> dict:
                     },
                     {
                         "q": "What happens if my internet goes down?",
-                        "a": "Your cameras keep recording and the Edge Agent keeps detecting "
-                             "incidents locally. Events are stored on your PC and automatically "
-                             "sync to the cloud once the internet comes back. You won't lose any "
-                             "detections.",
+                        "a": "In online mode, the hosted website and remote live view require internet. "
+                             "Already-running detection may continue locally and queue events within "
+                             "storage limits, but this is not disconnected onboarding and is not a "
+                             "guarantee of loss-free delivery. The separate Offline Site Console "
+                             "provides local setup/viewing and stores records locally under a valid "
+                             "entitlement; its records do not automatically sync to the website. "
+                             "In either mode, keep the agent PC and camera LAN running.",
                     },
                     {
                         "q": "Does my PC need to be on 24 hours a day?",
@@ -637,10 +746,12 @@ async def get_faq() -> dict:
                     },
                     {
                         "q": "My NVR password has special characters like # or @ — the RTSP link fails.",
-                        "a": "Special characters in the password must be URL-encoded in the RTSP "
-                             "string or the connection silently fails. Common encodings: # → %23, "
-                             "@ → %40, % → %25. Example: a password Pass#1 becomes Pass%231 in the "
-                             "RTSP URL.",
+                        "a": "In the app's separate password field, type the original password, "
+                             "including # or @. The app URL-encodes it when building the stream "
+                             "address. Only when constructing a full RTSP URL manually, encode "
+                             "special characters inside its password: # → %23, @ → %40, % → %25. "
+                             "For example Pass#1 becomes Pass%231 in the URL, not on the NVR. "
+                             "Verify RTSP permissions and the exact channel if authentication fails.",
                     },
                     {
                         "q": "I need to run MORE than 6–8 cameras. What is the recommended setup?",

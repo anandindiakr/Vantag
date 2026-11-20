@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Gem, Hand, RefreshCw, DoorOpen } from 'lucide-react';
 import Seo from '../components/Seo';
+import OfflineSiteGuide from '../components/OfflineSiteGuide';
 
 const Step = ({ num, title, body, icon }: { num: number; title: string; body: string; icon: string }) => (
   <div className="bg-white/5 border border-white/10 rounded-xl p-6">
@@ -54,6 +55,11 @@ export default function HowItWorks({ embedded = false }: { embedded?: boolean })
         <p className="text-xl text-white/70 text-center mb-16 max-w-3xl mx-auto">
           {t('how.subtitle', 'Plug-and-play retail AI. Up and running in under 30 minutes.')}
         </p>
+
+        <OfflineSiteGuide />
+
+        <h2 className="text-2xl font-bold mb-4">Existing online setup: website + Edge Agent</h2>
+        <p className="text-white/70 mb-6">The steps below use the hosted website and require internet. They do not apply to disconnected local-console onboarding.</p>
 
         {/* 6 steps */}
         <div className="grid md:grid-cols-3 gap-5 mb-20">

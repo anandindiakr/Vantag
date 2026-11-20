@@ -10,6 +10,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useRegion } from '../hooks/useRegion';
 import HighValueCounterStory from '../components/HighValueCounterStory';
+import OfflineSiteGuide from '../components/OfflineSiteGuide';
 
 interface FaqItem { q: string; a: string; }
 interface FaqCategory { id: string; title: string; icon: string; diagram?: string; items: FaqItem[]; }
@@ -101,6 +102,10 @@ export default function HelpCenter() {
           <div className="font-bold">{t('help.ql.manual', 'Download User Manual')}</div>
         </button>
       </div>
+
+      <OfflineSiteGuide />
+
+      <p className="text-sm text-white/60 mb-6">The downloadable PDF may describe the earlier online workflow. For the Offline Site Console, use the updated guide above. Website support chat and email need internet.</p>
 
       {/* FAQ */}
       <div className="flex items-center justify-between mb-4">

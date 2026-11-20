@@ -9,6 +9,7 @@
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
+import OfflineSiteGuide from '../components/OfflineSiteGuide';
 
 const CodeBlock: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <pre className="bg-black/60 border border-white/10 rounded-lg p-4 text-sm text-violet-200 overflow-x-auto">
@@ -140,8 +141,9 @@ export default function DownloadPage() {
         )}
       </h1>
       <p className="text-white/60 mb-8">
-        The Edge Agent runs on your local PC/tablet/Raspberry Pi and connects
-        your LAN cameras to Vantag cloud. Choose your platform below.
+        Choose the correct operating mode before downloading. The standard
+        online packages below connect LAN cameras to the hosted website;
+        disconnected setup requires the separate Windows Offline Site Console package.
         <br />
         <span className="text-white/40 text-sm">
           Every platform below downloads the same current version
@@ -163,6 +165,7 @@ export default function DownloadPage() {
           {progress}{busy && ' — keep this page open until it finishes.'}
         </div>
       )}
+      <h2 className="text-2xl font-bold mb-3">Online packages · internet required for the website</h2>
       <p className="mb-4 text-sm text-white/60">The Windows download is approximately 400 MB and may take several minutes. If prompted, choose where to save it.</p>
       <section className="grid md:grid-cols-3 gap-4 mb-12">
         <button
@@ -218,9 +221,11 @@ export default function DownloadPage() {
         {!offlineAvailable && <p className="text-sm text-amber-200 mt-3">Distribution stays blocked until disconnected packaged-app checks and model redistribution approvals are complete. The online agent above does not provide disconnected onboarding.</p>}
       </section>
 
+      <OfflineSiteGuide compact />
+
       {/* ── Installation steps ───────────────────────────────────────────── */}
       <section className="mb-12">
-        <h2 className="text-2xl font-bold mb-6">Installation (5 minutes)</h2>
+        <h2 className="text-2xl font-bold mb-6">Online agent installation</h2>
 
         <div className="space-y-6">
           <div>
@@ -268,12 +273,12 @@ Tenant ID        : ${apiKey}`}</CodeBlock>
           <div>
             <div className="flex items-center gap-3 mb-2">
               <span className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center font-bold">4</span>
-              <h3 className="font-bold text-lg">Agent auto-detects your cameras</h3>
+              <h3 className="font-bold text-lg">Add cameras and test the actual stream</h3>
             </div>
             <p className="text-white/60 ml-11">
-              The agent scans your local network (192.168.x.x) for IP cameras and
-              lists them in your Vantag dashboard. You then confirm which ones
-              belong to which zone.
+              In the website camera setup, enter the camera/NVR credentials and
+              channel. Use auto-detect if needed, then confirm a decoded preview
+              before saving zones. A reachable IP address is not proof of a working stream.
             </p>
           </div>
 
@@ -308,10 +313,11 @@ Tenant ID        : ${apiKey}`}</CodeBlock>
           <details className="bg-white/5 rounded-lg p-4 border border-white/10">
             <summary className="cursor-pointer font-bold">Do I need a PC? Can it run on a phone?</summary>
             <p className="mt-3 text-white/70">
-              Low hardware requirements: any PC, tablet, Raspberry Pi 4 (or
-              newer), or an always-on Android tablet works. For up to 4 cameras, a
-              Pi 4 or an old laptop is plenty. A dedicated phone/tablet version
-              is on the roadmap.
+              The Offline Site Console package is for a Windows 10/11 64-bit PC.
+              Online packages are listed separately for other platforms; their
+              dependencies differ. Camera capacity depends on resolution, enabled
+              models and measured CPU/GPU performance. Do not assume phone, Android
+              tablet or Raspberry Pi support for the offline Windows package.
             </p>
           </details>
 
