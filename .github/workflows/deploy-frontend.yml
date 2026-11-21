@@ -65,7 +65,7 @@ jobs:
             # One build serves every domain (region is detected at runtime
             # from the hostname). build:in only sets the prerender base URL
             # used for absolute SEO URLs in static meta tags.
-            if ! npm run build:in; then
+            if ! npx --no-install playwright install chromium || ! npm run build:in; then
               echo "Build failed — live dist/ untouched"
               rm -rf "$BUILD_DIR"
               exit 1
