@@ -34,7 +34,7 @@ import cv2
 import numpy as np
 
 from .config import CameraConfig, CONFIG_DIR
-from .discovery import diagnose_rtsp
+from .discovery import _describe_stream, diagnose_rtsp
 from .api_client import VantagApiClient
 from .inference import (
     YoloInference, RETAIL_CLASSES,
@@ -467,10 +467,14 @@ class PoseShopliftingDetector:
         l_sh = person.kp(KP_L_SHOULDER)
         r_sh = person.kp(KP_R_SHOULDER)
         shoulders = [s for s in (l_sh, r_sh) if s is not None]
-        if shoulders:
-            center_x = sum(s[0] for s in shoulders) / len(shoulders)
-        else:
-            center_x = person.box.x + person.box.w / 2
+        if not shoulders:
+            return None
+        center_x = sum(s[0] for s in shoulders) / len(shoulders)
+        shoulder_y = sum(s[1] for s in shoulders) / len(shoulders)
+        hip_x = sum(h[0] for h in hips) / len(hips)
+        torso_height = hip_y - shoulder_y
+        if torso_height <= max(0.02, abs(hip_x - center_x) * 1.3):
+            return None
 
         tol = PoseShopliftingDetector.CENTER_TOLERANCE * max(person.box.w, 1e-4)
 
@@ -479,8 +483,7 @@ class PoseShopliftingDetector:
             if wrist is None:
                 continue
             wx, wy = wrist
-            # Below the hip line AND tucked toward the body centerline
-            if wy > hip_y and abs(wx - center_x) < tol:
+            if hip_y < wy <= hip_y + torso_height * 0.35 and abs(wx - center_x) < tol:
                 return side
         return None
 
@@ -2295,12 +2298,19 @@ class CameraWorker:
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
                 if not cap.isOpened():
+                    cap.release()
+                    cap = None
+                    try:
+                        description = _describe_stream(stream_url, 3.0)
+                    except (OSError, ValueError, UnicodeError):
+                        raise ConnectionError('RTSP service unavailable; automatic reconnection will continue.') from None
+                    code = description.get('code')
+                    if code in {401, 403} or description.get('auth_error'):
+                        reason = f'RTSP access rejected ({code})' if code in {401, 403} else 'Unsupported RTSP authentication'
+                        raise PermissionError(reason + '. Camera paused to avoid repeated rejected logins. Check the device account, channel and remote live-view permission; then save this camera or Start / apply configuration to retry. Other cameras continue monitoring.')
                     raise ConnectionError(diagnose_rtsp(stream_url))
 
-                self.is_connected = True
-                self.consecutive_failures = 0
-                self.error_msg = ""
-                log.info(f"[{self.config.name}] RTSP connected")
+                connected_at = time.monotonic()
 
                 frame_count = 0
                 fps_t0 = time.time()
@@ -2328,6 +2338,12 @@ class CameraWorker:
                     if not ret:
                         raise ConnectionError("Frame read failed — stream ended")
 
+                    if not self.is_connected:
+                        log.info('[%s] RTSP video decoded', self.config.name)
+                    self.is_connected = True
+                    self.error_msg = ''
+                    if time.monotonic() - connected_at >= 30:
+                        self.consecutive_failures = 0
                     frame_count += 1
                     fps_frames += 1
 
@@ -2354,17 +2370,15 @@ class CameraWorker:
                 self.consecutive_failures += 1
                 self.error_msg = str(e)
                 log.warning(f"[{self.config.name}] Error: {e} (failures={self.consecutive_failures})")
-                # NEVER permanently give up: NVRs limit concurrent RTSP sessions,
-                # so 6 cameras hitting the same NVR at startup often fail a few
-                # times before slots free up. A permanent stop after 3 failures
-                # left cameras offline forever until an agent restart. Instead,
-                # keep retrying with capped exponential backoff (max 60s).
+                if isinstance(e, PermissionError):
+                    self._stop_event.wait()
+                    continue
                 if self.consecutive_failures == self.MAX_FAILURES:
                     log.error(
                         f"[{self.config.name}] {self.MAX_FAILURES} consecutive failures — "
                         f"will keep retrying every ≤60s (check RTSP URL/NVR session limits)."
                     )
-                backoff = min(2 ** self.consecutive_failures, 60)
+                backoff = min(2 ** min(self.consecutive_failures, 6), 60)
                 log.info(f"[{self.config.name}] Reconnecting in {backoff}s...")
                 self._stop_event.wait(timeout=backoff)
             finally:

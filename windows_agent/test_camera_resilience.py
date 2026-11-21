@@ -17,11 +17,79 @@ def worker_for_capture():
     worker._stop_event = threading.Event()
     worker._target_fps = 5
     worker.consecutive_failures = 0
+    worker.is_connected = False
     worker.MAX_FAILURES = 10
     worker._infer_inflight = threading.Event()
     worker._infer_executor = Mock()
     worker._maybe_push_frame = Mock()
     return worker
+
+
+@pytest.fixture(autouse=True)
+def accepted_stream_description(monkeypatch):
+    monkeypatch.setattr(camera_worker, '_describe_stream', lambda *args: {'code': 200, 'authenticated': True}, raising=False)
+
+
+@pytest.mark.parametrize('code', [401, 403])
+def test_rejected_stream_credentials_pause_without_repeated_camera_logins(monkeypatch, code):
+    worker = worker_for_capture()
+    describe = Mock(return_value={'code': code, 'authenticated': True})
+    capture = Mock()
+    capture.isOpened.return_value = False
+    monkeypatch.setattr(camera_worker, 'diagnose_rtsp', lambda *args: 'No decoded video')
+    monkeypatch.setattr(camera_worker, '_describe_stream', describe)
+    open_capture = Mock(return_value=capture)
+    monkeypatch.setattr(camera_worker.cv2, 'VideoCapture', open_capture)
+    waits = []
+    def wait(timeout=None):
+        waits.append(timeout)
+        worker._stop_event.set()
+    worker._stop_event.wait = wait
+    worker._run()
+    assert describe.call_count == 1
+    open_capture.assert_called_once()
+    capture.release.assert_called_once()
+    assert waits == [None]
+    assert not worker.is_connected
+    assert 'paused' in worker.error_msg.lower()
+    assert str(code) in worker.error_msg
+    assert 'secret' not in worker.error_msg
+
+
+def test_network_failure_keeps_bounded_automatic_reconnection(monkeypatch):
+    worker = worker_for_capture()
+    worker.consecutive_failures = 10000
+    capture = Mock()
+    capture.isOpened.return_value = False
+    monkeypatch.setattr(camera_worker.cv2, 'VideoCapture', lambda *args: capture)
+    monkeypatch.setattr(camera_worker, 'diagnose_rtsp', lambda *args: 'No decoded video')
+    monkeypatch.setattr(camera_worker, '_describe_stream', Mock(side_effect=TimeoutError('private stream')))
+    waits = []
+    def wait(timeout=None):
+        waits.append(timeout)
+        worker._stop_event.set()
+    worker._stop_event.wait = wait
+    worker._run()
+    assert waits == [60]
+    assert 'private stream' not in worker.error_msg
+
+
+def test_open_without_decoded_frames_does_not_reset_failure_backoff(monkeypatch):
+    worker = worker_for_capture()
+    worker.consecutive_failures = 4
+    capture = Mock()
+    capture.isOpened.return_value = True
+    capture.grab.return_value = False
+    monkeypatch.setattr(camera_worker.cv2, 'VideoCapture', lambda *args: capture)
+    waits = []
+    def wait(timeout=None):
+        waits.append(timeout)
+        worker._stop_event.set()
+    worker._stop_event.wait = wait
+    worker._run()
+    assert waits == [32]
+    assert worker.consecutive_failures == 5
+    assert not worker.is_connected
 
 
 def test_failed_capture_releases_nvr_session_before_retry_delay(monkeypatch):
@@ -61,7 +129,10 @@ def test_hot_add_inference_budget_takes_effect_without_reconnect(monkeypatch):
         if len(pushed) == 3:
             worker._stop_event.set()
     worker._maybe_push_frame = push
+    describe = Mock(side_effect=AssertionError('A working stream must not need a separate authentication probe'))
+    monkeypatch.setattr(camera_worker, '_describe_stream', describe)
     worker._run()
+    describe.assert_not_called()
     assert len(pushed) == 3
     assert len(submitted) == 1
 

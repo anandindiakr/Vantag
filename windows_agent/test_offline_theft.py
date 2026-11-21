@@ -75,6 +75,24 @@ def test_ordinary_upright_pose_is_not_a_concealment_event(monkeypatch):
         assert detector.analyse([], np.zeros((360, 640, 3), dtype=np.uint8)) == []
 
 
+@pytest.mark.parametrize('posture', ['hanging_hand', 'horizontal', 'missing_shoulders'])
+def test_non_concealment_posture_does_not_accumulate_a_theft_candidate(monkeypatch, posture):
+    import agent.camera_worker as module
+    person = concealment()
+    if posture == 'hanging_hand':
+        person.keypoints[9] = [0.49, 0.8, 0.9]
+    elif posture == 'horizontal':
+        person.keypoints[5] = [0.2, 0.48, 0.9]
+        person.keypoints[6] = [0.2, 0.50, 0.9]
+        person.keypoints[9] = [0.2, 0.55, 0.9]
+    else:
+        person.keypoints[5:7] = 0
+    detector = analyzer(SimpleNamespace(_session=object(), detect_poses=lambda *args, **kwargs: [person]))
+    for stamp in (100, 101.1, 102.2, 103.3):
+        monkeypatch.setattr(module.time, 'time', lambda: stamp)
+        assert detector.analyse([], np.zeros((360, 640, 3), dtype=np.uint8)) == []
+
+
 def test_pose_error_is_visible_without_breaking_other_analytics():
     def fail(*args, **kwargs):
         raise RuntimeError('model failed')
