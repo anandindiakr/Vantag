@@ -96,6 +96,19 @@ def prepare_offline_bundle() -> list[str]:
 def write_offline_launch_config(directory: Path) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "config.json").write_text(json.dumps({"mode": "offline"}), encoding="utf-8")
+    (directory / "START-OFFLINE.cmd").write_bytes(b'@echo off\r\ncd /d "%~dp0"\r\nstart "" "%~dp0VantagAgent.exe" --offline\r\n')
+
+
+def create_archive(output: Path, archive_path: Path, *, offline: bool) -> None:
+    if offline and json.loads((output / "config.json").read_text(encoding="utf-8")) != {"mode": "offline"}:
+        raise ValueError("Offline archive configuration must contain only the offline mode")
+    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=4, allowZip64=True) as archive:
+        for path in output.rglob("*"):
+            if path.is_file() and path.resolve() != archive_path.resolve():
+                relative = path.relative_to(output).as_posix()
+                if relative == "config.json" and not offline:
+                    continue
+                archive.write(path, relative)
 
 
 def build(offline: bool = False):
@@ -181,10 +194,8 @@ def build(offline: bool = False):
             raise RuntimeError(f"Packaged UI smoke test failed: {ui_result}")
         print(f"Packaged UI smoke test passed: {ui_result}")
 
-    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=4, allowZip64=True) as archive:
-        for path in output.rglob("*"):
-            if path.is_file() and not (offline and path.relative_to(output).as_posix() == "config.json"):
-                archive.write(path, path.relative_to(output).as_posix())
+    create_archive(output, archive_path, offline=offline)
+    with zipfile.ZipFile(archive_path, "a", compression=zipfile.ZIP_DEFLATED, compresslevel=4, allowZip64=True) as archive:
         archive.writestr("PACKAGE_VERSION.txt", __version__)
         if offline:
             archive.writestr("OFFLINE_CAPABILITIES.json", json.dumps({

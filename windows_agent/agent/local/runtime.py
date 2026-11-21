@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import re
+import sqlite3
 import threading
 import time
 import uuid
@@ -28,7 +29,7 @@ class LocalSink:
             return False
         try:
             self.store.record_event(event)
-        except (ValueError, OSError) as exc:
+        except (ValueError, OSError, sqlite3.Error) as exc:
             self.error = f"Evidence could not be saved: {type(exc).__name__}. Check local storage."
             return False
         self.error = ""
@@ -146,7 +147,7 @@ class LocalRuntime:
         sink = LocalSink(self.store, lambda: parent_sink.enabled and self.permitted(), self.event_permitted)
         sink.frames = parent_sink.frames
         sink.lock = parent_sink.lock
-        worker = LocalCameraWorker(config=CameraConfig(**data), inference=self.detector, api_client=sink, target_fps=fps, pose_inference=self.pose, people_count_zones=data.get("people_count_zones", []), inventory_zones=data.get("inventory_zones", []), exclusion_zones=data.get("exclusion_zones", []), detections=data["detections"], product_count_detector=self.products, high_value_counter=data.get("high_value_counter", {}), count_day=lambda: datetime.now(ZoneInfo(self.store.get("site", {}).get("timezone", "UTC"))).strftime("%Y-%m-%d"), detection_policy=detection_policy)
+        worker = LocalCameraWorker(config=CameraConfig(**data), inference=self.detector, api_client=sink, target_fps=fps, pose_inference=self.pose, people_count_zones=data.get("people_count_zones", []), inventory_zones=data.get("inventory_zones", []), restricted_zones=camera.get("restricted_zones", []), exclusion_zones=data.get("exclusion_zones", []), detections=data["detections"], product_count_detector=self.products, high_value_counter=data.get("high_value_counter", {}), count_day=lambda: datetime.now(ZoneInfo(self.store.get("site", {}).get("timezone", "UTC"))).strftime("%Y-%m-%d"), detection_policy=detection_policy)
         worker._local_run_id = str(uuid.uuid4())
         worker._local_sink = sink
         return worker
@@ -326,6 +327,7 @@ class LocalRuntime:
                     "connected": bool(worker.is_connected and frame), "fps": round(worker.current_fps, 1),
                     "connection_error": re.sub(r"rtsp://\S+", "[protected stream]", str(getattr(worker, "error_msg", "")))[:600] if not frame else "",
                     "connection_failures": getattr(worker, "consecutive_failures", 0),
+                    "evidence_error": getattr(getattr(worker, "_local_sink", None), "error", ""),
                     "inference_ms": round(worker.inference_ms, 1), "inference_error": worker.inference_error,
                     "sample_at": worker.count_sample["updated_at"] if worker.count_sample else None,
                     "frame_age_sec": round(time.time() - frame[1], 1) if frame else None,
@@ -334,7 +336,7 @@ class LocalRuntime:
                     "inventory_status": self._analytic_status(worker, configuration, entitlement, timezone_name, "inventory_movement"),
                 })
             return {
-                "running": bool(self.workers), "error": self.error or self.sink.error, "calibration": self.calibration,
+                "running": bool(self.workers), "error": self.error or self.sink.error or next((camera["evidence_error"] for camera in cameras if camera["evidence_error"]), ""), "calibration": self.calibration,
                 "detector": dict(self.detector.status) if self.detector else {}, "cameras": cameras,
                 "camera_capacity": {"configured": len(saved), "enabled": sum(camera.get("enabled", True) for camera in saved.values()), "monitored": len(self.workers), "connected": sum(camera["connected"] for camera in cameras), "entitlement_limit": entitlement.claims.get("camera_limit", 0)},
                 "advanced_features": {

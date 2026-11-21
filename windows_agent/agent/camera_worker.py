@@ -655,6 +655,7 @@ class DetectionAnalyzer:
         product_count_detector: Optional["ProductCountDetector"] = None,
         high_value_counter: Optional[dict] = None,
         count_day: Optional[Callable[[], str]] = None,
+        restricted_zones: Optional[list[dict]] = None,
     ):
         self.camera_id = camera_id
         self.cooldown_sec = cooldown_sec
@@ -727,6 +728,8 @@ class DetectionAnalyzer:
         # mirror/TV reflecting people, or an out-of-scope neighboring aisle.
         # Any box whose center falls inside one of these is dropped before
         # any alert/count logic runs (see _filter_exclusions below).
+        self._restricted_zones = restricted_zones
+        self._restricted_present: set[str] = set()
         self._exclusion_zones = exclusion_zones or []
 
         # Shelf/inventory-movement zones (Zone Editor "Shelf" type), fed to
@@ -1787,8 +1790,27 @@ class DetectionAnalyzer:
             self._person_with_items.clear()
 
         # 2. Restricted Zone: person stationary for >30s
+        if self._restricted_zones is not None:
+            present: set[str] = set()
+            if self._is_enabled("restricted_zone"):
+                height, width = frame.shape[:2]
+                for index, zone in enumerate(self._restricted_zones):
+                    bounds = self._zone_pixel_bbox(zone, width, height)
+                    if bounds is None:
+                        continue
+                    left, top, right, bottom = bounds
+                    inside = [person for person in persons if left <= (person.x + person.w / 2) * width <= right and top <= (person.y + person.h / 2) * height <= bottom]
+                    zone_id = str(zone.get("id") or index)
+                    if inside:
+                        present.add(zone_id)
+                        if zone_id not in self._restricted_present:
+                            event = self._emit("restricted_zone", max(person.confidence for person in inside), inside, frame, extra_metadata={"zone_id": zone_id, "zone_label": str(zone.get("label", "Restricted area")), "method": "person_center_zone_entry", "requires_review": True}, cooldown_key=f"restricted_zone:{zone_id}")
+                            if event:
+                                events.append(event)
+            self._restricted_present = present
+
         dwell_seen_keys: set[str] = set()
-        for p in persons:
+        for p in persons if self._restricted_zones is None else []:
             key = f"dwell_{int(p.x * 100)}_{int(p.y * 100)}"
             dwell_seen_keys.add(key)
             # Temporal smoothing (v1.5.1): if this exact spot wasn't matched
@@ -2054,6 +2076,7 @@ class CameraWorker:
         product_count_detector: Optional["ProductCountDetector"] = None,
         high_value_counter: Optional[dict] = None,
         count_day: Optional[Callable[[], str]] = None,
+        restricted_zones: Optional[list[dict]] = None,
     ):
         self.config = config
         self._inference = inference
@@ -2073,6 +2096,7 @@ class CameraWorker:
             product_count_detector=product_count_detector,
             high_value_counter=high_value_counter,
             count_day=count_day,
+            restricted_zones=restricted_zones,
         )
         self.count_sample = None
         self.inference_error = ""
@@ -2154,8 +2178,8 @@ class CameraWorker:
     def stop(self):
         self._stop_event.set()
         if self._thread:
-            self._thread.join(timeout=5)
-        self._infer_executor.shutdown(wait=False)
+            self._thread.join(timeout=20)
+        self._infer_executor.shutdown(wait=True, cancel_futures=True)
         log.info(f"[{self.config.name}] Worker stopped")
 
     # People counting uses a LOWER confidence than alerting: overhead/angled
@@ -2260,8 +2284,6 @@ class CameraWorker:
             log.debug(f"[{self.config.name}] Count snapshot push failed: {e}")
 
     def _run(self):
-        frame_interval = 1.0 / self._target_fps
-
         while not self._stop_event.is_set():
             cap = None
             try:
@@ -2316,7 +2338,7 @@ class CameraWorker:
                         fps_t0 = time.time()
 
                     now = time.time()
-                    if now - last_infer >= frame_interval and not self._infer_inflight.is_set():
+                    if now - last_infer >= 1.0 / max(0.01, self._target_fps) and not self._infer_inflight.is_set():
                         last_infer = now
                         self._infer_inflight.set()
                         self._infer_executor.submit(self._run_inference, frame.copy())
@@ -2324,7 +2346,11 @@ class CameraWorker:
                     self._maybe_push_frame(frame)
 
             except Exception as e:
+                if cap is not None:
+                    cap.release()
+                    cap = None
                 self.is_connected = False
+                self.current_fps = 0.0
                 self.consecutive_failures += 1
                 self.error_msg = str(e)
                 log.warning(f"[{self.config.name}] Error: {e} (failures={self.consecutive_failures})")

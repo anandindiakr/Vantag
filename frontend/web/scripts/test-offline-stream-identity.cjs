@@ -67,7 +67,7 @@ const { chromium } = require('playwright');
     await page.getByRole('status').filter({ hasText: 'Saved for next start' }).waitFor();
     assert.equal(posts[1].rtsp_url, 'rtsp://viewer:test%23password@192.168.50.84:554/cam/realmonitor?channel=5&subtype=0');
     await page.getByRole('button', { name: 'Licence & health', exact: true }).click();
-    await page.getByText('Incomplete: legacy stationary-person dwell heuristic', { exact: false }).waitFor();
+    await page.getByText('Person-centre entry/presence candidates in a saved restricted rectangle.', { exact: false }).waitFor();
     await page.getByText('Candidate heuristics only:', { exact: false }).waitFor();
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ ok: true, checks: 15, real_camera_accuracy_tested: false }));

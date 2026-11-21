@@ -56,6 +56,7 @@ class CameraInput(BaseModel):
     detection_schedule: ScheduleInput = Field(default_factory=ScheduleInput)
     people_count_zones: list[dict] = Field(default_factory=list, max_length=20)
     inventory_zones: list[dict] = Field(default_factory=list, max_length=20)
+    restricted_zones: list[dict] = Field(default_factory=list, max_length=20)
     exclusion_zones: list[dict] = Field(default_factory=list, max_length=20)
 
 
@@ -190,7 +191,7 @@ def create_app(store, licence, runtime, assets: Path | None = None) -> FastAPI:
             validate_stream(data["rtsp_url"])
         if any(enabled and feature not in entitlement.claims["features"] for feature, enabled in data["detections"].items()):
             raise HTTPException(403, "A selected AI function is not included in this entitlement")
-        for key in ("people_count_zones", "inventory_zones", "exclusion_zones"):
+        for key in ("people_count_zones", "inventory_zones", "exclusion_zones", "restricted_zones"):
             for zone in data[key]:
                 box = zone.get("bbox", [])
                 if len(box) != 4 or not all(isinstance(value, (int, float)) and 0 <= value <= 1 for value in box) or box[0] >= box[2] or box[1] >= box[3]:
