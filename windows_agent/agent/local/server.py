@@ -9,10 +9,11 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from starlette.background import BackgroundTask
 from fastapi.responses import FileResponse, HTMLResponse
@@ -46,6 +47,42 @@ class OnvifInput(BaseModel):
     profile_token: str = Field(default="", max_length=200)
 
 
+class ReviewInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    state: Literal['candidate', 'confirmed', 'dismissed']
+    note: str = Field(default='', max_length=2000)
+
+
+class PersonQualityInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    mode: Literal['precision', 'balanced'] = 'balanced'
+    confidence: float = Field(default=0.6, ge=0.4, le=0.95)
+    confirmation_frames: int = Field(default=3, ge=2, le=10)
+
+
+class PeopleSettingsInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    capture_enabled: bool = False
+    recognition_enabled: bool = False
+    retention_days: int = Field(default=7, ge=1, le=30)
+    authorised: bool = False
+
+
+class StaffInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    staff_code: str = Field(min_length=1, max_length=80, pattern=r'\S')
+    name: str = Field(min_length=1, max_length=200, pattern=r'\S')
+    consent: bool
+    consent_note: str = Field(min_length=10, max_length=1000)
+    photos: list[str] = Field(min_length=3, max_length=5)
+
+
+class LinkInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    target_id: str = Field(min_length=1, max_length=64)
+    state: Literal['confirmed', 'rejected']
+
+
 class CameraInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: str | None = Field(default=None, max_length=64)
@@ -54,6 +91,7 @@ class CameraInput(BaseModel):
     enabled: bool = True
     detections: dict[str, bool] = Field(default_factory=dict)
     detection_schedule: ScheduleInput = Field(default_factory=ScheduleInput)
+    person_quality: PersonQualityInput = Field(default_factory=PersonQualityInput)
     people_count_zones: list[dict] = Field(default_factory=list, max_length=20)
     inventory_zones: list[dict] = Field(default_factory=list, max_length=20)
     restricted_zones: list[dict] = Field(default_factory=list, max_length=20)
@@ -322,6 +360,83 @@ def create_app(store, licence, runtime, assets: Path | None = None) -> FastAPI:
     @app.get("/api/events")
     def events():
         return store.events()
+
+    @app.get("/api/incidents")
+    def incident_report(q: str = Query('', max_length=200), camera_id: str = Query('', max_length=64), event_type: str = Query('', max_length=80), start_day: str = '', end_day: str = '', min_people: int | None = Query(None, ge=0, le=10000), review_state: Literal['', 'candidate', 'confirmed', 'dismissed'] = '', page: int = Query(1, ge=1, le=1000000), page_size: int = Query(50, ge=1, le=1000)):
+        return store.incident_search(q=q, camera_id=camera_id, event_type=event_type, start_day=start_day, end_day=end_day, min_people=min_people, review_state=review_state, page=page, page_size=page_size)
+
+    @app.post("/api/incidents/{event_id}/review")
+    def review_saved_incident(event_id: str, body: ReviewInput):
+        from .reports import review_incident
+        try:
+            review_incident(store, event_id, body.state, body.note)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        return {"ok": True}
+
+    def people_tools():
+        tools = getattr(runtime, 'people', None)
+        if tools is None:
+            raise HTTPException(503, 'Local people tools unavailable in this build')
+        return tools
+
+    @app.exception_handler(LookupError)
+    async def missing_record(request, error):
+        return Response(content=json.dumps({'detail': str(error)}), status_code=404, media_type='application/json')
+
+    @app.get('/api/people/settings')
+    def people_settings():
+        tools = people_tools()
+        return {'settings': tools.settings(), 'status': dict(tools.status), 'faces': dict(tools.faces.status)}
+
+    @app.post('/api/people/settings')
+    def save_people_settings(body: PeopleSettingsInput):
+        return people_tools().configure(body.model_dump())
+
+    @app.get('/api/people/staff')
+    def staff_directory():
+        return people_tools().staff()
+
+    @app.post('/api/people/staff')
+    def enrol_staff(body: StaffInput):
+        return people_tools().enrol(body.model_dump())
+
+    @app.delete('/api/people/staff/{staff_id}')
+    def delete_staff(staff_id: str):
+        people_tools().delete_staff(staff_id)
+        return {'ok': True}
+
+    @app.get('/api/people/observations')
+    def people_observations(camera_id: str = Query('', max_length=64), page: int = Query(1, ge=1, le=1000000)):
+        return people_tools().observations(camera_id=camera_id, page=page)
+
+    @app.delete('/api/people/observations')
+    def clear_people_observations():
+        people_tools().clear_observations()
+        return {'ok': True}
+
+    @app.get('/api/people/observations/{identifier}/thumbnail')
+    def people_thumbnail(identifier: str):
+        tools = people_tools()
+        tools.prune()
+        return Response(tools.thumbnail(identifier), media_type='image/jpeg')
+
+    @app.get('/api/people/observations/{identifier}/candidates')
+    def people_candidates(identifier: str, minutes: int = Query(30, ge=1, le=1440)):
+        return people_tools().candidates(identifier, minutes=minutes)
+
+    @app.post('/api/people/observations/{identifier}/links')
+    def review_person_link(identifier: str, body: LinkInput):
+        tools = people_tools()
+        tools.prune()
+        tools.review_link(identifier, body.target_id, body.state)
+        return tools.timeline(identifier)
+
+    @app.get('/api/people/observations/{identifier}/timeline')
+    def person_timeline(identifier: str):
+        tools = people_tools()
+        tools.prune()
+        return tools.timeline(identifier)
 
     @app.get("/api/counts")
     def counts(day: str):

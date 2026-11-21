@@ -59,6 +59,8 @@ class LocalRuntime:
         self.store = store
         self.licence = licence
         self.model_dir = model_dir
+        from .people import LocalPeopleTools
+        self.people = LocalPeopleTools(store, licence, model_dir)
         self.sink = LocalSink(store, self.permitted, self.event_permitted)
         self.workers = []
         self.detector = None
@@ -147,7 +149,7 @@ class LocalRuntime:
         sink = LocalSink(self.store, lambda: parent_sink.enabled and self.permitted(), self.event_permitted)
         sink.frames = parent_sink.frames
         sink.lock = parent_sink.lock
-        worker = LocalCameraWorker(config=CameraConfig(**data), inference=self.detector, api_client=sink, target_fps=fps, pose_inference=self.pose, people_count_zones=data.get("people_count_zones", []), inventory_zones=data.get("inventory_zones", []), restricted_zones=camera.get("restricted_zones", []), exclusion_zones=data.get("exclusion_zones", []), detections=data["detections"], product_count_detector=self.products, high_value_counter=data.get("high_value_counter", {}), count_day=lambda: datetime.now(ZoneInfo(self.store.get("site", {}).get("timezone", "UTC"))).strftime("%Y-%m-%d"), detection_policy=detection_policy)
+        worker = LocalCameraWorker(config=CameraConfig(**data), inference=self.detector, api_client=sink, target_fps=fps, pose_inference=self.pose, people_count_zones=data.get("people_count_zones", []), inventory_zones=data.get("inventory_zones", []), restricted_zones=camera.get("restricted_zones", []), exclusion_zones=data.get("exclusion_zones", []), detections=data["detections"], product_count_detector=self.products, high_value_counter=data.get("high_value_counter", {}), count_day=lambda: datetime.now(ZoneInfo(self.store.get("site", {}).get("timezone", "UTC"))).strftime("%Y-%m-%d"), detection_policy=detection_policy, person_quality=camera.get('person_quality', {}), people_observer=self.people)
         worker._local_run_id = str(uuid.uuid4())
         worker._local_sink = sink
         return worker
@@ -242,9 +244,15 @@ class LocalRuntime:
     def close(self) -> None:
         self.stopping.set()
         self.stop()
+        self.people.close()
 
     def _supervise(self) -> None:
         while not self.stopping.wait(1):
+            if int(time.monotonic()) % 60 == 0:
+                try:
+                    self.people.prune()
+                except Exception as exc:
+                    self.people.status['error'] = f'Observation retention cleanup failed: {type(exc).__name__}'
             try:
                 with self.lock:
                     if not self.permitted():
@@ -300,6 +308,8 @@ class LocalRuntime:
             saved = {camera["id"]: camera for camera in self.store.cameras()}
             entitlement = self.licence.status()
             timezone_name = self.store.get("site", {}).get("timezone", "UTC")
+            people = getattr(self, 'people', None)
+            face_status = dict(people.faces.status) if people else {}
             for worker in self.workers:
                 frame = self.sink.frame(worker.config.id)
                 configuration = saved.get(worker.config.id, {})
@@ -332,6 +342,7 @@ class LocalRuntime:
                     "sample_at": worker.count_sample["updated_at"] if worker.count_sample else None,
                     "frame_age_sec": round(time.time() - frame[1], 1) if frame else None,
                     "fall_status": fall_status,
+                    "person_quality": dict(getattr(getattr(getattr(worker, '_analyzer', None), '_person_quality', None), 'status', {})),
                     "theft_status": self._analytic_status(worker, configuration, entitlement, timezone_name, "shoplifting"),
                     "inventory_status": self._analytic_status(worker, configuration, entitlement, timezone_name, "inventory_movement"),
                 })
@@ -339,8 +350,10 @@ class LocalRuntime:
                 "running": bool(self.workers), "error": self.error or self.sink.error or next((camera["evidence_error"] for camera in cameras if camera["evidence_error"]), ""), "calibration": self.calibration,
                 "detector": dict(self.detector.status) if self.detector else {}, "cameras": cameras,
                 "camera_capacity": {"configured": len(saved), "enabled": sum(camera.get("enabled", True) for camera in saved.values()), "monitored": len(self.workers), "connected": sum(camera["connected"] for camera in cameras), "entitlement_limit": entitlement.claims.get("camera_limit", 0)},
+                "people_tools": {**people.status, "settings": people.settings(), "faces": face_status} if people else {},
                 "advanced_features": {
-                    "staff_matching": "unavailable: local model redistribution not qualified",
+                    "staff_matching": "Opt-in local YuNet + SFace; field accuracy unverified" if face_status.get('available') else face_status.get('error', 'Face models not checked; enable recognition to check'),
+                    "cross_camera_tracking": "Operator-reviewed appearance search; no guaranteed identity or blind-spot continuity",
                     "visual_verification": "unavailable: no qualified local VLM bundled",
                     "visual_search": "unavailable: local embedding package not qualified",
                     "assistant": "unavailable: no qualified local assistant bundled",

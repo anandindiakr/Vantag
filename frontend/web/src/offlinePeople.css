@@ -1,0 +1,9 @@
+.people-tools { display: grid; gap: 20px; }
+.people-tools textarea { min-height: 80px; width: 100%; }
+.observation-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 16px; margin: 16px 0; }
+.observation { padding: 14px; border: 1px solid #334155; border-radius: 10px; min-width: 0; }
+.observation img { display: block; height: 180px; max-width: 100%; margin: 0 auto 12px; object-fit: contain; background: #0f172a; }
+.observation p { overflow-wrap: anywhere; font-size: .9rem; }
+.selected-observation { max-width: 300px; margin-bottom: 14px; border-color: #2dd4bf; }
+.staff-row { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; border-top: 1px solid #334155; padding: 16px 0; }
+.people-tools fieldset { min-width: 0; }

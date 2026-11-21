@@ -71,7 +71,7 @@ class SiteStore:
         self.path = self.directory / "site.sqlite3"
         self.lock = threading.RLock()
         with self.connect() as connection:
-            if connection.execute("PRAGMA user_version").fetchone()[0] > 1:
+            if connection.execute("PRAGMA user_version").fetchone()[0] > 2:
                 raise RuntimeError("This site database requires a newer agent; restore a compatible backup instead of downgrading")
             connection.executescript("""
                 PRAGMA journal_mode=WAL;
@@ -82,7 +82,14 @@ class SiteStore:
                 CREATE TABLE IF NOT EXISTS count_sessions (camera_id TEXT NOT NULL, day TEXT NOT NULL, run_id TEXT NOT NULL, entries INTEGER NOT NULL, PRIMARY KEY(camera_id, day, run_id));
                 CREATE TABLE IF NOT EXISTS counts (camera_id TEXT NOT NULL, day TEXT NOT NULL, people_visible INTEGER NOT NULL, updated_at REAL NOT NULL, PRIMARY KEY(camera_id, day));
                 CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY, created_at REAL NOT NULL, action TEXT NOT NULL);
-                PRAGMA user_version=1;
+                CREATE TABLE IF NOT EXISTS staff_profiles (id TEXT PRIMARY KEY, staff_code TEXT NOT NULL UNIQUE COLLATE NOCASE, name TEXT NOT NULL, consent_note TEXT NOT NULL, consent_at REAL NOT NULL, templates TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS person_observations (id TEXT PRIMARY KEY, camera_id TEXT NOT NULL, run_id TEXT NOT NULL, track_id INTEGER NOT NULL, first_seen REAL NOT NULL, last_seen REAL NOT NULL, descriptor TEXT NOT NULL, thumbnail TEXT NOT NULL, staff_id TEXT, staff_score REAL);
+                CREATE INDEX IF NOT EXISTS person_observation_time ON person_observations(last_seen DESC);
+                CREATE TABLE IF NOT EXISTS person_links (seed_id TEXT NOT NULL, target_id TEXT NOT NULL, state TEXT NOT NULL, reviewed_at REAL NOT NULL, PRIMARY KEY(seed_id,target_id));
+                CREATE TABLE IF NOT EXISTS incident_reviews (event_id TEXT PRIMARY KEY, state TEXT NOT NULL, note TEXT NOT NULL, reviewed_at REAL NOT NULL);
+                CREATE INDEX IF NOT EXISTS events_created ON events(created_at DESC, id DESC);
+                CREATE INDEX IF NOT EXISTS events_camera_created ON events(camera_id, created_at DESC);
+                PRAGMA user_version=2;
             """)
 
     @contextmanager
@@ -217,6 +224,10 @@ class SiteStore:
         with self.connect() as connection:
             rows = connection.execute("SELECT created_at, data FROM events ORDER BY created_at DESC LIMIT ?", (min(1000, max(1, limit)),)).fetchall()
         return [dict(json.loads(row["data"]), recorded_at=row["created_at"]) for row in rows]
+
+    def incident_search(self, **filters) -> dict:
+        from .reports import search_incidents
+        return search_incidents(self, **filters)
 
     def record_count(self, camera_id: str, day: str, visible: int, entries: int, run_id: str, updated_at: float | None = None) -> None:
         if min(visible, entries) < 0:

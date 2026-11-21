@@ -75,8 +75,13 @@ def prepare_offline_bundle() -> list[str]:
     ui = REPO / "frontend" / "web" / "dist-offline"
     if not (ui / "offline.html").is_file() or not (ui / "assets").is_dir():
         raise FileNotFoundError("Build the offline console assets first")
+    from prepare_face_models import prepare_face_models
+    prepare_face_models(BUILD_MODELS)
+    sys.path.insert(0, str(ROOT))
+    from agent.local.faces import LocalFaceEngine
+    LocalFaceEngine(BUILD_MODELS).initialize()
     hashes = {}
-    for name in ("yolo26n.onnx", "yolov8n-pose.onnx", "yolov8s-worldv2.pt", "hand_landmarker.task"):
+    for name in ("yolo26n.onnx", "yolov8n-pose.onnx", "yolov8s-worldv2.pt", "hand_landmarker.task", "face-manifest.json", "face_detection_yunet_2026may.onnx", "face_recognition_sface_2021dec.onnx", "face_detection_yunet-LICENSE.txt", "face_recognition_sface-LICENSE.txt"):
         with (BUILD_MODELS / name).open("rb") as source:
             hashes[name] = hashlib.file_digest(source, "sha256").hexdigest()
     (BUILD_MODELS / "offline-manifest.json").write_text(json.dumps({"version": 1, "sha256": hashes}, indent=2), encoding="utf-8")
@@ -202,7 +207,8 @@ def build(offline: bool = False):
                 "version": __version__, "disconnected_core_validated": False,
                 "commercial_redistribution_approved": False,
                 "status": "development; not qualified for customer distribution",
-                "unavailable": ["staff_matching", "visual_verification", "visual_search", "assistant", "high_value_counter"],
+                "unavailable": ["visual_verification", "visual_search", "assistant", "high_value_counter"],
+                "engineering_features_unqualified_in_field": ["staff_matching", "cross_camera_appearance_search", "precision_person_validation"],
             }, indent=2))
     print(f"Package: {archive_path}")
     print(f"Compressed bytes: {archive_path.stat().st_size}")

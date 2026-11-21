@@ -82,8 +82,6 @@ class _Track:
         self.hits += 1
         self.age += 1
         self.time_since_update = 0
-        if self.hits >= 2:
-            self.confirmed = True
 
 
 class ByteTracker:
@@ -148,6 +146,7 @@ class ByteTracker:
                         best_track, best_iou = tr, iou
                 if best_track is not None:
                     best_track.assign(det)
+                    best_track.confirmed = best_track.hits >= self.min_hits
                     matched_track_ids.add(id(best_track))
                     det.track_id = best_track.id
                     det.track_confirmed = best_track.confirmed
@@ -166,6 +165,7 @@ class ByteTracker:
         for det in high:
             if det.track_id is None:
                 tr = _Track(next(self._next_id), det)
+                tr.confirmed = self.min_hits <= 1
                 new_tracks.append(tr)
                 det.track_id = tr.id
                 det.track_confirmed = tr.confirmed

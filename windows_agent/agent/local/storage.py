@@ -11,6 +11,7 @@ from contextlib import closing
 from pathlib import Path
 
 TABLES = ("cameras", "events", "count_sessions", "counts")
+PEOPLE_TABLES = ('incident_reviews', 'staff_profiles', 'person_observations', 'person_links')
 
 
 def storage_status(store) -> dict:
@@ -63,14 +64,22 @@ def restore_backup(store, archive_path: Path) -> None:
             raise ValueError("Unsupported backup version")
         with closing(sqlite3.connect((staging / "site.sqlite3").as_uri() + "?mode=ro", uri=True)) as source:
             source.execute("PRAGMA trusted_schema=OFF")
-            if source.execute("PRAGMA user_version").fetchone()[0] != 1 or source.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+            version = source.execute("PRAGMA user_version").fetchone()[0]
+            if version not in (1, 2) or source.execute("PRAGMA quick_check").fetchone()[0] != "ok":
                 raise ValueError("Backup database integrity or version check failed")
-            for table in (*TABLES, "settings"):
+            tables = TABLES + PEOPLE_TABLES if version == 2 else TABLES
+            for table in (*tables, "settings"):
                 schema = source.execute("SELECT type, sql FROM sqlite_master WHERE name=?", (table,)).fetchone()
                 if not schema or schema[0] != "table" or not schema[1].upper().startswith("CREATE TABLE"):
                     raise ValueError("Backup schema is not supported")
             for stream, in source.execute("SELECT stream FROM cameras"):
                 validate_stream(unprotect(stream))
+            if version == 2:
+                for templates, in source.execute('SELECT templates FROM staff_profiles'):
+                    json.loads(unprotect(templates))
+                for descriptor, thumbnail in source.execute('SELECT descriptor,thumbnail FROM person_observations'):
+                    json.loads(unprotect(descriptor))
+                    unprotect(thumbnail)
             evidence = staging / "evidence"
             if evidence.is_dir():
                 target = store.directory / "evidence"
@@ -82,7 +91,10 @@ def restore_backup(store, archive_path: Path) -> None:
                 for path in evidence.iterdir():
                     path.replace(target / path.name)
             with store.connect() as connection:
-                for table in TABLES:
+                connection.execute('PRAGMA secure_delete=ON')
+                for table in PEOPLE_TABLES:
+                    connection.execute(f'DELETE FROM {table}')
+                for table in tables:
                     connection.execute(f"DELETE FROM {table}")
                     columns = source.execute(f"PRAGMA table_info({table})").fetchall()
                     placeholders = ",".join("?" for _ in columns)

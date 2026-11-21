@@ -1736,6 +1736,10 @@ class DetectionAnalyzer:
             if count_persons is not None:
                 count_persons = self._filter_exclusions(count_persons, fw, fh)
 
+        quality = getattr(self, '_person_quality', None)
+        if quality is not None:
+            boxes, count_persons = quality.filter(boxes, count_persons if count_persons is not None else [box for box in boxes if box.label == 'person'], frame)
+
         persons     = [b for b in boxes if b.label == "person"]
         items       = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "high_value_item"]
         shelf_items = [b for b in boxes if RETAIL_CLASSES.get(b.label) == "shelf_item"]
@@ -1749,6 +1753,10 @@ class DetectionAnalyzer:
         # used for accurate, never-double-counted footfall below. Does not
         # change the live count itself.
         tracked = self._tracker.update(count_boxes)
+        if quality is not None:
+            tracked = [box for box in tracked if box.track_confirmed]
+            persons = [box for box in persons if any(self._boxes_overlap(box, candidate, threshold=.5) for candidate in tracked)]
+        self.last_person_boxes = tracked
         self.last_person_count = len(tracked)
         self._count_window.append((now, self.last_person_count))
         # ZONE count = persons inside the drawn zone (falls back to the full
@@ -2215,7 +2223,7 @@ class CameraWorker:
             self.count_sample = {"day": self._analyzer._entries_day, "visible": self._analyzer.last_person_count, "entries": self._analyzer.entries_today, "updated_at": time.time()}
             self.inference_ms = (time.monotonic() - started) * 1000
             self.inference_error = ""
-            self._maybe_push_count_snapshot(frame, count_persons)
+            self._maybe_push_count_snapshot(frame, getattr(self._analyzer, 'last_person_boxes', count_persons))
             for event in events:
                 log.info(
                     f"[{self.config.name}] Event: {event['event_type']} "
